@@ -1148,7 +1148,7 @@ export const AprobacionCreditos: React.FC = () => {
             <div className="bg-slate-100/80 p-0.5 rounded-2xl border border-slate-200/50 flex gap-0.5 shadow-inner">
               <button
                 onClick={() => setViewMode('kanban')}
-                className={`w-40 h-8.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                className={`w-40 h-8.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   viewMode === 'kanban'
                     ? 'bg-[#0054A6] text-white shadow-sm'
                     : 'text-slate-500 hover:text-[#0054A6] hover:bg-blue-50/50'
@@ -1159,7 +1159,7 @@ export const AprobacionCreditos: React.FC = () => {
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`w-40 h-8.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                className={`w-40 h-8.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   viewMode === 'list'
                     ? 'bg-[#0054A6] text-white shadow-sm'
                     : 'text-slate-500 hover:text-[#0054A6] hover:bg-blue-50/50'
