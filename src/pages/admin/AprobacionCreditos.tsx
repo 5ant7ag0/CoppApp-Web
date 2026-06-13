@@ -244,11 +244,12 @@ export const AprobacionCreditos: React.FC = () => {
   const [minAmount, setMinAmount] = useState<string>('');
   const [maxAmount, setMaxAmount] = useState<string>('');
   const [selectedOfficer, setSelectedOfficer] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
 
   // Reset de página al cambiar filtros
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, dateFilter, startDate, endDate, minAmount, maxAmount, selectedOfficer]);
+  }, [searchQuery, dateFilter, startDate, endDate, minAmount, maxAmount, selectedOfficer, selectedStatus]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type });
@@ -859,6 +860,11 @@ export const AprobacionCreditos: React.FC = () => {
       });
     }
 
+    // 5. Filtro por Estado
+    if (selectedStatus !== 'all') {
+      result = result.filter(s => s.estado === selectedStatus);
+    }
+
     // Ordenamiento
     result.sort((a, b) => {
       let valA: any;
@@ -936,7 +942,8 @@ export const AprobacionCreditos: React.FC = () => {
     endDate !== '' || 
     minAmount !== '' || 
     maxAmount !== '' || 
-    selectedOfficer !== 'all';
+    selectedOfficer !== 'all' ||
+    selectedStatus !== 'all';
 
   // Limpiar todos los filtros
   const handleClearFilters = () => {
@@ -947,6 +954,7 @@ export const AprobacionCreditos: React.FC = () => {
     setMinAmount('');
     setMaxAmount('');
     setSelectedOfficer('all');
+    setSelectedStatus('all');
   };
 
   // Clasificación de Columnas Kanban (usando data filtrada)
@@ -1069,18 +1077,34 @@ export const AprobacionCreditos: React.FC = () => {
       <div className="bg-white rounded-[2rem] border border-slate-100 p-4 shadow-[0_4px_12px_rgba(0,0,0,0.01)] space-y-3 no-print">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           
-          {/* Buscador Principal */}
-          <div className="relative flex-1">
-            <input
-              type="text"
-              placeholder="Buscar socio, cédula o número de crédito..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-xs font-semibold text-slate-700 bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 focus:border-[#0054A6]"
-            />
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-450">
-              <Filter className="h-4 w-4" />
+          {/* Buscador Principal y Filtro de Estado */}
+          <div className="flex flex-1 gap-2.5 items-center">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Buscar socio, cédula o número de crédito..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 text-xs font-semibold text-slate-700 bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 focus:border-[#0054A6]"
+              />
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-450">
+                <Filter className="h-4 w-4" />
+              </div>
             </div>
+
+            {/* Filtro por Estado */}
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="p-2 px-3 rounded-2xl border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 bg-slate-50/50 h-9.5 shrink-0 cursor-pointer shadow-sm"
+            >
+              <option value="all">Todos los estados</option>
+              <option value="SOLICITADO">Pendientes</option>
+              <option value="EN_REVISION">En Análisis</option>
+              <option value="APROBADO">Aprobados</option>
+              <option value="DESEMBOLSADO">Desembolsados</option>
+              <option value="RECHAZADO">Rechazados</option>
+            </select>
           </div>
 
           <div className="flex items-center gap-2.5">
