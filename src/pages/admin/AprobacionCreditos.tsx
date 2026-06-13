@@ -59,6 +59,28 @@ const formatCurrency = (val: number | undefined | null) => {
   return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
+// Formateador de fecha a formato regional (dd/mm/yyyy)
+const formatFechaStr = (dateStr?: string) => {
+  if (!dateStr) return 'N/A';
+  try {
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split('T')[0].split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  } catch {
+    return dateStr;
+  }
+};
+
+
 // Conversor de Números a Letras en Español para Respaldo Legal
 const numeroALetras = (num: number): string => {
   const unidades = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
@@ -1197,7 +1219,7 @@ export const AprobacionCreditos: React.FC = () => {
                     className="flex-1 bg-white border border-slate-200 hover:bg-blue-50/60 text-slate-650 hover:text-[#0054A6] hover:border-blue-200 font-bold rounded-2xl h-11 text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm disabled:opacity-50"
                   >
                     <Printer className="h-4 w-4" />
-                    Imprimir Amortización
+                    Imprimir Tabla de Amortización
                   </Button>
                 </div>
               )}
@@ -1637,7 +1659,7 @@ export const AprobacionCreditos: React.FC = () => {
       {/* Modal: Visor de Pagaré Firmado Custodiado */}
       {verPagareCredito && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in select-none">
-          <Card className="w-full max-w-lg bg-white rounded-[2rem] border border-slate-100 p-6 md:p-8 shadow-2xl flex flex-col justify-between relative overflow-hidden animate-scale-up">
+          <Card className="w-full max-w-lg bg-white rounded-[2rem] border border-slate-100 p-5 md:p-6 shadow-2xl flex flex-col justify-between relative max-h-[96vh] overflow-y-auto transform transition-all duration-300 animate-scale-up">
             
             <button 
               onClick={() => setVerPagareCredito(null)}
@@ -1646,9 +1668,9 @@ export const AprobacionCreditos: React.FC = () => {
               <X className="h-4 w-4" />
             </button>
 
-            <div className="flex flex-col items-center text-center pb-3 border-b border-slate-100">
-              <div className="h-12 w-12 rounded-2xl bg-[#0054A6]/10 text-[#0054A6] flex items-center justify-center mb-3 border border-[#0054A6]/20">
-                <Building className="h-5 w-5" />
+            <div className="flex flex-col items-center text-center pb-2.5 border-b border-slate-100">
+              <div className="h-10 w-10 rounded-2xl bg-[#0054A6]/10 text-[#0054A6] flex items-center justify-center mb-2.5 border border-[#0054A6]/20">
+                <Building className="h-4.5 w-4.5" />
               </div>
               <h3 className="text-base font-semibold text-slate-800 tracking-tight">Expediente Digital de Compliance</h3>
               <p className="text-[11px] text-slate-500 font-medium tracking-wide uppercase mt-0.5">
@@ -1656,8 +1678,8 @@ export const AprobacionCreditos: React.FC = () => {
               </p>
             </div>
 
-            <div className="space-y-4 py-4 text-left text-xs">
-              <div className="grid grid-cols-2 gap-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+            <div className="space-y-3.5 py-3 text-left text-xs">
+              <div className="grid grid-cols-2 gap-3 bg-slate-50/50 p-3.5 rounded-2xl border border-slate-100">
                 <div className="space-y-0.5">
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Crédito Nro:</span>
                   <span className="font-extrabold text-slate-700 font-mono">{verPagareCredito.numeroCredito}</span>
@@ -1673,43 +1695,42 @@ export const AprobacionCreditos: React.FC = () => {
                   <span className="font-extrabold text-[#0054A6] font-mono">{formatCurrency(verPagareCredito.montoSolicitado)}</span>
                 </div>
                 <div className="space-y-0.5">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Archivo Custodiado:</span>
-                  <span className="font-bold text-slate-700 truncate block" title={documentosFirmados[verPagareCredito.id]?.name || `pagare_firmado_${verPagareCredito.numeroCredito}.pdf`}>
-                    📎 {documentosFirmados[verPagareCredito.id]?.name || `pagare_firmado_${verPagareCredito.numeroCredito}.pdf`}
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Vigencia (Desembolso - Vence):</span>
+                  <span className="font-bold text-slate-700 truncate block text-[10px]">
+                    {formatFechaStr(verPagareCredito.fechaDesembolso || verPagareCredito.fechaSolicitud)} - {formatFechaStr(tablaAmortizacion[tablaAmortizacion.length - 1]?.fecha || 'N/A')}
                   </span>
                 </div>
               </div>
 
-              {/* Contenedor del Documento Real o Mockup si no hay archivo subido */}
+              {/* Sello de Compliance (Control de Custodia) */}
+              <div className="border border-slate-200 rounded-3xl p-4 bg-white relative overflow-hidden shadow-inner flex flex-col items-center justify-center min-h-[90px] select-none">
+                {/* Sello de Custodia de Agua */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] select-none pointer-events-none">
+                  <Building className="h-24 w-24 text-slate-850" />
+                </div>
+                
+                {/* Sello de Compliance */}
+                <div className="absolute rotate-6 border-2 border-emerald-600/30 text-emerald-600/50 font-black text-[9px] tracking-widest px-3 py-1 rounded-lg uppercase select-none pointer-events-none flex flex-col items-center justify-center text-center">
+                  <span>CONTROL DE CUSTODIA</span>
+                  <span>BÓVEDA DIGITAL ITQ</span>
+                  <span className="text-[7px] mt-0.5">APROBADO & DESEMBOLSADO</span>
+                </div>
+
+                {/* Bosquejo del Documento */}
+                <div className="w-full space-y-1.5 opacity-20">
+                  <div className="h-2 w-1/4 bg-slate-300 rounded" />
+                  <div className="h-1 w-full bg-slate-200 rounded" />
+                  <div className="h-1.5 w-full bg-slate-200 rounded" />
+                </div>
+              </div>
+
+              {/* Previsualización del PDF o Imagen debajo */}
               {(() => {
                 const doc = documentosFirmados[verPagareCredito.id];
                 if (!doc || !doc.dataUrl) {
                   return (
-                    <div className="border border-slate-200 rounded-3xl p-6 bg-white relative overflow-hidden shadow-inner flex flex-col items-center justify-center min-h-[180px] select-none">
-                      {/* Sello de Custodia de Agua */}
-                      <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] select-none pointer-events-none">
-                        <Building className="h-40 w-40 text-slate-800" />
-                      </div>
-                      
-                      {/* Sello de Compliance */}
-                      <div className="absolute rotate-12 border-4 border-emerald-600/30 text-emerald-600/50 font-black text-[10px] tracking-widest px-4 py-2 rounded-xl uppercase select-none pointer-events-none flex flex-col items-center justify-center text-center">
-                        <span>CONTROL DE CUSTODIA</span>
-                        <span>BÓVEDA DIGITAL ITQ</span>
-                        <span className="text-[8px] mt-0.5">APROBADO & DESEMBOLSADO</span>
-                      </div>
-
-                      {/* Bosquejo del Documento */}
-                      <div className="w-full space-y-2.5 opacity-40">
-                        <div className="h-2.5 w-1/3 bg-slate-300 rounded" />
-                        <div className="h-1.5 w-full bg-slate-200 rounded" />
-                        <div className="h-1.5 w-full bg-slate-200 rounded" />
-                        <div className="h-1.5 w-5/6 bg-slate-200 rounded" />
-                        <div className="pt-3 flex justify-between">
-                          <div className="h-6 w-20 border-b border-dashed border-slate-300 flex items-end justify-center text-[7px] text-slate-400">Deudor</div>
-                          <div className="h-6 w-20 border-b border-dashed border-slate-300 flex items-end justify-center text-[7px] text-slate-400">Garante</div>
-                          <div className="h-6 w-20 border-b border-dashed border-slate-300 flex items-end justify-center text-[7px] text-slate-400">Oficial</div>
-                        </div>
-                      </div>
+                    <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl text-[10px] text-amber-700 font-semibold text-center leading-relaxed">
+                      ⚠️ No se detectó un archivo PDF/Imagen adjunto para este crédito. Se visualiza la custodia simulada.
                     </div>
                   );
                 }
@@ -1717,62 +1738,38 @@ export const AprobacionCreditos: React.FC = () => {
                 const isImage = doc.dataUrl.startsWith('data:image/');
                 const isPdf = doc.dataUrl.startsWith('data:application/pdf');
 
-                if (isImage) {
-                  return (
-                    <div className="border border-slate-200 rounded-3xl p-4 bg-slate-50 flex flex-col items-center justify-center min-h-[200px] relative">
-                      <div className="max-h-[220px] overflow-y-auto w-full flex justify-center">
+                return (
+                  <div className="border border-slate-200 rounded-3xl overflow-hidden bg-slate-50 relative shadow-inner">
+                    {isImage ? (
+                      <div className="max-h-[350px] overflow-y-auto w-full flex justify-center p-2 bg-slate-50">
                         <img 
                           src={doc.dataUrl} 
                           alt={doc.name} 
-                          className="max-h-[200px] object-contain rounded-lg border border-slate-100 shadow-sm animate-scale-up"
+                          className="max-h-[330px] object-contain rounded-lg border border-slate-100 shadow-sm animate-scale-up"
                         />
                       </div>
-                      <div className="mt-2 text-[10px] text-slate-500 font-medium truncate max-w-full">
-                        {doc.name}
+                    ) : isPdf ? (
+                      <div className="w-full h-[350px] bg-slate-100 relative">
+                        <iframe 
+                          src={doc.dataUrl} 
+                          title={doc.name}
+                          className="w-full h-full border-0 rounded-2xl"
+                        />
                       </div>
-                    </div>
-                  );
-                }
-
-                if (isPdf) {
-                  return (
-                    <div className="border border-slate-200 rounded-3xl p-6 bg-slate-50 flex flex-col items-center justify-center min-h-[200px] text-center gap-3">
-                      <div className="h-14 w-14 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500">
-                        <FileText className="h-7 w-7" />
+                    ) : (
+                      <div className="p-6 bg-slate-50 text-center space-y-2">
+                        <FileText className="h-10 w-10 text-slate-450 mx-auto" />
+                        <span className="text-xs font-bold text-slate-700 block">{doc.name}</span>
+                        <a 
+                          href={doc.dataUrl} 
+                          download={doc.name}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          Descargar Archivo
+                        </a>
                       </div>
-                      <div>
-                        <h4 className="font-bold text-slate-700 text-xs truncate max-w-[240px]">{doc.name}</h4>
-                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5 uppercase tracking-wider">Documento PDF Firmado</p>
-                      </div>
-                      <a 
-                        href={doc.dataUrl} 
-                        download={doc.name}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        Ver / Descargar PDF
-                      </a>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="border border-slate-200 rounded-3xl p-6 bg-slate-50 flex flex-col items-center justify-center min-h-[200px] text-center gap-3">
-                    <div className="h-14 w-14 rounded-2xl bg-[#0054A6]/10 border border-[#0054A6]/20 flex items-center justify-center text-[#0054A6]">
-                      <FileText className="h-7 w-7" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-700 text-xs truncate max-w-[240px]">{doc.name}</h4>
-                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5 uppercase tracking-wider">Archivo Custodiado</p>
-                    </div>
-                    <a 
-                      href={doc.dataUrl} 
-                      download={doc.name}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      Descargar Archivo
-                    </a>
+                    )}
                   </div>
                 );
               })()}
