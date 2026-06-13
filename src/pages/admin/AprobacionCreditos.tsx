@@ -854,10 +854,10 @@ export const AprobacionCreditos: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in select-none no-print">
           
           {/* Contenedor del Modal Redondeado */}
-          <div className="w-full max-w-4xl bg-white shadow-2xl border border-slate-100 rounded-[2rem] p-8 flex flex-col justify-between max-h-[92vh] overflow-y-auto transform transition-all duration-300 relative animate-scale-up">
+          <div className="w-full max-w-4xl bg-white shadow-2xl border border-slate-100 rounded-[2rem] p-5 md:p-6 pb-6 flex flex-col justify-between max-h-[96vh] overflow-y-auto transform transition-all duration-300 relative animate-scale-up">
             
             {/* Header del Modal */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div>
                 <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-lg border uppercase tracking-wider mb-1.5 ${
                   creditoSeleccionado.estado === 'SOLICITADO' || creditoSeleccionado.estado === 'EN_REVISION'
@@ -887,7 +887,7 @@ export const AprobacionCreditos: React.FC = () => {
 
             {/* Alerta de bloqueo por desembolso */}
             {isDisbursing && (
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-center gap-3 animate-pulse">
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-center gap-3 animate-pulse">
                 <Loader2 className="h-5 w-5 animate-spin text-[#0054A6]" />
                 <div className="text-xs text-blue-700 font-bold">
                   Procesando Aprobación y Desembolso... No cierre esta ventana ni interrumpa la operación.
@@ -897,7 +897,7 @@ export const AprobacionCreditos: React.FC = () => {
 
             {/* Error de desembolso crítico */}
             {disburseError && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex gap-3 items-start animate-fade-in">
+              <div className="mb-4 p-4 bg-red-50 border border-red-100 rounded-2xl flex gap-3 items-start animate-fade-in">
                 <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <h4 className="text-xs font-bold text-red-800 uppercase">Error de Desembolso Contable</h4>
@@ -907,17 +907,17 @@ export const AprobacionCreditos: React.FC = () => {
             )}
 
             {/* Cuerpo de Dos Columnas */}
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
               
               {/* Columna Izquierda: Perfil de Riesgo */}
-              <div className="space-y-5">
-                <div className="space-y-3">
+              <div className="space-y-4">
+                <div className="space-y-2.5">
                   <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
                     Perfil del Socio Solicitante
                   </h4>
                   
                   {/* Datos Básicos */}
-                  <Card className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3 shadow-none">
+                  <Card className="rounded-2xl border border-slate-100 bg-slate-50/50 p-3.5 space-y-2.5 shadow-none">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-450 font-medium">Socio:</span>
                       <span className="font-extrabold text-slate-700 uppercase">{creditoSeleccionado.socio?.nombresCompletos}</span>
@@ -934,7 +934,7 @@ export const AprobacionCreditos: React.FC = () => {
                 </div>
 
                 {/* Score Crediticio (Media Dona Gauge SVG) */}
-                <Card className="rounded-3xl border border-slate-100 p-5 shadow-sm bg-white space-y-2">
+                <Card className="rounded-3xl border border-slate-100 p-4 shadow-sm bg-white space-y-1">
                   <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                     Score de Buró Crediticio
                   </h5>
@@ -961,7 +961,7 @@ export const AprobacionCreditos: React.FC = () => {
                       
                       return (
                         <>
-                          <svg viewBox="0 0 200 110" className="w-full max-w-[190px] mx-auto">
+                          <svg viewBox="0 0 200 110" className="w-full max-w-[160px] mx-auto">
                             <circle
                               cx="100"
                               cy="100"
@@ -1003,12 +1003,12 @@ export const AprobacionCreditos: React.FC = () => {
                 </Card>
 
                 {/* Ingresos y Gastos con formateador de moneda */}
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
                     Ingresos y Gastos Declarados
                   </h4>
 
-                  <Card className="rounded-3xl border border-slate-100 p-5 space-y-4 shadow-sm bg-white">
+                  <Card className="rounded-3xl border border-slate-100 p-4 space-y-3 shadow-sm bg-white">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-550 font-semibold flex items-center gap-1.5">
                         <TrendingUp className="h-4 w-4 text-emerald-500" />
@@ -1027,7 +1027,7 @@ export const AprobacionCreditos: React.FC = () => {
                         {formatCurrency(Number(gastos))}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center text-xs border-b border-dashed border-slate-100 pb-3">
+                    <div className="flex justify-between items-center text-xs border-b border-dashed border-slate-100 pb-2.5">
                       <span className="text-slate-550 font-semibold flex items-center gap-1.5">
                         <AlertCircle className="h-4 w-4 text-slate-400" />
                         Otras Deudas Actuales:
@@ -1037,7 +1037,7 @@ export const AprobacionCreditos: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="flex justify-between items-center pt-1">
+                    <div className="flex justify-between items-center pt-0.5">
                       <span className="text-slate-800 text-xs font-black uppercase tracking-wider">
                         Flujo Neto Mensual:
                       </span>
@@ -1049,7 +1049,7 @@ export const AprobacionCreditos: React.FC = () => {
 
                   {/* Banner de Advertencia del 40% */}
                   {superaCapacidad && (
-                    <div className="p-4 bg-amber-50 border border-amber-100 rounded-3xl flex gap-3 items-start animate-fade-in">
+                    <div className="p-3 bg-amber-50 border border-amber-100 rounded-3xl flex gap-3 items-start animate-fade-in">
                       <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                       <div className="space-y-1">
                         <h4 className="text-xs font-black text-amber-800 uppercase tracking-wide">Alerta de Capacidad de Pago</h4>
@@ -1077,14 +1077,14 @@ export const AprobacionCreditos: React.FC = () => {
               </div>
 
               {/* Columna Derecha: Proyección Financiera */}
-              <div className="space-y-5 flex flex-col justify-between">
+              <div className="space-y-4 flex flex-col justify-between">
                 
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
                     Proyección Financiera
                   </h4>
 
-                  <Card className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3 shadow-none">
+                  <Card className="rounded-2xl border border-slate-100 bg-slate-50/50 p-3.5 space-y-2.5 shadow-none">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-450 font-medium">Monto Solicitado:</span>
                       <span className="font-extrabold text-slate-800 font-mono">{formatCurrency(creditoSeleccionado.montoSolicitado)}</span>
@@ -1101,7 +1101,7 @@ export const AprobacionCreditos: React.FC = () => {
                       <span className="text-slate-450 font-medium">Plazo:</span>
                       <span className="font-bold text-slate-800">{creditoSeleccionado.plazoMeses} meses</span>
                     </div>
-                    <div className="flex justify-between items-start text-xs flex-col gap-1 border-t border-slate-100 pt-3">
+                    <div className="flex justify-between items-start text-xs flex-col gap-1 border-t border-slate-100 pt-2.5">
                       <span className="text-slate-450 font-semibold">Garantía / Justificación:</span>
                       <p className="text-slate-650 italic text-[11px] leading-relaxed">{creditoSeleccionado.garantiaDescripcion}</p>
                     </div>
@@ -1109,12 +1109,12 @@ export const AprobacionCreditos: React.FC = () => {
                 </div>
 
                 {/* Tabla de Amortización con Skeleton Loader */}
-                <div className="space-y-3 flex-1 flex flex-col pt-2">
+                <div className="space-y-2.5 flex-1 flex flex-col pt-1">
                   <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
                     Tabla de Amortización {creditoSeleccionado.estado === 'DESEMBOLSADO' ? 'Real' : 'Simulada'}
                   </h4>
                   
-                  <div className="border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/20 flex-1 max-h-[280px] overflow-y-auto">
+                  <div className="border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/20 flex-1 max-h-[220px] overflow-y-auto">
                     {cargandoAmortizacion ? (
                       <div className="p-4 space-y-3">
                         <div className="flex justify-between items-center border-b border-slate-100 pb-2">
@@ -1174,7 +1174,7 @@ export const AprobacionCreditos: React.FC = () => {
                   <Button
                     onClick={() => setMostrarRechazoModal(true)}
                     disabled={isDisbursing}
-                    className="flex-1 border border-rose-200 hover:bg-rose-50 text-rose-600 font-bold rounded-2xl h-11 text-xs cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                    className="flex-1 bg-rose-50/80 hover:bg-rose-600 border border-rose-200/60 text-rose-700 hover:text-white font-bold rounded-2xl h-11 text-xs cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-2 hover:shadow-md hover:shadow-rose-600/10"
                   >
                     <Ban className="h-4 w-4" />
                     Rechazar Solicitud
@@ -1194,7 +1194,7 @@ export const AprobacionCreditos: React.FC = () => {
                   <Button
                     onClick={() => descargarTablaAmortizacionPdf(creditoSeleccionado, tablaAmortizacion)}
                     disabled={cargandoAmortizacion || isDisbursing}
-                    className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-650 font-bold rounded-2xl h-11 text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm disabled:opacity-50"
+                    className="flex-1 bg-white border border-slate-200 hover:bg-blue-50/60 text-slate-650 hover:text-[#0054A6] hover:border-blue-200 font-bold rounded-2xl h-11 text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm disabled:opacity-50"
                   >
                     <Printer className="h-4 w-4" />
                     Imprimir Amortización
