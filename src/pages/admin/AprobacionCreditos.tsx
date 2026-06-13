@@ -10,8 +10,9 @@ import {
   AlertTriangle, AlertCircle, Loader2, 
   TrendingUp, Ban, Printer, Building,
   Eye, FileText, LayoutGrid, List,
-  SlidersHorizontal, Filter, FileDown,
-  ChevronUp, ChevronDown, ChevronLeft, ChevronRight
+  SlidersHorizontal, FileDown,
+  ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
+  Search
 } from 'lucide-react';
 
 interface Socio {
@@ -1088,7 +1089,7 @@ export const AprobacionCreditos: React.FC = () => {
                 className="w-full pl-10 pr-4 py-2 text-xs font-semibold text-slate-700 bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 focus:border-[#0054A6]"
               />
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-450">
-                <Filter className="h-4 w-4" />
+                <Search className="h-4 w-4" />
               </div>
             </div>
 
@@ -1096,13 +1097,12 @@ export const AprobacionCreditos: React.FC = () => {
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="p-2 px-3 rounded-2xl border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 bg-slate-50/50 h-9.5 shrink-0 cursor-pointer shadow-sm"
+              className="w-40 border border-slate-200 text-slate-650 font-bold rounded-2xl text-xs h-9.5 px-3 cursor-pointer shadow-sm transition-all bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20"
             >
               <option value="all">Todos los estados</option>
               <option value="SOLICITADO">Pendientes</option>
               <option value="EN_REVISION">En Análisis</option>
               <option value="APROBADO">Aprobados</option>
-              <option value="DESEMBOLSADO">Desembolsados</option>
               <option value="RECHAZADO">Rechazados</option>
             </select>
           </div>
