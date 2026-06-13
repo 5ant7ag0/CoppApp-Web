@@ -1702,29 +1702,7 @@ export const AprobacionCreditos: React.FC = () => {
                 </div>
               </div>
 
-              {/* Sello de Compliance (Control de Custodia) */}
-              <div className="border border-slate-200 rounded-3xl p-4 bg-white relative overflow-hidden shadow-inner flex flex-col items-center justify-center min-h-[90px] select-none">
-                {/* Sello de Custodia de Agua */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] select-none pointer-events-none">
-                  <Building className="h-24 w-24 text-slate-850" />
-                </div>
-                
-                {/* Sello de Compliance */}
-                <div className="absolute rotate-6 border-2 border-emerald-600/30 text-emerald-600/50 font-black text-[9px] tracking-widest px-3 py-1 rounded-lg uppercase select-none pointer-events-none flex flex-col items-center justify-center text-center">
-                  <span>CONTROL DE CUSTODIA</span>
-                  <span>BÓVEDA DIGITAL ITQ</span>
-                  <span className="text-[7px] mt-0.5">APROBADO & DESEMBOLSADO</span>
-                </div>
-
-                {/* Bosquejo del Documento */}
-                <div className="w-full space-y-1.5 opacity-20">
-                  <div className="h-2 w-1/4 bg-slate-300 rounded" />
-                  <div className="h-1 w-full bg-slate-200 rounded" />
-                  <div className="h-1.5 w-full bg-slate-200 rounded" />
-                </div>
-              </div>
-
-              {/* Previsualización del PDF o Imagen debajo */}
+              {/* Previsualización del PDF o Imagen del Pagaré Firmado */}
               {(() => {
                 const doc = documentosFirmados[verPagareCredito.id];
                 if (!doc || !doc.dataUrl) {
@@ -1782,7 +1760,17 @@ export const AprobacionCreditos: React.FC = () => {
             <div className="flex gap-3 pt-2">
               <Button
                 onClick={() => {
-                  descargarPagarePdf(verPagareCredito, tablaAmortizacion, user?.nombresCompletos || 'Oficial');
+                  const doc = documentosFirmados[verPagareCredito.id];
+                  if (doc && doc.dataUrl) {
+                    const link = document.createElement('a');
+                    link.href = doc.dataUrl;
+                    link.download = doc.name || `pagare_firmado_${verPagareCredito.numeroCredito}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  } else {
+                    descargarPagarePdf(verPagareCredito, tablaAmortizacion, user?.nombresCompletos || 'Oficial');
+                  }
                 }}
                 className="flex-1 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-xl h-10 flex items-center justify-center gap-2 text-xs cursor-pointer shadow-md shadow-blue-805/10"
               >
