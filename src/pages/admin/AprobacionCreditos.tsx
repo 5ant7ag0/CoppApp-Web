@@ -9,7 +9,9 @@ import {
   Layers, Clock, X, CheckCircle2, 
   AlertTriangle, AlertCircle, Loader2, 
   TrendingUp, Ban, Printer, Building,
-  Eye, FileText
+  Eye, FileText, LayoutGrid, List,
+  SlidersHorizontal, Filter, FileDown,
+  ChevronUp, ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 interface Socio {
@@ -225,6 +227,28 @@ export const AprobacionCreditos: React.FC = () => {
     message: '',
     type: 'success'
   });
+
+  // Nuevos estados para Escalamiento y Optimización
+  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+  const [sortField, setSortField] = useState<keyof Credito | 'socio.nombresCompletos'>('fechaSolicitud');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
+  
+  // Filtros Avanzados
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [minAmount, setMinAmount] = useState<string>('');
+  const [maxAmount, setMaxAmount] = useState<string>('');
+  const [selectedOfficer, setSelectedOfficer] = useState<string>('all');
+
+  // Reset de página al cambiar filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, dateFilter, startDate, endDate, minAmount, maxAmount, selectedOfficer]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type });
@@ -726,11 +750,193 @@ export const AprobacionCreditos: React.FC = () => {
     return `Hace ${diffDays} día${diffDays > 1 ? 's' : ''}`;
   };
 
-  // Clasificación de Columnas Kanban
-  const colPendientes = solicitudes.filter(s => s.estado === 'SOLICITADO');
-  const colAnalisis = solicitudes.filter(s => s.estado === 'EN_REVISION');
-  const colAprobados = solicitudes.filter(s => s.estado === 'APROBADO' || s.estado === 'DESEMBOLSADO');
-  const colRechazados = solicitudes.filter(s => s.estado === 'RECHAZADO');
+  // Obtener lista única de IDs de oficiales de crédito para el dropdown
+  const oficialesDisponibles = Array.from(
+    new Set(
+      solicitudes
+        .map(s => s.usuarioOficialId)
+        .filter((id): id is number => id !== undefined && id !== null)
+    )
+  );
+
+  // Cálculos de KPIs de la Cinta de Métricas
+  const getKpis = () => {
+    const ahora = new Date();
+    const mesActual = ahora.getMonth();
+    const anioActual = ahora.getFullYear();
+
+    const pendientesCount = solicitudes.filter(s => s.estado === 'SOLICITADO').length;
+    
+    const volumenAnalisis = solicitudes
+      .filter(s => s.estado === 'EN_REVISION')
+      .reduce((sum, s) => sum + (s.montoSolicitado || 0), 0);
+      
+    const desembolsosMes = solicitudes
+      .filter(s => {
+        if (s.estado !== 'DESEMBOLSADO') return false;
+        const fechaStr = s.fechaDesembolso || s.fechaSolicitud;
+        if (!fechaStr) return false;
+        const d = new Date(fechaStr);
+        return d.getMonth() === mesActual && d.getFullYear() === anioActual;
+      })
+      .reduce((sum, s) => sum + (s.montoDesembolsado || s.montoSolicitado || 0), 0);
+
+    return { pendientesCount, volumenAnalisis, desembolsosMes };
+  };
+
+  // Filtrado y ordenamiento de solicitudes
+  const getFilteredAndSortedSolicitudes = () => {
+    let result = [...solicitudes];
+
+    // 1. Búsqueda principal (Socio, Cédula, Nro Crédito)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(s => 
+        (s.socio?.nombresCompletos || '').toLowerCase().includes(q) ||
+        (s.socio?.identificacion || '').includes(q) ||
+        (s.numeroCredito || '').toLowerCase().includes(q)
+      );
+    }
+
+    // 2. Filtro de Oficial
+    if (selectedOfficer !== 'all') {
+      const officerId = Number(selectedOfficer);
+      result = result.filter(s => s.usuarioOficialId === officerId);
+    }
+
+    // 3. Filtro de Montos
+    if (minAmount) {
+      result = result.filter(s => s.montoSolicitado >= Number(minAmount));
+    }
+    if (maxAmount) {
+      result = result.filter(s => s.montoSolicitado <= Number(maxAmount));
+    }
+
+    // 4. Filtro de Fecha
+    if (dateFilter !== 'all') {
+      const ahora = new Date();
+      ahora.setHours(0, 0, 0, 0);
+
+      result = result.filter(s => {
+        const fechaStr = s.fechaSolicitud;
+        if (!fechaStr) return false;
+        const d = new Date(fechaStr);
+        d.setHours(0, 0, 0, 0);
+
+        if (dateFilter === 'today') {
+          return d.getFullYear() === ahora.getFullYear() &&
+                 d.getMonth() === ahora.getMonth() &&
+                 d.getDate() === ahora.getDate();
+        }
+        if (dateFilter === 'week') {
+          // Esta semana (últimos 7 días)
+          const haceUnaSemana = new Date(ahora);
+          haceUnaSemana.setDate(ahora.getDate() - 7);
+          return d >= haceUnaSemana && d <= ahora;
+        }
+        if (dateFilter === 'month') {
+          // Este mes
+          return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear();
+        }
+        if (dateFilter === 'year') {
+          // Este año
+          return d.getFullYear() === ahora.getFullYear();
+        }
+        if (dateFilter === 'custom') {
+          if (startDate) {
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+            if (d < start) return false;
+          }
+          if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            if (d > end) return false;
+          }
+          return true;
+        }
+        return true;
+      });
+    }
+
+    // Ordenamiento
+    result.sort((a, b) => {
+      let valA: any;
+      let valB: any;
+
+      if (sortField === 'socio.nombresCompletos') {
+        valA = a.socio?.nombresCompletos || '';
+        valB = b.socio?.nombresCompletos || '';
+      } else {
+        valA = a[sortField as keyof Credito];
+        valB = b[sortField as keyof Credito];
+      }
+
+      if (valA === undefined || valA === null) valA = '';
+      if (valB === undefined || valB === null) valB = '';
+
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        return sortDirection === 'asc'
+          ? valA.localeCompare(valB)
+          : valB.localeCompare(valA);
+      }
+
+      return sortDirection === 'asc'
+        ? (valA > valB ? 1 : -1)
+        : (valB > valA ? 1 : -1);
+    });
+
+    return result;
+  };
+
+  const filteredSolicitudes = getFilteredAndSortedSolicitudes();
+
+  // Exportar a CSV
+  const handleExportCSV = () => {
+    const headers = [
+      'Socio Nombres',
+      'Identificacion',
+      'Numero Credito',
+      'Monto Solicitado',
+      'Plazo Meses',
+      'Fecha Solicitud',
+      'Estado'
+    ];
+
+    const rows = filteredSolicitudes.map(s => [
+      `"${s.socio?.nombresCompletos || ''}"`,
+      s.socio?.identificacion || '',
+      s.numeroCredito || '',
+      s.montoSolicitado || 0,
+      s.plazoMeses || 0,
+      s.fechaSolicitud || '',
+      s.estado || ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(e => e.join(','))
+    ].join('\n');
+
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `reporte_creditos_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Clasificación de Columnas Kanban (usando data filtrada)
+  const colPendientes = filteredSolicitudes.filter(s => s.estado === 'SOLICITADO');
+  const colAnalisis = filteredSolicitudes.filter(s => s.estado === 'EN_REVISION');
+  const colAprobados = filteredSolicitudes.filter(s => s.estado === 'APROBADO' || s.estado === 'DESEMBOLSADO');
+  const colRechazados = filteredSolicitudes.filter(s => s.estado === 'RECHAZADO');
+
+  // Límite de Kanban a 30 tarjetas
+  const colAprobadosSliced = colAprobados.slice(0, 30);
+  const colRechazadosSliced = colRechazados.slice(0, 30);
 
   // Cálculos de riesgo con verificaciones nulas y fallbacks lógicos
   const ingresos = creditoSeleccionado?.socio?.ingresosMensuales ?? (creditoSeleccionado?.socio as any)?.ingresos ?? 0;
@@ -742,6 +948,26 @@ export const AprobacionCreditos: React.FC = () => {
   
   const porcentajeCapacidad = flujoNeto > 0 ? (cuotaProyectada / flujoNeto) * 100 : 100;
   const superaCapacidad = flujoNeto <= 0 || porcentajeCapacidad > 40;
+
+  const handleSort = (field: keyof Credito | 'socio.nombresCompletos') => {
+    if (sortField === field) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const renderSortIcon = (field: keyof Credito | 'socio.nombresCompletos') => {
+    if (sortField !== field) return null;
+    return sortDirection === 'asc' ? (
+      <ChevronUp className="inline-block h-3.5 w-3.5 ml-1 text-slate-500" />
+    ) : (
+      <ChevronDown className="inline-block h-3.5 w-3.5 ml-1 text-slate-500" />
+    );
+  };
+
+  const { pendientesCount, volumenAnalisis, desembolsosMes } = getKpis();
 
   return (
     <div className="space-y-6 animate-fade-in select-none">
@@ -770,6 +996,223 @@ export const AprobacionCreditos: React.FC = () => {
         </div>
       </div>
 
+      {/* Cinta de Métricas Ejecutivas */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 no-print">
+        {/* Solicitudes Pendientes */}
+        <Card className="rounded-3xl border border-slate-100 p-5 shadow-[0_4px_12px_rgba(0,0,0,0.01)] bg-white flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">
+              Solicitudes Pendientes
+            </span>
+            <span className="text-2xl font-black text-slate-800 block">
+              {pendientesCount}
+            </span>
+          </div>
+          <div className="h-12 w-12 rounded-2xl bg-amber-50 border border-amber-100/50 flex items-center justify-center text-amber-500">
+            <Clock className="h-6 w-6" />
+          </div>
+        </Card>
+
+        {/* Volumen en Análisis */}
+        <Card className="rounded-3xl border border-slate-100 p-5 shadow-[0_4px_12px_rgba(0,0,0,0.01)] bg-white flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">
+              Volumen en Análisis
+            </span>
+            <span className="text-2xl font-black text-slate-800 block">
+              {formatCurrency(volumenAnalisis)}
+            </span>
+          </div>
+          <div className="h-12 w-12 rounded-2xl bg-blue-50 border border-blue-100/50 flex items-center justify-center text-blue-500">
+            <Layers className="h-6 w-6" />
+          </div>
+        </Card>
+
+        {/* Desembolsos del Mes */}
+        <Card className="rounded-3xl border border-slate-100 p-5 shadow-[0_4px_12px_rgba(0,0,0,0.01)] bg-white flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">
+              Desembolsos del Mes
+            </span>
+            <span className="text-2xl font-black text-slate-800 block">
+              {formatCurrency(desembolsosMes)}
+            </span>
+          </div>
+          <div className="h-12 w-12 rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-500">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+        </Card>
+      </div>
+
+      {/* Controles de Búsqueda, Vista y Filtros */}
+      <div className="bg-white rounded-[2rem] border border-slate-100 p-4 shadow-[0_4px_12px_rgba(0,0,0,0.01)] space-y-3 no-print">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          
+          {/* Buscador Principal */}
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Buscar socio, cédula o número de crédito..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-xs font-semibold text-slate-700 bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 focus:border-[#0054A6]"
+            />
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-450">
+              <Filter className="h-4 w-4" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            {/* Botón Filtros Avanzados */}
+            <Button
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              variant="outline"
+              className={`border-slate-200 text-slate-650 font-bold rounded-2xl text-xs h-9.5 px-3.5 flex items-center gap-1.5 cursor-pointer shadow-sm transition-all ${
+                showAdvancedFilters ? 'bg-slate-100 border-slate-300' : 'hover:bg-slate-50'
+              }`}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Filtros Avanzados
+            </Button>
+
+            {/* Exportar CSV (Sólo en Vista Lista) */}
+            {viewMode === 'list' && (
+              <Button
+                onClick={handleExportCSV}
+                variant="outline"
+                className="border-emerald-250 text-emerald-700 hover:bg-emerald-50 font-bold rounded-2xl text-xs h-9.5 px-3.5 flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                Exportar CSV
+              </Button>
+            )}
+
+            {/* Toggle de Vista (Tablero / Lista) */}
+            <div className="bg-slate-100/80 p-0.5 rounded-2xl border border-slate-200/50 flex gap-0.5 shadow-inner">
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  viewMode === 'kanban'
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Tablero
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  viewMode === 'list'
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <List className="h-3.5 w-3.5" />
+                Lista
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Panel de Filtros Avanzados (Colapsable) */}
+        {showAdvancedFilters && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-slate-100 animate-slide-down">
+            {/* Filtro de Fecha */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Filtro de Fecha
+              </label>
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 bg-slate-50/30"
+              >
+                <option value="all">Todas las fechas</option>
+                <option value="today">Hoy</option>
+                <option value="week">Esta semana</option>
+                <option value="month">Este mes</option>
+                <option value="year">Este año</option>
+                <option value="custom">Rango personalizado</option>
+              </select>
+            </div>
+
+            {/* Oficial Asignado */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Oficial Asignado
+              </label>
+              <select
+                value={selectedOfficer}
+                onChange={(e) => setSelectedOfficer(e.target.value)}
+                className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 bg-slate-50/30"
+              >
+                <option value="all">Todos los oficiales</option>
+                {oficialesDisponibles.map(id => (
+                  <option key={id} value={id}>Oficial #{id}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Monto Mínimo */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Monto Mínimo (USD)
+              </label>
+              <input
+                type="number"
+                placeholder="Mínimo"
+                value={minAmount}
+                onChange={(e) => setMinAmount(e.target.value)}
+                className="w-full p-2 text-xs font-semibold text-slate-700 bg-slate-50/30 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20"
+              />
+            </div>
+
+            {/* Monto Máximo */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Monto Máximo (USD)
+              </label>
+              <input
+                type="number"
+                placeholder="Máximo"
+                value={maxAmount}
+                onChange={(e) => setMaxAmount(e.target.value)}
+                className="w-full p-2 text-xs font-semibold text-slate-700 bg-slate-50/30 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20"
+              />
+            </div>
+
+            {/* Rango de Fechas Personalizado */}
+            {dateFilter === 'custom' && (
+              <div className="sm:col-span-2 md:col-span-4 grid grid-cols-2 gap-4 animate-fade-in pt-1">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Fecha Inicio
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full p-2 text-xs font-semibold text-slate-700 bg-slate-50/30 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Fecha Fin
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full p-2 text-xs font-semibold text-slate-700 bg-slate-50/30 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Tablero Kanban con Fondos Ultra Tenues estilo Apple Light */}
       {cargando ? (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-5 min-h-[500px] no-print">
@@ -782,93 +1225,251 @@ export const AprobacionCreditos: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-start no-print">
-          
-          {/* Columna: PENDIENTES */}
-          <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
-            <div className="flex items-center justify-between px-2">
-              <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-amber-400" />
-                Pendientes ({colPendientes.length})
-              </span>
-            </div>
-            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-              {colPendientes.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
-                  Sin solicitudes pendientes
+        <>
+          {viewMode === 'kanban' ? (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-start no-print">
+              
+              {/* Columna: PENDIENTES */}
+              <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
+                <div className="flex items-center justify-between px-2">
+                  <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-amber-400" />
+                    Pendientes ({colPendientes.length})
+                  </span>
                 </div>
-              ) : (
-                colPendientes.map(cred => (
-                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Columna: EN ANÁLISIS */}
-          <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
-            <div className="flex items-center justify-between px-2">
-              <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-                En Análisis ({colAnalisis.length})
-              </span>
-            </div>
-            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-              {colAnalisis.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
-                  Ningún crédito en análisis
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                  {colPendientes.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
+                      Sin solicitudes pendientes
+                    </div>
+                  ) : (
+                    colPendientes.map(cred => (
+                      <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} />
+                    ))
+                  )}
                 </div>
-              ) : (
-                colAnalisis.map(cred => (
-                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} />
-                ))
-              )}
-            </div>
-          </div>
+              </div>
 
-          {/* Columna: APROBADOS/DESEMBOLSADOS */}
-          <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
-            <div className="flex items-center justify-between px-2">
-              <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Aprobados ({colAprobados.length})
-              </span>
-            </div>
-            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-              {colAprobados.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
-                  Ningún crédito aprobado hoy
+              {/* Columna: EN ANÁLISIS */}
+              <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
+                <div className="flex items-center justify-between px-2">
+                  <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                    En Análisis ({colAnalisis.length})
+                  </span>
                 </div>
-              ) : (
-                colAprobados.map(cred => (
-                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Columna: RECHAZADOS */}
-          <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
-            <div className="flex items-center justify-between px-2">
-              <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-rose-500" />
-                Rechazados ({colRechazados.length})
-              </span>
-            </div>
-            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-              {colRechazados.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
-                  Sin solicitudes rechazadas
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                  {colAnalisis.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
+                      Ningún crédito en análisis
+                    </div>
+                  ) : (
+                    colAnalisis.map(cred => (
+                      <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} />
+                    ))
+                  )}
                 </div>
-              ) : (
-                colRechazados.map(cred => (
-                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} />
-                ))
-              )}
-            </div>
-          </div>
+              </div>
 
-        </div>
+              {/* Columna: APROBADOS/DESEMBOLSADOS */}
+              <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
+                <div className="flex items-center justify-between px-2">
+                  <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    Aprobados ({colAprobados.length})
+                  </span>
+                </div>
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                  {colAprobados.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
+                      Ningún crédito aprobado hoy
+                    </div>
+                  ) : (
+                    <>
+                      {colAprobadosSliced.map(cred => (
+                        <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} />
+                      ))}
+                      {colAprobados.length > 30 && (
+                        <div className="p-3 bg-amber-50/50 border border-dashed border-amber-200 rounded-2xl text-center">
+                          <p className="text-[10px] font-semibold text-amber-700 leading-relaxed">
+                            ⚠️ Mostrando las primeras 30 tarjetas. Use la <strong>"Vista Lista"</strong> para consultar el histórico completo.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Columna: RECHAZADOS */}
+              <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
+                <div className="flex items-center justify-between px-2">
+                  <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-rose-500" />
+                    Rechazados ({colRechazados.length})
+                  </span>
+                </div>
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                  {colRechazados.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
+                      Sin solicitudes rechazadas
+                    </div>
+                  ) : (
+                    <>
+                      {colRechazadosSliced.map(cred => (
+                        <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} />
+                      ))}
+                      {colRechazados.length > 30 && (
+                        <div className="p-3 bg-amber-50/50 border border-dashed border-amber-200 rounded-2xl text-center">
+                          <p className="text-[10px] font-semibold text-amber-700 leading-relaxed">
+                            ⚠️ Mostrando las primeras 30 tarjetas. Use la <strong>"Vista Lista"</strong> para consultar el histórico completo.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          ) : (
+            <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.01)] no-print">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider select-none">
+                      <th 
+                        onClick={() => handleSort('socio.nombresCompletos')}
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100/50 transition-colors border-b border-slate-100"
+                      >
+                        Socio {renderSortIcon('socio.nombresCompletos')}
+                      </th>
+                      <th 
+                        onClick={() => handleSort('numeroCredito')}
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100/50 transition-colors border-b border-slate-100"
+                      >
+                        Nro. Crédito {renderSortIcon('numeroCredito')}
+                      </th>
+                      <th 
+                        onClick={() => handleSort('montoSolicitado')}
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100/50 transition-colors border-b border-slate-100"
+                      >
+                        Monto {renderSortIcon('montoSolicitado')}
+                      </th>
+                      <th 
+                        onClick={() => handleSort('plazoMeses')}
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100/50 transition-colors border-b border-slate-100"
+                      >
+                        Plazo {renderSortIcon('plazoMeses')}
+                      </th>
+                      <th 
+                        onClick={() => handleSort('fechaSolicitud')}
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100/50 transition-colors border-b border-slate-100"
+                      >
+                        Fecha Solicitud {renderSortIcon('fechaSolicitud')}
+                      </th>
+                      <th 
+                        onClick={() => handleSort('estado')}
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100/50 transition-colors border-b border-slate-100"
+                      >
+                        Estado {renderSortIcon('estado')}
+                      </th>
+                      <th className="py-3 px-4 text-right border-b border-slate-100">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-semibold text-slate-650">
+                    {filteredSolicitudes.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-400 bg-white">
+                          No se encontraron registros coincidentes
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredSolicitudes
+                        .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                        .map(s => (
+                          <tr key={s.id} className="hover:bg-slate-550/5 hover:bg-slate-50/30 transition-colors">
+                            <td className="py-3.5 px-4 font-bold text-slate-800 uppercase">
+                              {s.socio?.nombresCompletos}
+                            </td>
+                            <td className="py-3.5 px-4 font-mono">{s.numeroCredito}</td>
+                            <td className="py-3.5 px-4 font-mono text-[#0054A6]">
+                              {formatCurrency(s.montoSolicitado)}
+                            </td>
+                            <td className="py-3.5 px-4">{s.plazoMeses} meses</td>
+                            <td className="py-3.5 px-4">{formatFechaStr(s.fechaSolicitud)}</td>
+                            <td className="py-3.5 px-4">
+                              <span className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-lg border uppercase tracking-wider ${
+                                s.estado === 'SOLICITADO'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                  : s.estado === 'EN_REVISION'
+                                    ? 'bg-blue-50 text-blue-700 border-blue-100'
+                                    : s.estado === 'DESEMBOLSADO' || s.estado === 'APROBADO'
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                      : 'bg-rose-50 text-rose-700 border-rose-100'
+                              }`}>
+                                {s.estado === 'EN_REVISION' ? 'En Análisis' : s.estado}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <Button
+                                onClick={() => handleSelectCardClick(s)}
+                                variant="outline"
+                                className="border-slate-200 text-slate-650 hover:bg-slate-50 font-bold rounded-xl text-[10px] h-8 px-2.5 cursor-pointer shadow-sm flex items-center gap-1 ml-auto"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                Evaluar
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Paginación Footer */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-slate-100 select-none bg-slate-50/30">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                  Mostrar
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="p-1 rounded-lg border border-slate-200 bg-white text-xs font-semibold focus:outline-none"
+                  >
+                    <option value={10}>10 registros</option>
+                    <option value={20}>20 registros</option>
+                    <option value={50}>50 registros</option>
+                  </select>
+                  de {filteredSolicitudes.length} encontrados
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className="p-1.5 rounded-xl border border-slate-200 hover:bg-white text-slate-550 disabled:opacity-40 disabled:hover:bg-transparent transition-all cursor-pointer"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-xs font-bold text-slate-600">
+                    Página {currentPage} de {Math.ceil(filteredSolicitudes.length / pageSize) || 1}
+                  </span>
+                  <button
+                    disabled={currentPage === (Math.ceil(filteredSolicitudes.length / pageSize) || 1)}
+                    onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredSolicitudes.length / pageSize) || 1, prev + 1))}
+                    className="p-1.5 rounded-xl border border-slate-200 hover:bg-white text-slate-550 disabled:opacity-40 disabled:hover:bg-transparent transition-all cursor-pointer"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Modal Centrado y Flotante Premium (Aesthetic Apple Light) */}
@@ -1672,9 +2273,9 @@ export const AprobacionCreditos: React.FC = () => {
               <div className="h-10 w-10 rounded-2xl bg-[#0054A6]/10 text-[#0054A6] flex items-center justify-center mb-2.5 border border-[#0054A6]/20">
                 <Building className="h-4.5 w-4.5" />
               </div>
-              <h3 className="text-base font-semibold text-slate-800 tracking-tight">Expediente Digital de Compliance</h3>
+              <h3 className="text-base font-semibold text-slate-800 tracking-tight">Expediente Digital</h3>
               <p className="text-[11px] text-slate-500 font-medium tracking-wide uppercase mt-0.5">
-                Custodia de Pagarés SEPS
+                Custodia de Pagarés
               </p>
             </div>
 
