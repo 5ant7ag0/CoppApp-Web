@@ -8,7 +8,7 @@ import autoTable from 'jspdf-autotable';
 import { 
   Layers, Clock, X, CheckCircle2, 
   AlertTriangle, AlertCircle, Loader2, 
-  TrendingUp, Ban, Printer
+  TrendingUp, Ban, Printer, Building
 } from 'lucide-react';
 
 interface Socio {
@@ -172,7 +172,16 @@ export const AprobacionCreditos: React.FC = () => {
   const [creditoSeleccionado, setCreditoSeleccionado] = useState<Credito | null>(null);
   const [tablaAmortizacion, setTablaAmortizacion] = useState<CuotaProyectada[]>([]);
   const [cargandoAmortizacion, setCargandoAmortizacion] = useState<boolean>(false);
-  
+  const [verPagareCredito, setVerPagareCredito] = useState<Credito | null>(null);
+  const [documentosFirmados, setDocumentosFirmados] = useState<Record<number, string>>(() => {
+    try {
+      const saved = localStorage.getItem('coop_pagares_firmados');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
   // Respaldo Legal Pagaré
   const [pagareCredito, setPagareCredito] = useState<Credito | null>(null);
   const [pagareCuotas, setPagareCuotas] = useState<CuotaProyectada[]>([]);
@@ -629,6 +638,15 @@ export const AprobacionCreditos: React.FC = () => {
       });
       
       showToast('Crédito aprobado y desembolsado con éxito.', 'success');
+      
+      // Guardar referencia del documento firmado
+      const updatedDocs = {
+        ...documentosFirmados,
+        [targetCredito.id]: pagareFirmadoName || `pagare_firmado_${targetCredito.numeroCredito}.pdf`
+      };
+      setDocumentosFirmados(updatedDocs);
+      localStorage.setItem('coop_pagares_firmados', JSON.stringify(updatedDocs));
+
       setPagareCredito(null); // Cerrar pagare modal
       setCreditoSeleccionado(null); // Cerrar detail modal
       setPagareFirmadoFile(null);
@@ -746,7 +764,7 @@ export const AprobacionCreditos: React.FC = () => {
                 </div>
               ) : (
                 colPendientes.map(cred => (
-                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} onPrintClick={handleImprimirPagare} />
+                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} />
                 ))
               )}
             </div>
@@ -767,7 +785,7 @@ export const AprobacionCreditos: React.FC = () => {
                 </div>
               ) : (
                 colAnalisis.map(cred => (
-                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} onPrintClick={handleImprimirPagare} />
+                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} />
                 ))
               )}
             </div>
@@ -788,7 +806,7 @@ export const AprobacionCreditos: React.FC = () => {
                 </div>
               ) : (
                 colAprobados.map(cred => (
-                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} onPrintClick={handleImprimirPagare} />
+                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} />
                 ))
               )}
             </div>
@@ -809,7 +827,7 @@ export const AprobacionCreditos: React.FC = () => {
                 </div>
               ) : (
                 colRechazados.map(cred => (
-                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} onPrintClick={handleImprimirPagare} />
+                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} />
                 ))
               )}
             </div>
@@ -1079,9 +1097,9 @@ export const AprobacionCreditos: React.FC = () => {
 
                 {/* Tabla de Amortización con Skeleton Loader */}
                 <div className="space-y-3 flex-1 flex flex-col pt-2">
-                  <h5 className="text-[10px] font-black text-slate-450 uppercase tracking-widest">
+                  <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
                     Tabla de Amortización {creditoSeleccionado.estado === 'DESEMBOLSADO' ? 'Real' : 'Simulada'}
-                  </h5>
+                  </h4>
                   
                   <div className="border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/20 flex-1 max-h-[280px] overflow-y-auto">
                     {cargandoAmortizacion ? (
@@ -1150,42 +1168,65 @@ export const AprobacionCreditos: React.FC = () => {
 
               {/* Botón Aprobar y Desembolsar (Interceptado para Compliance Documental) */}
               {(creditoSeleccionado.estado === 'SOLICITADO' || creditoSeleccionado.estado === 'EN_REVISION') && (
-                <Button
-                  onClick={() => handleImprimirPagare(creditoSeleccionado)}
-                  disabled={isDisbursing}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl h-11 text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md shadow-emerald-700/10"
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  Aprobar y Desembolsar Fondos
-                </Button>
+                <div className="flex gap-2 w-full">
+                  <Button
+                    onClick={() => handleImprimirPagare(creditoSeleccionado)}
+                    disabled={isDisbursing}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl h-11 text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md shadow-emerald-700/10"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Aprobar y Desembolsar Fondos
+                  </Button>
+                  <Button
+                    onClick={() => descargarTablaAmortizacionPdf(creditoSeleccionado, tablaAmortizacion)}
+                    disabled={cargandoAmortizacion || isDisbursing}
+                    title="Imprimir Tabla de Amortización Proyectada"
+                    variant="outline"
+                    className="h-11 w-11 p-0 border border-slate-200 hover:bg-slate-50 text-slate-650 rounded-2xl flex items-center justify-center cursor-pointer shadow-sm shrink-0 disabled:opacity-50"
+                  >
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                </div>
               )}
 
-              {/* Cerrar / Imprimir para Aprobados/Rechazados */}
+              {/* Acciones para Aprobados/Desembolsados */}
               {(creditoSeleccionado.estado === 'APROBADO' || 
-                creditoSeleccionado.estado === 'DESEMBOLSADO' || 
-                creditoSeleccionado.estado === 'RECHAZADO') && (
+                creditoSeleccionado.estado === 'DESEMBOLSADO') && (
                 <div className="flex w-full gap-4">
-                  {(creditoSeleccionado.estado === 'APROBADO' || creditoSeleccionado.estado === 'DESEMBOLSADO') && (
-                    <Button
-                      onClick={() => {
-                        descargarTablaAmortizacionPdf(creditoSeleccionado, tablaAmortizacion);
-                      }}
-                      disabled={cargandoAmortizacion}
-                      className="flex-1 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-2xl h-11 text-xs cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-blue-800/10 disabled:opacity-50"
-                    >
-                      {cargandoAmortizacion ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                          Cargando...
-                        </>
-                      ) : (
-                        <>📄 Imprimir Tabla de Amortización</>
-                      )}
-                    </Button>
-                  )}
+                  <Button
+                    onClick={() => {
+                      descargarTablaAmortizacionPdf(creditoSeleccionado, tablaAmortizacion);
+                    }}
+                    disabled={cargandoAmortizacion}
+                    className="flex-1 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-2xl h-11 text-xs cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-blue-800/10 disabled:opacity-50"
+                  >
+                    {cargandoAmortizacion ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                        Cargando...
+                      </>
+                    ) : (
+                      <>
+                        <Printer className="h-3.5 w-3.5" />
+                        Imprimir Tabla de Amortización
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => setVerPagareCredito(creditoSeleccionado)}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl h-11 text-xs cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-emerald-700/10"
+                  >
+                    👁️ Ver Pagaré Firmado
+                  </Button>
+                </div>
+              )}
+
+              {/* Acciones para Rechazados */}
+              {creditoSeleccionado.estado === 'RECHAZADO' && (
+                <div className="flex w-full">
                   <Button
                     onClick={() => setCreditoSeleccionado(null)}
-                    className="flex-1 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-2xl h-11 text-xs cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-blue-805/10"
+                    className="flex-1 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-2xl h-11 text-xs cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-blue-850/10"
                   >
                     Cerrar Ficha de Detalle
                   </Button>
@@ -1576,6 +1617,97 @@ export const AprobacionCreditos: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Modal: Visor de Pagaré Firmado Custodiado */}
+      {verPagareCredito && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in select-none">
+          <Card className="w-full max-w-lg bg-white rounded-[2rem] border border-slate-100 p-6 md:p-8 shadow-2xl flex flex-col justify-between relative overflow-hidden animate-scale-up">
+            
+            <button 
+              onClick={() => setVerPagareCredito(null)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-650 hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="flex flex-col items-center text-center pb-3 border-b border-slate-100">
+              <div className="h-12 w-12 rounded-2xl bg-[#0054A6]/10 text-[#0054A6] flex items-center justify-center mb-3 border border-[#0054A6]/20">
+                <Building className="h-5 w-5" />
+              </div>
+              <h3 className="text-base font-semibold text-slate-800 tracking-tight">Expediente Digital de Compliance</h3>
+              <p className="text-[11px] text-slate-500 font-medium tracking-wide uppercase mt-0.5">
+                Custodia de Pagarés SEPS
+              </p>
+            </div>
+
+            <div className="space-y-4 py-4 text-left text-xs">
+              <div className="grid grid-cols-2 gap-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                <div className="space-y-0.5">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Crédito Nro:</span>
+                  <span className="font-extrabold text-slate-700 font-mono">{verPagareCredito.numeroCredito}</span>
+                </div>
+                <div className="space-y-0.5">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Socio:</span>
+                  <span className="font-bold text-slate-700 uppercase truncate block" title={verPagareCredito.socio?.nombresCompletos}>
+                    {verPagareCredito.socio?.nombresCompletos}
+                  </span>
+                </div>
+                <div className="space-y-0.5">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Monto Solicitado:</span>
+                  <span className="font-extrabold text-[#0054A6] font-mono">{formatCurrency(verPagareCredito.montoSolicitado)}</span>
+                </div>
+                <div className="space-y-0.5">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Archivo Custodiado:</span>
+                  <span className="font-bold text-slate-700 truncate block" title={documentosFirmados[verPagareCredito.id] || `pagare_firmado_${verPagareCredito.numeroCredito}.pdf`}>
+                    📎 {documentosFirmados[verPagareCredito.id] || `pagare_firmado_${verPagareCredito.numeroCredito}.pdf`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Simulación del Documento Firmado con Sello */}
+              <div className="border border-slate-200 rounded-3xl p-6 bg-white relative overflow-hidden shadow-inner flex flex-col items-center justify-center min-h-[180px] select-none">
+                {/* Sello de Custodia de Agua */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] select-none pointer-events-none">
+                  <Building className="h-40 w-40 text-slate-800" />
+                </div>
+                
+                {/* Sello de Compliance */}
+                <div className="absolute rotate-12 border-4 border-emerald-600/30 text-emerald-600/50 font-black text-[10px] tracking-widest px-4 py-2 rounded-xl uppercase select-none pointer-events-none flex flex-col items-center justify-center text-center">
+                  <span>CONTROL DE CUSTODIA</span>
+                  <span>BÓVEDA DIGITAL ITQ</span>
+                  <span className="text-[8px] mt-0.5">APROBADO & DESEMBOLSADO</span>
+                </div>
+
+                {/* Bosquejo del Documento */}
+                <div className="w-full space-y-2.5 opacity-40">
+                  <div className="h-2.5 w-1/3 bg-slate-300 rounded" />
+                  <div className="h-1.5 w-full bg-slate-200 rounded" />
+                  <div className="h-1.5 w-full bg-slate-200 rounded" />
+                  <div className="h-1.5 w-5/6 bg-slate-200 rounded" />
+                  <div className="pt-3 flex justify-between">
+                    <div className="h-6 w-20 border-b border-dashed border-slate-300 flex items-end justify-center text-[7px] text-slate-400">Deudor</div>
+                    <div className="h-6 w-20 border-b border-dashed border-slate-300 flex items-end justify-center text-[7px] text-slate-400">Garante</div>
+                    <div className="h-6 w-20 border-b border-dashed border-slate-300 flex items-end justify-center text-[7px] text-slate-400">Oficial</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-[10px] text-slate-400 text-center font-medium leading-relaxed">
+                Este pagaré digitalizado ha sido verificado mediante firma física y se encuentra custodiado en los servidores de la Cooperativa ITQ bajo los lineamientos de la SEPS.
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                onClick={() => setVerPagareCredito(null)}
+                className="flex-1 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-xl h-10 flex items-center justify-center text-xs cursor-pointer shadow-md shadow-blue-805/10"
+              >
+                Entendido
+              </Button>
+            </div>
+
+          </Card>
+        </div>
+      )}
 
     </div>
   );
@@ -1586,11 +1718,9 @@ interface CardSolicitudProps {
   cred: Credito;
   onClick: () => void;
   getElapsedTime: (date: string) => string;
-  onPrintClick: (cred: Credito) => void;
 }
 
-const CardSolicitud: React.FC<CardSolicitudProps> = ({ cred, onClick, getElapsedTime, onPrintClick }) => {
-  const isResolved = cred.estado === 'APROBADO' || cred.estado === 'DESEMBOLSADO';
+const CardSolicitud: React.FC<CardSolicitudProps> = ({ cred, onClick, getElapsedTime }) => {
   
   return (
     <div 
@@ -1653,19 +1783,6 @@ const CardSolicitud: React.FC<CardSolicitudProps> = ({ cred, onClick, getElapsed
             {cred.garantiaDescripcion}
           </div>
         </div>
-
-        {isResolved && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPrintClick(cred);
-            }}
-            className="w-full mt-3 bg-slate-50 hover:bg-[#0054A6]/10 border border-slate-200/50 hover:border-[#0054A6]/30 text-slate-650 hover:text-[#0054A6] font-extrabold rounded-xl h-8 text-[10px] flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
-          >
-            <Printer className="h-3.5 w-3.5" />
-                        Imprimir Tabla de Amortización
-          </button>
-        )}
       </div>
     </div>
   );
