@@ -8,7 +8,8 @@ import autoTable from 'jspdf-autotable';
 import { 
   Layers, Clock, X, CheckCircle2, 
   AlertTriangle, AlertCircle, Loader2, 
-  TrendingUp, Ban, Printer, Building
+  TrendingUp, Ban, Printer, Building,
+  Eye, FileText
 } from 'lucide-react';
 
 interface Socio {
@@ -173,7 +174,7 @@ export const AprobacionCreditos: React.FC = () => {
   const [tablaAmortizacion, setTablaAmortizacion] = useState<CuotaProyectada[]>([]);
   const [cargandoAmortizacion, setCargandoAmortizacion] = useState<boolean>(false);
   const [verPagareCredito, setVerPagareCredito] = useState<Credito | null>(null);
-  const [documentosFirmados, setDocumentosFirmados] = useState<Record<number, string>>(() => {
+  const [documentosFirmados, setDocumentosFirmados] = useState<Record<number, { name: string; dataUrl?: string }>>(() => {
     try {
       const saved = localStorage.getItem('coop_pagares_firmados');
       return saved ? JSON.parse(saved) : {};
@@ -188,6 +189,7 @@ export const AprobacionCreditos: React.FC = () => {
   const [cargandoPagareCuotas, setCargandoPagareCuotas] = useState<boolean>(false);
   const [pagareFirmadoFile, setPagareFirmadoFile] = useState<File | null>(null);
   const [pagareFirmadoName, setPagareFirmadoName] = useState<string>('');
+  const [pagareFirmadoDataUrl, setPagareFirmadoDataUrl] = useState<string>('');
 
   // Modals y Resoluciones
   const [mostrarRechazoModal, setMostrarRechazoModal] = useState<boolean>(false);
@@ -564,6 +566,14 @@ export const AprobacionCreditos: React.FC = () => {
       const file = e.target.files[0];
       setPagareFirmadoFile(file);
       setPagareFirmadoName(file.name);
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setPagareFirmadoDataUrl(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -642,7 +652,10 @@ export const AprobacionCreditos: React.FC = () => {
       // Guardar referencia del documento firmado
       const updatedDocs = {
         ...documentosFirmados,
-        [targetCredito.id]: pagareFirmadoName || `pagare_firmado_${targetCredito.numeroCredito}.pdf`
+        [targetCredito.id]: {
+          name: pagareFirmadoName || `pagare_firmado_${targetCredito.numeroCredito}.pdf`,
+          dataUrl: pagareFirmadoDataUrl || ''
+        }
       };
       setDocumentosFirmados(updatedDocs);
       localStorage.setItem('coop_pagares_firmados', JSON.stringify(updatedDocs));
@@ -1152,23 +1165,22 @@ export const AprobacionCreditos: React.FC = () => {
             </div>
 
             {/* Footer de Resoluciones (Botones de Cierre) */}
-            <div className="border-t border-slate-100 pt-6 flex gap-4">
+            <div className="border-t border-slate-100 pt-6 flex gap-4 w-full">
               
-              {/* Botón Rechazar */}
+              {/* Controles para Créditos en Análisis (Solicitados / En Revisión) */}
               {(creditoSeleccionado.estado === 'SOLICITADO' || creditoSeleccionado.estado === 'EN_REVISION') && (
-                <Button
-                  onClick={() => setMostrarRechazoModal(true)}
-                  disabled={isDisbursing}
-                  className="flex-1 border border-rose-200 hover:bg-rose-50 text-rose-600 font-bold rounded-2xl h-11 text-xs cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-                >
-                  <Ban className="h-4 w-4" />
-                  Rechazar Solicitud
-                </Button>
-              )}
+                <div className="flex flex-col sm:flex-row gap-3 w-full">
+                  {/* Botón Rechazar */}
+                  <Button
+                    onClick={() => setMostrarRechazoModal(true)}
+                    disabled={isDisbursing}
+                    className="flex-1 border border-rose-200 hover:bg-rose-50 text-rose-600 font-bold rounded-2xl h-11 text-xs cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Ban className="h-4 w-4" />
+                    Rechazar Solicitud
+                  </Button>
 
-              {/* Botón Aprobar y Desembolsar (Interceptado para Compliance Documental) */}
-              {(creditoSeleccionado.estado === 'SOLICITADO' || creditoSeleccionado.estado === 'EN_REVISION') && (
-                <div className="flex gap-2 w-full">
+                  {/* Botón Aprobar y Desembolsar */}
                   <Button
                     onClick={() => handleImprimirPagare(creditoSeleccionado)}
                     disabled={isDisbursing}
@@ -1177,14 +1189,15 @@ export const AprobacionCreditos: React.FC = () => {
                     <CheckCircle2 className="h-4 w-4" />
                     Aprobar y Desembolsar Fondos
                   </Button>
+
+                  {/* Botón Imprimir Tabla de Amortización */}
                   <Button
                     onClick={() => descargarTablaAmortizacionPdf(creditoSeleccionado, tablaAmortizacion)}
                     disabled={cargandoAmortizacion || isDisbursing}
-                    title="Imprimir Tabla de Amortización Proyectada"
-                    variant="outline"
-                    className="h-11 w-11 p-0 border border-slate-200 hover:bg-slate-50 text-slate-650 rounded-2xl flex items-center justify-center cursor-pointer shadow-sm shrink-0 disabled:opacity-50"
+                    className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-650 font-bold rounded-2xl h-11 text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm disabled:opacity-50"
                   >
                     <Printer className="h-4 w-4" />
+                    Imprimir Amortización
                   </Button>
                 </div>
               )}
@@ -1193,6 +1206,16 @@ export const AprobacionCreditos: React.FC = () => {
               {(creditoSeleccionado.estado === 'APROBADO' || 
                 creditoSeleccionado.estado === 'DESEMBOLSADO') && (
                 <div className="flex w-full gap-4">
+                  {/* Botón Ver Pagaré Firmado (Mover a la izquierda con icono Eye) */}
+                  <Button
+                    onClick={() => setVerPagareCredito(creditoSeleccionado)}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl h-11 text-xs cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-emerald-700/10"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Ver Pagaré Firmado
+                  </Button>
+
+                  {/* Botón Imprimir Tabla de Amortización (Mover a la derecha con icono Printer) */}
                   <Button
                     onClick={() => {
                       descargarTablaAmortizacionPdf(creditoSeleccionado, tablaAmortizacion);
@@ -1211,12 +1234,6 @@ export const AprobacionCreditos: React.FC = () => {
                         Imprimir Tabla de Amortización
                       </>
                     )}
-                  </Button>
-                  <Button
-                    onClick={() => setVerPagareCredito(creditoSeleccionado)}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl h-11 text-xs cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-emerald-700/10"
-                  >
-                    👁️ Ver Pagaré Firmado
                   </Button>
                 </div>
               )}
@@ -1657,39 +1674,108 @@ export const AprobacionCreditos: React.FC = () => {
                 </div>
                 <div className="space-y-0.5">
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Archivo Custodiado:</span>
-                  <span className="font-bold text-slate-700 truncate block" title={documentosFirmados[verPagareCredito.id] || `pagare_firmado_${verPagareCredito.numeroCredito}.pdf`}>
-                    📎 {documentosFirmados[verPagareCredito.id] || `pagare_firmado_${verPagareCredito.numeroCredito}.pdf`}
+                  <span className="font-bold text-slate-700 truncate block" title={documentosFirmados[verPagareCredito.id]?.name || `pagare_firmado_${verPagareCredito.numeroCredito}.pdf`}>
+                    📎 {documentosFirmados[verPagareCredito.id]?.name || `pagare_firmado_${verPagareCredito.numeroCredito}.pdf`}
                   </span>
                 </div>
               </div>
 
-              {/* Simulación del Documento Firmado con Sello */}
-              <div className="border border-slate-200 rounded-3xl p-6 bg-white relative overflow-hidden shadow-inner flex flex-col items-center justify-center min-h-[180px] select-none">
-                {/* Sello de Custodia de Agua */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] select-none pointer-events-none">
-                  <Building className="h-40 w-40 text-slate-800" />
-                </div>
-                
-                {/* Sello de Compliance */}
-                <div className="absolute rotate-12 border-4 border-emerald-600/30 text-emerald-600/50 font-black text-[10px] tracking-widest px-4 py-2 rounded-xl uppercase select-none pointer-events-none flex flex-col items-center justify-center text-center">
-                  <span>CONTROL DE CUSTODIA</span>
-                  <span>BÓVEDA DIGITAL ITQ</span>
-                  <span className="text-[8px] mt-0.5">APROBADO & DESEMBOLSADO</span>
-                </div>
+              {/* Contenedor del Documento Real o Mockup si no hay archivo subido */}
+              {(() => {
+                const doc = documentosFirmados[verPagareCredito.id];
+                if (!doc || !doc.dataUrl) {
+                  return (
+                    <div className="border border-slate-200 rounded-3xl p-6 bg-white relative overflow-hidden shadow-inner flex flex-col items-center justify-center min-h-[180px] select-none">
+                      {/* Sello de Custodia de Agua */}
+                      <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] select-none pointer-events-none">
+                        <Building className="h-40 w-40 text-slate-800" />
+                      </div>
+                      
+                      {/* Sello de Compliance */}
+                      <div className="absolute rotate-12 border-4 border-emerald-600/30 text-emerald-600/50 font-black text-[10px] tracking-widest px-4 py-2 rounded-xl uppercase select-none pointer-events-none flex flex-col items-center justify-center text-center">
+                        <span>CONTROL DE CUSTODIA</span>
+                        <span>BÓVEDA DIGITAL ITQ</span>
+                        <span className="text-[8px] mt-0.5">APROBADO & DESEMBOLSADO</span>
+                      </div>
 
-                {/* Bosquejo del Documento */}
-                <div className="w-full space-y-2.5 opacity-40">
-                  <div className="h-2.5 w-1/3 bg-slate-300 rounded" />
-                  <div className="h-1.5 w-full bg-slate-200 rounded" />
-                  <div className="h-1.5 w-full bg-slate-200 rounded" />
-                  <div className="h-1.5 w-5/6 bg-slate-200 rounded" />
-                  <div className="pt-3 flex justify-between">
-                    <div className="h-6 w-20 border-b border-dashed border-slate-300 flex items-end justify-center text-[7px] text-slate-400">Deudor</div>
-                    <div className="h-6 w-20 border-b border-dashed border-slate-300 flex items-end justify-center text-[7px] text-slate-400">Garante</div>
-                    <div className="h-6 w-20 border-b border-dashed border-slate-300 flex items-end justify-center text-[7px] text-slate-400">Oficial</div>
+                      {/* Bosquejo del Documento */}
+                      <div className="w-full space-y-2.5 opacity-40">
+                        <div className="h-2.5 w-1/3 bg-slate-300 rounded" />
+                        <div className="h-1.5 w-full bg-slate-200 rounded" />
+                        <div className="h-1.5 w-full bg-slate-200 rounded" />
+                        <div className="h-1.5 w-5/6 bg-slate-200 rounded" />
+                        <div className="pt-3 flex justify-between">
+                          <div className="h-6 w-20 border-b border-dashed border-slate-300 flex items-end justify-center text-[7px] text-slate-400">Deudor</div>
+                          <div className="h-6 w-20 border-b border-dashed border-slate-300 flex items-end justify-center text-[7px] text-slate-400">Garante</div>
+                          <div className="h-6 w-20 border-b border-dashed border-slate-300 flex items-end justify-center text-[7px] text-slate-400">Oficial</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const isImage = doc.dataUrl.startsWith('data:image/');
+                const isPdf = doc.dataUrl.startsWith('data:application/pdf');
+
+                if (isImage) {
+                  return (
+                    <div className="border border-slate-200 rounded-3xl p-4 bg-slate-50 flex flex-col items-center justify-center min-h-[200px] relative">
+                      <div className="max-h-[220px] overflow-y-auto w-full flex justify-center">
+                        <img 
+                          src={doc.dataUrl} 
+                          alt={doc.name} 
+                          className="max-h-[200px] object-contain rounded-lg border border-slate-100 shadow-sm animate-scale-up"
+                        />
+                      </div>
+                      <div className="mt-2 text-[10px] text-slate-500 font-medium truncate max-w-full">
+                        {doc.name}
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (isPdf) {
+                  return (
+                    <div className="border border-slate-200 rounded-3xl p-6 bg-slate-50 flex flex-col items-center justify-center min-h-[200px] text-center gap-3">
+                      <div className="h-14 w-14 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500">
+                        <FileText className="h-7 w-7" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-700 text-xs truncate max-w-[240px]">{doc.name}</h4>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5 uppercase tracking-wider">Documento PDF Firmado</p>
+                      </div>
+                      <a 
+                        href={doc.dataUrl} 
+                        download={doc.name}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        Ver / Descargar PDF
+                      </a>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="border border-slate-200 rounded-3xl p-6 bg-slate-50 flex flex-col items-center justify-center min-h-[200px] text-center gap-3">
+                    <div className="h-14 w-14 rounded-2xl bg-[#0054A6]/10 border border-[#0054A6]/20 flex items-center justify-center text-[#0054A6]">
+                      <FileText className="h-7 w-7" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-700 text-xs truncate max-w-[240px]">{doc.name}</h4>
+                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5 uppercase tracking-wider">Archivo Custodiado</p>
+                    </div>
+                    <a 
+                      href={doc.dataUrl} 
+                      download={doc.name}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Descargar Archivo
+                    </a>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
 
               <div className="text-[10px] text-slate-400 text-center font-medium leading-relaxed">
                 Este pagaré digitalizado ha sido verificado mediante firma física y se encuentra custodiado en los servidores de la Cooperativa ITQ bajo los lineamientos de la SEPS.
@@ -1698,10 +1784,13 @@ export const AprobacionCreditos: React.FC = () => {
 
             <div className="flex gap-3 pt-2">
               <Button
-                onClick={() => setVerPagareCredito(null)}
-                className="flex-1 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-xl h-10 flex items-center justify-center text-xs cursor-pointer shadow-md shadow-blue-805/10"
+                onClick={() => {
+                  descargarPagarePdf(verPagareCredito, tablaAmortizacion, user?.nombresCompletos || 'Oficial');
+                }}
+                className="flex-1 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-xl h-10 flex items-center justify-center gap-2 text-xs cursor-pointer shadow-md shadow-blue-805/10"
               >
-                Entendido
+                <Printer className="h-4 w-4" />
+                Imprimir Pagaré
               </Button>
             </div>
 
