@@ -1,0 +1,1672 @@
+import React, { useState, useEffect } from 'react';
+import api from '../../services/api';
+import { Card } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import { useAuth } from '../../context/AuthContext';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { 
+  Layers, Clock, X, CheckCircle2, 
+  AlertTriangle, AlertCircle, Loader2, 
+  TrendingUp, Ban, Printer
+} from 'lucide-react';
+
+interface Socio {
+  id: number;
+  identificacion: string;
+  nombresCompletos: string;
+  direccion: string;
+  telefono: string;
+  correo: string;
+  actividadEconomica: string;
+  ingresosMensuales: number;
+  gastosMensuales: number;
+  deudasActuales: number;
+  capacidadPago: number;
+}
+
+interface Credito {
+  id: number;
+  socio: Socio;
+  numeroCredito: string;
+  montoSolicitado: number;
+  montoDesembolsado: number;
+  plazoMeses: number;
+  tasaInteresAnual: number;
+  tasaMoraAnual: number;
+  tipoAmortizacion: string;
+  garantiaDescripcion: string;
+  estado: 'SOLICITADO' | 'EN_REVISION' | 'APROBADO' | 'RECHAZADO' | 'DESEMBOLSADO' | 'CANCELADO' | 'EN_MORA';
+  fechaSolicitud: string;
+  fechaDesembolso?: string;
+  usuarioOficialId?: number;
+  motivoRechazo?: string;
+}
+
+interface CuotaProyectada {
+  num: number;
+  fecha: string;
+  capital: number;
+  interes: number;
+  total: number;
+  saldo: number;
+}
+
+// Formateador de moneda regional estándar ($500.00)
+const formatCurrency = (val: number | undefined | null) => {
+  const v = val ?? 0;
+  return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+// Conversor de Números a Letras en Español para Respaldo Legal
+const numeroALetras = (num: number): string => {
+  const unidades = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
+  const decenas = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+  const especiales = {
+    11: 'ONCE', 12: 'DOCE', 13: 'TRECE', 14: 'CATORCE', 15: 'QUINCE',
+    16: 'DIECISEIS', 17: 'DIECISIETE', 18: 'DIECIOCHO', 19: 'DIECINUEVE',
+    21: 'VEINTIUN', 22: 'VEINTIDOS', 23: 'VEINTITRES', 24: 'VEINTICUATRO',
+    25: 'VEINTICINCO', 26: 'VEINTISEIS', 27: 'VEINTISIETE', 28: 'VEINTIOCHO', 29: 'VEINTINUEVE'
+  };
+  const centenas = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SIETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+
+  const miles = (n: number): string => {
+    if (n === 0) return '';
+    if (n === 1) return 'MIL';
+    return `${convertirTresDigitos(n)} MIL`;
+  };
+
+  const convertirTresDigitos = (n: number): string => {
+    if (n === 100) return 'CIEN';
+    const c = Math.floor(n / 100);
+    const resto = n % 100;
+    
+    let res = centenas[c];
+    if (resto > 0) {
+      if (res !== '') res += ' ';
+      if (resto in especiales) {
+        res += (especiales as any)[resto];
+      } else {
+        const d = Math.floor(resto / 10);
+        const u = resto % 10;
+        if (d > 0) {
+          res += decenas[d];
+          if (u > 0) res += ` Y ${unidades[u]}`;
+        } else {
+          res += unidades[u];
+        }
+      }
+    }
+    return res;
+  };
+
+  const entero = Math.floor(num);
+  const decimal = Math.round((num - entero) * 100);
+  const centavos = `${decimal.toString().padStart(2, '0')}/100`;
+
+  if (entero === 0) return `CERO CON ${centavos}`;
+
+  let texto = '';
+  const millon = Math.floor(entero / 1000000);
+  const mil = Math.floor((entero % 1000000) / 1000);
+  const unidadesResto = entero % 1000;
+
+  if (millon > 0) {
+    if (millon === 1) {
+      texto += 'UN MILLÓN';
+    } else {
+      texto += `${convertirTresDigitos(millon)} MILLONES`;
+    }
+  }
+
+  if (mil > 0) {
+    if (texto !== '') texto += ' ';
+    texto += miles(mil);
+  }
+
+  if (unidadesResto > 0) {
+    if (texto !== '') texto += ' ';
+    texto += convertirTresDigitos(unidadesResto);
+  }
+
+  return `${texto} CON ${centavos} CENTAVOS`;
+};
+
+// Simulador determinista de Score Crediticio (Rango 300 a 1000)
+const getCreditScore = (socio: Socio | undefined, cuota: number) => {
+  if (!socio) return 600;
+  const ing = socio.ingresosMensuales ?? (socio as any).ingresos ?? 0;
+  const gas = socio.gastosMensuales ?? (socio as any).gastos ?? 0;
+  const deu = socio.deudasActuales ?? (socio as any).deudas ?? 0;
+  const netFlow = Number(ing) - Number(gas);
+  
+  let score = 700;
+  
+  if (netFlow > 0) {
+    score += Math.min(150, Math.floor(netFlow / 10));
+  } else {
+    score -= 150;
+  }
+  
+  if (deu > 0) {
+    score -= Math.min(150, Math.floor(deu / 5));
+  }
+  
+  const ratio = netFlow > 0 ? (cuota / netFlow) * 100 : 100;
+  if (ratio > 40) {
+    score -= 200;
+  } else if (netFlow <= 0) {
+    score -= 250;
+  } else {
+    score += 50;
+  }
+  
+  return Math.max(300, Math.min(1000, score));
+};
+
+export const AprobacionCreditos: React.FC = () => {
+  const { user } = useAuth();
+  
+  const [solicitudes, setSolicitudes] = useState<Credito[]>([]);
+  const [cargando, setCargando] = useState<boolean>(true);
+  const [creditoSeleccionado, setCreditoSeleccionado] = useState<Credito | null>(null);
+  const [tablaAmortizacion, setTablaAmortizacion] = useState<CuotaProyectada[]>([]);
+  const [cargandoAmortizacion, setCargandoAmortizacion] = useState<boolean>(false);
+  
+  // Respaldo Legal Pagaré
+  const [pagareCredito, setPagareCredito] = useState<Credito | null>(null);
+  const [pagareCuotas, setPagareCuotas] = useState<CuotaProyectada[]>([]);
+  const [cargandoPagareCuotas, setCargandoPagareCuotas] = useState<boolean>(false);
+  const [pagareFirmadoFile, setPagareFirmadoFile] = useState<File | null>(null);
+  const [pagareFirmadoName, setPagareFirmadoName] = useState<string>('');
+
+  // Modals y Resoluciones
+  const [mostrarRechazoModal, setMostrarRechazoModal] = useState<boolean>(false);
+  const [motivoRechazo, setMotivoRechazo] = useState<string>('');
+  const [isDisbursing, setIsDisbursing] = useState<boolean>(false);
+  const [disburseError, setDisburseError] = useState<string | null>(null);
+  
+  // Toast
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
+    show: false,
+    message: '',
+    type: 'success'
+  });
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 4500);
+  };
+
+  const fetchSolicitudes = async () => {
+    setCargando(true);
+    try {
+      const res = await api.get('/creditos');
+      setSolicitudes(res.data || []);
+    } catch (err) {
+      console.error('Error fetching solicitudes:', err);
+      showToast('Error al cargar solicitudes de crédito.', 'error');
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSolicitudes();
+  }, []);
+
+  const fetchAmortizacion = async (credito: Credito) => {
+    setTablaAmortizacion([]);
+    setCargandoAmortizacion(true);
+    try {
+      if (credito.estado === 'DESEMBOLSADO' || credito.estado === 'APROBADO') {
+        const res = await api.get(`/creditos/${credito.id}/amortizacion`);
+        const cuotas = res.data || [];
+        
+        let runningBalance = credito.montoSolicitado;
+        const mapped = cuotas.map((c: any) => {
+          const cap = c.capitalProyectado;
+          const int = c.interesProyectado;
+          const tot = c.cuotaTotalProyectada || (cap + int);
+          runningBalance = Math.max(0, runningBalance - cap);
+          return {
+            num: c.numeroCuota,
+            fecha: c.fechaVencimiento,
+            capital: cap,
+            interes: int,
+            total: tot,
+            saldo: runningBalance
+          };
+        });
+        setTablaAmortizacion(mapped);
+      } else {
+        const res = await api.get('/creditos/simular', {
+          params: {
+            monto: credito.montoSolicitado,
+            plazoMeses: credito.plazoMeses,
+            tasaAnual: credito.tasaInteresAnual,
+            sistema: credito.tipoAmortizacion
+          }
+        });
+        const cuotas = res.data || [];
+        const mapped = cuotas.map((c: any) => ({
+          num: c.numeroCuota,
+          fecha: c.fechaVencimiento,
+          capital: c.capital,
+          interes: c.interes,
+          total: c.cuotaTotal,
+          saldo: c.saldoRemanente
+        }));
+        setTablaAmortizacion(mapped);
+      }
+    } catch (err) {
+      console.error('Error al simular/cargar tabla:', err);
+    } finally {
+      setCargandoAmortizacion(false);
+    }
+  };
+
+  useEffect(() => {
+    if (creditoSeleccionado) {
+      fetchAmortizacion(creditoSeleccionado);
+    }
+  }, [creditoSeleccionado]);
+
+  // Obtener amortización de pagaré (Soporta simulación y definitivo)
+  const handleImprimirPagare = async (cred: Credito) => {
+    setPagareCredito(cred);
+    setPagareCuotas([]);
+    setCargandoPagareCuotas(true);
+    setPagareFirmadoFile(null);
+    setPagareFirmadoName('');
+    setDisburseError(null);
+    try {
+      if (cred.estado === 'DESEMBOLSADO' || cred.estado === 'APROBADO') {
+        const res = await api.get(`/creditos/${cred.id}/amortizacion`);
+        const cuotas = res.data || [];
+        
+        let runningBalance = cred.montoSolicitado;
+        const mapped = cuotas.map((c: any) => {
+          const cap = c.capitalProyectado;
+          const int = c.interesProyectado;
+          const tot = c.cuotaTotalProyectada || (cap + int);
+          runningBalance = Math.max(0, runningBalance - cap);
+          return {
+            num: c.numeroCuota,
+            fecha: c.fechaVencimiento,
+            capital: cap,
+            interes: int,
+            total: tot,
+            saldo: runningBalance
+          };
+        });
+        setPagareCuotas(mapped);
+      } else {
+        // Si está en análisis o solicitado, simular para el pagaré previo
+        const res = await api.get('/creditos/simular', {
+          params: {
+            monto: cred.montoSolicitado,
+            plazoMeses: cred.plazoMeses,
+            tasaAnual: cred.tasaInteresAnual,
+            sistema: cred.tipoAmortizacion
+          }
+        });
+        const cuotas = res.data || [];
+        const mapped = cuotas.map((c: any) => ({
+          num: c.numeroCuota,
+          fecha: c.fechaVencimiento,
+          capital: c.capital,
+          interes: c.interes,
+          total: c.cuotaTotal,
+          saldo: c.saldoRemanente
+        }));
+        setPagareCuotas(mapped);
+      }
+    } catch (err) {
+      console.error('Error al cargar amortización de pagaré:', err);
+      showToast('Error al cargar la tabla de amortización del pagaré.', 'error');
+    } finally {
+      setCargandoPagareCuotas(false);
+    }
+  };
+
+  // Generación e Impresión del PDF Pagaré (Pág 1: Pagaré, Pág 2+: Tabla Amortización)
+  const descargarPagarePdf = (cred: Credito, cuotas: CuotaProyectada[], oficialName: string) => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const marginX = 20;
+    let currentY = 20;
+
+    // PAGINA 1: Membrete Institucional
+    doc.setFont("times", "bold");
+    doc.setFontSize(14);
+    doc.text("COOPERATIVA DE AHORRO Y CRÉDITO ITQ", 105, currentY, { align: "center" });
+    
+    currentY += 5;
+    doc.setFontSize(10);
+    doc.text("RUC: 1791234567001", 105, currentY, { align: "center" });
+    
+    currentY += 5;
+    doc.setFont("times", "normal");
+    doc.text("Dirección Matriz: Av. Antonio de Ulloa N28-30, Quito, Ecuador", 105, currentY, { align: "center" });
+    
+    currentY += 12;
+
+    // Título del Pagaré
+    doc.setFont("times", "bold");
+    doc.setFontSize(15);
+    doc.text("PAGARÉ A LA ORDEN", 105, currentY, { align: "center" });
+    
+    currentY += 8;
+    doc.setFontSize(11);
+    doc.text(`Por USD: ${formatCurrency(cred.montoSolicitado)}`, 105, currentY, { align: "center" });
+
+    currentY += 6;
+    const fechaStr = new Date(cred.fechaSolicitud).toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+    doc.setFont("times", "italic");
+    doc.setFontSize(9);
+    doc.text(`Fecha de Emisión: ${fechaStr}`, 105, currentY, { align: "center" });
+
+    currentY += 12;
+    
+    // Cuerpo Legal
+    doc.setFont("times", "normal");
+    doc.setFontSize(10);
+    
+    const textoLegal = `Debo y pagaré incondicionalmente a la orden de la COOPERATIVA DE AHORRO Y CRÉDITO ITQ, en esta ciudad o en el lugar que se me requiera, la cantidad de ${formatCurrency(cred.montoSolicitado)} (${numeroALetras(cred.montoSolicitado)}) dólares de los Estados Unidos de América, reconociendo una tasa de interés del ${cred.tasaInteresAnual}% anual. En caso de mora, me sujeto a la tasa de interés máxima de mora permitida por la Junta de Política y Regulación Financiera del Ecuador. Renuncio expresamente a fuero y domicilio, y me someto a los jueces competentes de esta jurisdicción y al trámite ejecutivo o coactivo a elección del acreedor.`;
+
+    const splitText = doc.splitTextToSize(textoLegal, 170);
+    doc.text(splitText, marginX, currentY, { align: "justify" });
+    
+    // Firmas al pie de la Página 1
+    const sigY = 210;
+    doc.setFont("times", "bold");
+    doc.setFontSize(9);
+
+    const sigWidth = 45;
+
+    // Deudor Principal
+    doc.line(marginX, sigY, marginX + sigWidth, sigY);
+    doc.text("DEUDOR PRINCIPAL", marginX + sigWidth/2, sigY + 4, { align: "center" });
+    doc.setFont("times", "normal");
+    doc.text(cred.socio?.nombresCompletos?.toUpperCase() || "", marginX + sigWidth/2, sigY + 8, { align: "center" });
+    doc.text(`C.I.: ${cred.socio?.identificacion || ""}`, marginX + sigWidth/2, sigY + 12, { align: "center" });
+
+    // Garante
+    doc.setFont("times", "bold");
+    doc.line(105 - sigWidth/2, sigY, 105 + sigWidth/2, sigY);
+    doc.text("CÓNYUGE / GARANTE", 105, sigY + 4, { align: "center" });
+    doc.setFont("times", "normal");
+    doc.text("FIRMA DEL GARANTE", 105, sigY + 8, { align: "center" });
+    doc.text("C.I.: _________________", 105, sigY + 12, { align: "center" });
+
+    // Oficial de Crédito
+    doc.setFont("times", "bold");
+    doc.line(190 - sigWidth, sigY, 190, sigY);
+    doc.text("OFICIAL DE CRÉDITO", 190 - sigWidth/2, sigY + 4, { align: "center" });
+    doc.setFont("times", "normal");
+    doc.text(oficialName.toUpperCase(), 190 - sigWidth/2, sigY + 8, { align: "center" });
+    doc.text("COOP. DE AHORRO Y CRÉDITO ITQ", 190 - sigWidth/2, sigY + 12, { align: "center" });
+
+    // PAGINA 2: Salto de Página Obligatorio para la Tabla de Amortización
+    doc.addPage();
+    currentY = 20;
+
+    doc.setFont("times", "bold");
+    doc.setFontSize(12);
+    doc.text("COOPERATIVA DE AHORRO Y CRÉDITO ITQ", 105, currentY, { align: "center" });
+    
+    currentY += 6;
+    doc.setFontSize(10);
+    doc.text("ANEXO I: TABLA DE AMORTIZACIÓN", 105, currentY, { align: "center" });
+    
+    currentY += 5;
+    doc.setFont("times", "normal");
+    doc.setFontSize(9);
+    doc.text(`Crédito Nro: ${cred.numeroCredito}  |  Socio: ${cred.socio?.nombresCompletos}`, 105, currentY, { align: "center" });
+
+    currentY += 12;
+
+    autoTable(doc, {
+      startY: currentY,
+      margin: { left: 20, right: 20 },
+      head: [
+        ['Cuota', 'Vencimiento', 'Capital', 'Interés', 'Cuota Total', 'Saldo Restante']
+      ],
+      body: cuotas.map(cuo => [
+        cuo.num.toString(),
+        cuo.fecha,
+        formatCurrency(cuo.capital),
+        formatCurrency(cuo.interes),
+        formatCurrency(cuo.total),
+        formatCurrency(cuo.saldo)
+      ]),
+      theme: 'grid',
+      styles: {
+        font: 'courier',
+        fontSize: 8.5,
+        cellPadding: 1.5,
+      },
+      headStyles: {
+        fillColor: [245, 247, 250],
+        textColor: [30, 41, 59],
+        font: 'times',
+        fontStyle: 'bold',
+        lineWidth: 0.1,
+        lineColor: [180, 180, 180]
+      },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 15 },
+        1: { halign: 'center', cellWidth: 30 },
+        2: { halign: 'right', cellWidth: 30 },
+        3: { halign: 'right', cellWidth: 30 },
+        4: { halign: 'right', cellWidth: 30 },
+        5: { halign: 'right', cellWidth: 35 }
+      }
+    });
+
+    doc.save(`Pagare_${cred.numeroCredito}.pdf`);
+  };
+
+  // Genera Exclusivamente la Tabla de Amortización con Membrete (Créditos ya Aprobados/Desembolsados)
+  const descargarTablaAmortizacionPdf = (cred: Credito, cuotas: CuotaProyectada[]) => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    let currentY = 20;
+
+    // Membrete Institucional
+    doc.setFont("times", "bold");
+    doc.setFontSize(14);
+    doc.text("COOPERATIVA DE AHORRO Y CRÉDITO ITQ", 105, currentY, { align: "center" });
+    
+    currentY += 5;
+    doc.setFontSize(10);
+    doc.text("RUC: 1791234567001", 105, currentY, { align: "center" });
+    
+    currentY += 5;
+    doc.setFont("times", "normal");
+    doc.text("Dirección Matriz: Av. Antonio de Ulloa N28-30, Quito, Ecuador", 105, currentY, { align: "center" });
+    
+    currentY += 12;
+
+    // Título de la tabla
+    doc.setFont("times", "bold");
+    doc.setFontSize(13);
+    doc.text("TABLA DE AMORTIZACIÓN", 105, currentY, { align: "center" });
+    
+    currentY += 5;
+    doc.setFont("times", "normal");
+    doc.setFontSize(9.5);
+    doc.text(`Crédito Nro: ${cred.numeroCredito}  |  Socio: ${cred.socio?.nombresCompletos}`, 105, currentY, { align: "center" });
+
+    currentY += 10;
+
+    autoTable(doc, {
+      startY: currentY,
+      margin: { left: 20, right: 20 },
+      head: [
+        ['Cuota', 'Vencimiento', 'Capital', 'Interés', 'Cuota Total', 'Saldo Restante']
+      ],
+      body: cuotas.map(cuo => [
+        cuo.num.toString(),
+        cuo.fecha,
+        formatCurrency(cuo.capital),
+        formatCurrency(cuo.interes),
+        formatCurrency(cuo.total),
+        formatCurrency(cuo.saldo)
+      ]),
+      theme: 'grid',
+      styles: {
+        font: 'courier',
+        fontSize: 8.5,
+        cellPadding: 1.5,
+      },
+      headStyles: {
+        fillColor: [245, 247, 250],
+        textColor: [30, 41, 59],
+        font: 'times',
+        fontStyle: 'bold',
+        lineWidth: 0.1,
+        lineColor: [180, 180, 180]
+      },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 15 },
+        1: { halign: 'center', cellWidth: 30 },
+        2: { halign: 'right', cellWidth: 30 },
+        3: { halign: 'right', cellWidth: 30 },
+        4: { halign: 'right', cellWidth: 30 },
+        5: { halign: 'right', cellWidth: 35 }
+      }
+    });
+
+    doc.save(`TablaAmortizacion_${cred.numeroCredito}.pdf`);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setPagareFirmadoFile(file);
+      setPagareFirmadoName(file.name);
+    }
+  };
+
+  // Manejar click en tarjeta
+  const handleSelectCardClick = async (credito: Credito) => {
+    setCreditoSeleccionado(credito);
+    setDisburseError(null);
+    
+    if (credito.estado === 'SOLICITADO') {
+      try {
+        const res = await api.put(`/creditos/${credito.id}/revisar`);
+        setCreditoSeleccionado(res.data);
+        fetchSolicitudes();
+      } catch (err) {
+        console.error('Error al marcar crédito en revisión:', err);
+      }
+    }
+  };
+
+  // Rechazar Solicitud
+  const handleRechazarSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!creditoSeleccionado) return;
+    if (!motivoRechazo.trim()) {
+      showToast('Por favor, ingrese el motivo de rechazo.', 'error');
+      return;
+    }
+
+    try {
+      await api.put(`/creditos/${creditoSeleccionado.id}/rechazar`, {
+        motivo: motivoRechazo.trim()
+      });
+      showToast('Solicitud rechazada correctamente.', 'success');
+      setMostrarRechazoModal(false);
+      setMotivoRechazo('');
+      setCreditoSeleccionado(null);
+      fetchSolicitudes();
+    } catch (err: any) {
+      console.error('Error al rechazar crédito:', err);
+      showToast(err.response?.data || 'Error al procesar el rechazo.', 'error');
+    }
+  };
+
+  // Secuencia de Aprobación y Desembolso blindada (Compliance Legal)
+  const handleAprobarYDesembolsar = async () => {
+    const targetCredito = pagareCredito || creditoSeleccionado;
+    if (!targetCredito) return;
+    
+    setIsDisbursing(true);
+    setDisburseError(null);
+    let paso1Completado = false;
+    
+    try {
+      // Paso 1: Aprobar el crédito (Estado -> APROBADO)
+      await api.put(`/creditos/${targetCredito.id}/aprobar`);
+      paso1Completado = true;
+      
+      // Paso 2: Consultar cuentas del socio para encontrar la cuenta de ahorros activa
+      const resCuentas = await api.get(`/cuentas/socio/${targetCredito.socio.id}`);
+      const cuentas = resCuentas.data || [];
+      const cuentaAhorro = cuentas.find((c: any) => c.tipo === 'AHORRO_VISTA');
+      
+      if (!cuentaAhorro) {
+        throw new Error('EL_CREDITO_FUE_APROBADO_PERO_SIN_CUENTA');
+      }
+      
+      // Paso 3: Ejecutar el desembolso transaccional
+      await api.post('/creditos/desembolsar', {
+        creditoId: targetCredito.id,
+        cuentaAhorrosId: cuentaAhorro.id,
+        referenciaDocumental: pagareFirmadoName || 'pagare_firmado.pdf'
+      });
+      
+      showToast('Crédito aprobado y desembolsado con éxito.', 'success');
+      setPagareCredito(null); // Cerrar pagare modal
+      setCreditoSeleccionado(null); // Cerrar detail modal
+      setPagareFirmadoFile(null);
+      setPagareFirmadoName('');
+      fetchSolicitudes();
+      
+    } catch (err: any) {
+      console.error('Error crítico en el pipeline de desembolso:', err);
+      
+      if (err.message === 'EL_CREDITO_FUE_APROBADO_PERO_SIN_CUENTA') {
+        setDisburseError(
+          'El crédito fue aprobado, pero el desembolso falló porque el socio no posee una cuenta de ahorros activa para recibir el desembolso. Intente desembolsar manualmente.'
+        );
+        showToast('Error en la secuencia de desembolso.', 'error');
+      } else if (paso1Completado) {
+        setDisburseError(
+          'El crédito fue aprobado, pero el desembolso falló por error de red. Intente desembolsar manualmente.'
+        );
+        showToast('Error en la secuencia de desembolso.', 'error');
+      } else {
+        showToast(err.response?.data || 'Error al aprobar el crédito.', 'error');
+      }
+    } finally {
+      setIsDisbursing(false);
+    }
+  };
+
+  // Helper para tiempo transcurrido
+  const getElapsedTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    if (isNaN(diffMs)) return 'Reciente';
+    
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) return 'Hace un momento';
+    if (diffMins < 60) return `Hace ${diffMins} min`;
+    if (diffHours < 24) return `Hace ${diffHours} hr`;
+    return `Hace ${diffDays} día${diffDays > 1 ? 's' : ''}`;
+  };
+
+  // Clasificación de Columnas Kanban
+  const colPendientes = solicitudes.filter(s => s.estado === 'SOLICITADO');
+  const colAnalisis = solicitudes.filter(s => s.estado === 'EN_REVISION');
+  const colAprobados = solicitudes.filter(s => s.estado === 'APROBADO' || s.estado === 'DESEMBOLSADO');
+  const colRechazados = solicitudes.filter(s => s.estado === 'RECHAZADO');
+
+  // Cálculos de riesgo con verificaciones nulas y fallbacks lógicos
+  const ingresos = creditoSeleccionado?.socio?.ingresosMensuales ?? (creditoSeleccionado?.socio as any)?.ingresos ?? 0;
+  const gastos = creditoSeleccionado?.socio?.gastosMensuales ?? (creditoSeleccionado?.socio as any)?.gastos ?? 0;
+  const deudas = creditoSeleccionado?.socio?.deudasActuales ?? (creditoSeleccionado?.socio as any)?.deudas ?? 0;
+
+  const flujoNeto = Number(ingresos) - Number(gastos);
+  const cuotaProyectada = tablaAmortizacion.length > 0 ? (tablaAmortizacion[0]?.total ?? 0) : 0;
+  
+  const porcentajeCapacidad = flujoNeto > 0 ? (cuotaProyectada / flujoNeto) * 100 : 100;
+  const superaCapacidad = flujoNeto <= 0 || porcentajeCapacidad > 40;
+
+  return (
+    <div className="space-y-6 animate-fade-in select-none">
+      
+      {/* Encabezado del Módulo */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-100 no-print">
+        <div>
+          <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+            <Layers className="h-5.5 w-5.5 text-[#0054A6]" />
+            Mesa de Aprobación de Créditos
+          </h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Evalúa el flujo neto del socio, simula la tabla de amortización y desembolsa de forma segura.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={fetchSolicitudes}
+            variant="outline"
+            disabled={cargando}
+            className="border-slate-200 text-slate-650 hover:bg-slate-50 font-bold rounded-xl text-xs h-9 shadow-sm cursor-pointer"
+          >
+            {cargando ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+            Actualizar Tablero
+          </Button>
+        </div>
+      </div>
+
+      {/* Tablero Kanban con Fondos Ultra Tenues estilo Apple Light */}
+      {cargando ? (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 min-h-[500px] no-print">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="bg-slate-50/40 rounded-[2rem] border border-slate-100 p-4 animate-pulse space-y-4">
+              <div className="h-4 w-24 bg-slate-200 rounded-lg" />
+              <div className="h-36 bg-white rounded-2xl border border-slate-100" />
+              <div className="h-36 bg-white rounded-2xl border border-slate-100" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-start no-print">
+          
+          {/* Columna: PENDIENTES */}
+          <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                Pendientes ({colPendientes.length})
+              </span>
+            </div>
+            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+              {colPendientes.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
+                  Sin solicitudes pendientes
+                </div>
+              ) : (
+                colPendientes.map(cred => (
+                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} onPrintClick={handleImprimirPagare} />
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Columna: EN ANÁLISIS */}
+          <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                En Análisis ({colAnalisis.length})
+              </span>
+            </div>
+            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+              {colAnalisis.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
+                  Ningún crédito en análisis
+                </div>
+              ) : (
+                colAnalisis.map(cred => (
+                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} onPrintClick={handleImprimirPagare} />
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Columna: APROBADOS/DESEMBOLSADOS */}
+          <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Aprobados ({colAprobados.length})
+              </span>
+            </div>
+            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+              {colAprobados.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
+                  Ningún crédito aprobado hoy
+                </div>
+              ) : (
+                colAprobados.map(cred => (
+                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} onPrintClick={handleImprimirPagare} />
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Columna: RECHAZADOS */}
+          <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-rose-500" />
+                Rechazados ({colRechazados.length})
+              </span>
+            </div>
+            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+              {colRechazados.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
+                  Sin solicitudes rechazadas
+                </div>
+              ) : (
+                colRechazados.map(cred => (
+                  <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} onPrintClick={handleImprimirPagare} />
+                ))
+              )}
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* Modal Centrado y Flotante Premium (Aesthetic Apple Light) */}
+      {creditoSeleccionado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in select-none no-print">
+          
+          {/* Contenedor del Modal Redondeado */}
+          <div className="w-full max-w-4xl bg-white shadow-2xl border border-slate-100 rounded-[2rem] p-8 flex flex-col justify-between max-h-[92vh] overflow-y-auto transform transition-all duration-300 relative animate-scale-up">
+            
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+              <div>
+                <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-lg border uppercase tracking-wider mb-1.5 ${
+                  creditoSeleccionado.estado === 'SOLICITADO' || creditoSeleccionado.estado === 'EN_REVISION'
+                    ? 'bg-amber-50 text-amber-700 border-amber-100'
+                    : creditoSeleccionado.estado === 'DESEMBOLSADO' || creditoSeleccionado.estado === 'APROBADO'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                      : 'bg-rose-50 text-rose-700 border-rose-100'
+                }`}>
+                  {creditoSeleccionado.estado === 'EN_REVISION' ? 'En Análisis' : creditoSeleccionado.estado}
+                </span>
+                <h3 className="text-lg font-semibold text-slate-800 tracking-tight flex items-center gap-2">
+                  Ficha de Evaluación: {creditoSeleccionado.numeroCredito}
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  if (!isDisbursing) {
+                    setCreditoSeleccionado(null);
+                  }
+                }}
+                disabled={isDisbursing}
+                className="p-1.5 text-slate-400 hover:text-slate-650 hover:bg-slate-50 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Alerta de bloqueo por desembolso */}
+            {isDisbursing && (
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-center gap-3 animate-pulse">
+                <Loader2 className="h-5 w-5 animate-spin text-[#0054A6]" />
+                <div className="text-xs text-blue-700 font-bold">
+                  Procesando Aprobación y Desembolso... No cierre esta ventana ni interrumpa la operación.
+                </div>
+              </div>
+            )}
+
+            {/* Error de desembolso crítico */}
+            {disburseError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex gap-3 items-start animate-fade-in">
+                <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-red-800 uppercase">Error de Desembolso Contable</h4>
+                  <p className="text-xs text-red-600 leading-relaxed font-medium">{disburseError}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Cuerpo de Dos Columnas */}
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
+              
+              {/* Columna Izquierda: Perfil de Riesgo */}
+              <div className="space-y-5">
+                <div className="space-y-3">
+                  <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
+                    Perfil del Socio Solicitante
+                  </h4>
+                  
+                  {/* Datos Básicos */}
+                  <Card className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3 shadow-none">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-450 font-medium">Socio:</span>
+                      <span className="font-extrabold text-slate-700 uppercase">{creditoSeleccionado.socio?.nombresCompletos}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-450 font-medium">Cédula:</span>
+                      <span className="font-bold text-slate-700 font-mono">{creditoSeleccionado.socio?.identificacion}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-450 font-medium">Actividad Económica:</span>
+                      <span className="font-semibold text-slate-700">{creditoSeleccionado.socio?.actividadEconomica || 'No declarada'}</span>
+                    </div>
+                  </Card>
+                </div>
+
+                {/* Score Crediticio (Media Dona Gauge SVG) */}
+                <Card className="rounded-3xl border border-slate-100 p-5 shadow-sm bg-white space-y-2">
+                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
+                    Score de Buró Crediticio
+                  </h5>
+                  <div className="relative flex flex-col items-center">
+                    {(() => {
+                      const scoreVal = getCreditScore(creditoSeleccionado.socio, cuotaProyectada);
+                      const percent = Math.min(100, Math.max(0, ((scoreVal - 300) / 700) * 100));
+                      
+                      let strokeColor = '#EF4444';
+                      let scoreLabel = 'RIESGO ALTO';
+                      let scoreClass = 'text-rose-500';
+                      
+                      if (scoreVal >= 600 && scoreVal < 800) {
+                        strokeColor = '#F59E0B';
+                        scoreLabel = 'RIESGO MEDIO';
+                        scoreClass = 'text-amber-500';
+                      } else if (scoreVal >= 800) {
+                        strokeColor = '#10B981';
+                        scoreLabel = 'EXCELENTE';
+                        scoreClass = 'text-emerald-500';
+                      }
+                      
+                      const offsetVal = 251.3 - (percent / 100) * 251.3;
+                      
+                      return (
+                        <>
+                          <svg viewBox="0 0 200 110" className="w-full max-w-[190px] mx-auto">
+                            <circle
+                              cx="100"
+                              cy="100"
+                              r="80"
+                              fill="transparent"
+                              stroke="#F1F5F9"
+                              strokeWidth="12"
+                              strokeDasharray="251.3 502.6"
+                              transform="rotate(-180 100 100)"
+                              strokeLinecap="round"
+                            />
+                            <circle
+                              cx="100"
+                              cy="100"
+                              r="80"
+                              fill="transparent"
+                              stroke={strokeColor}
+                              strokeWidth="12"
+                              strokeDasharray="251.3 502.6"
+                              strokeDashoffset={offsetVal}
+                              transform="rotate(-180 100 100)"
+                              strokeLinecap="round"
+                              className="transition-all duration-1000 ease-out"
+                            />
+                            <text x="100" y="80" textAnchor="middle" className="text-3xl font-black fill-slate-800 tracking-tight font-sans">
+                              {scoreVal}
+                            </text>
+                            <text x="100" y="98" textAnchor="middle" className={`text-[8px] font-black tracking-widest uppercase fill-current ${scoreClass} font-sans`}>
+                              {scoreLabel}
+                            </text>
+                          </svg>
+                          <div className="text-[9px] text-slate-400 font-semibold text-center mt-1">
+                            Rango de Calificación SEPS (300 a 1000)
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </Card>
+
+                {/* Ingresos y Gastos con formateador de moneda */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
+                    Ingresos y Gastos Declarados
+                  </h4>
+
+                  <Card className="rounded-3xl border border-slate-100 p-5 space-y-4 shadow-sm bg-white">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-550 font-semibold flex items-center gap-1.5">
+                        <TrendingUp className="h-4 w-4 text-emerald-500" />
+                        Ingresos Mensuales (+):
+                      </span>
+                      <span className="font-bold text-emerald-600 font-mono text-sm">
+                        {formatCurrency(Number(ingresos))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-550 font-semibold flex items-center gap-1.5">
+                        <Ban className="h-4 w-4 text-rose-500" />
+                        Gastos Mensuales (-):
+                      </span>
+                      <span className="font-bold text-rose-600 font-mono text-sm">
+                        {formatCurrency(Number(gastos))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs border-b border-dashed border-slate-100 pb-3">
+                      <span className="text-slate-550 font-semibold flex items-center gap-1.5">
+                        <AlertCircle className="h-4 w-4 text-slate-400" />
+                        Otras Deudas Actuales:
+                      </span>
+                      <span className="font-bold text-slate-600 font-mono">
+                        {formatCurrency(Number(deudas))}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-1">
+                      <span className="text-slate-800 text-xs font-black uppercase tracking-wider">
+                        Flujo Neto Mensual:
+                      </span>
+                      <span className={`font-black font-mono text-base ${flujoNeto > 0 ? 'text-[#0054A6]' : 'text-rose-600'}`}>
+                        {formatCurrency(flujoNeto)}
+                      </span>
+                    </div>
+                  </Card>
+
+                  {/* Banner de Advertencia del 40% */}
+                  {superaCapacidad && (
+                    <div className="p-4 bg-amber-50 border border-amber-100 rounded-3xl flex gap-3 items-start animate-fade-in">
+                      <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <h4 className="text-xs font-black text-amber-800 uppercase tracking-wide">Alerta de Capacidad de Pago</h4>
+                        <p className="text-[11px] text-amber-700 leading-relaxed font-semibold">
+                          Alto riesgo de impago: La cuota proyectada de {formatCurrency(cuotaProyectada)} representa el{' '}
+                          {flujoNeto > 0 ? porcentajeCapacidad.toFixed(1) : '100+'}% del flujo neto mensual. Supera la capacidad de pago SEPS (límite del 40%).
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Motivo de rechazo previo */}
+                {creditoSeleccionado.estado === 'RECHAZADO' && creditoSeleccionado.motivoRechazo && (
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
+                      Historial de Resolución
+                    </h4>
+                    <div className="p-4 bg-rose-50/50 border border-rose-100/50 rounded-2xl">
+                      <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest block mb-1">Motivo de Rechazo:</span>
+                      <p className="text-xs text-rose-700 font-bold leading-relaxed">{creditoSeleccionado.motivoRechazo}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Columna Derecha: Proyección Financiera */}
+              <div className="space-y-5 flex flex-col justify-between">
+                
+                <div className="space-y-3">
+                  <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
+                    Proyección Financiera
+                  </h4>
+
+                  <Card className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3 shadow-none">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-450 font-medium">Monto Solicitado:</span>
+                      <span className="font-extrabold text-slate-800 font-mono">{formatCurrency(creditoSeleccionado.montoSolicitado)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-450 font-medium">Sistema Amortización:</span>
+                      <span className="font-bold text-slate-800 uppercase text-[11px]">{creditoSeleccionado.tipoAmortizacion}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-450 font-medium">Tasa Interés Anual:</span>
+                      <span className="font-bold text-slate-800 font-mono">{creditoSeleccionado.tasaInteresAnual.toFixed(2)}%</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-450 font-medium">Plazo:</span>
+                      <span className="font-bold text-slate-800">{creditoSeleccionado.plazoMeses} meses</span>
+                    </div>
+                    <div className="flex justify-between items-start text-xs flex-col gap-1 border-t border-slate-100 pt-3">
+                      <span className="text-slate-450 font-semibold">Garantía / Justificación:</span>
+                      <p className="text-slate-650 italic text-[11px] leading-relaxed">{creditoSeleccionado.garantiaDescripcion}</p>
+                    </div>
+                  </Card>
+                </div>
+
+                {/* Tabla de Amortización con Skeleton Loader */}
+                <div className="space-y-3 flex-1 flex flex-col pt-2">
+                  <h5 className="text-[10px] font-black text-slate-450 uppercase tracking-widest">
+                    Tabla de Amortización {creditoSeleccionado.estado === 'DESEMBOLSADO' ? 'Real' : 'Simulada'}
+                  </h5>
+                  
+                  <div className="border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/20 flex-1 max-h-[280px] overflow-y-auto">
+                    {cargandoAmortizacion ? (
+                      <div className="p-4 space-y-3">
+                        <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                          <div className="h-3 w-10 bg-slate-200/50 rounded" />
+                          <div className="h-3 w-16 bg-slate-200/50 rounded" />
+                          <div className="h-3 w-16 bg-slate-200/50 rounded" />
+                          <div className="h-3 w-16 bg-slate-200/50 rounded" />
+                        </div>
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <div key={i} className="flex justify-between items-center animate-pulse py-1.5">
+                            <div className="h-3 w-6 bg-slate-100 rounded" />
+                            <div className="h-3 w-14 bg-slate-100 rounded" />
+                            <div className="h-3 w-14 bg-slate-100 rounded" />
+                            <div className="h-3 w-16 bg-slate-100 rounded" />
+                            <div className="h-3 w-14 bg-slate-100 rounded" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <table className="w-full text-left border-collapse text-[11px]">
+                        <thead>
+                          <tr className="bg-slate-50/80 border-b border-slate-100 text-[9px] font-extrabold text-slate-450 uppercase tracking-wider">
+                            <th className="py-2.5 pl-3">Cuota</th>
+                            <th className="py-2.5">Capital</th>
+                            <th className="py-2.5">Interés</th>
+                            <th className="py-2.5">Cuota Total</th>
+                            <th className="py-2.5 pr-3 text-right">Saldo Restante</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50 font-semibold text-slate-650 font-mono">
+                          {tablaAmortizacion.map(cuo => (
+                            <tr key={cuo.num} className="hover:bg-slate-50/50">
+                              <td className="py-2 pl-3 text-slate-400 font-bold">{cuo.num}</td>
+                              <td className="py-2">{formatCurrency(cuo.capital)}</td>
+                              <td className="py-2">{formatCurrency(cuo.interes)}</td>
+                              <td className="py-2 text-slate-800 font-bold">{formatCurrency(cuo.total)}</td>
+                              <td className="py-2 pr-3 text-right text-slate-400">{formatCurrency(cuo.saldo)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* Footer de Resoluciones (Botones de Cierre) */}
+            <div className="border-t border-slate-100 pt-6 flex gap-4">
+              
+              {/* Botón Rechazar */}
+              {(creditoSeleccionado.estado === 'SOLICITADO' || creditoSeleccionado.estado === 'EN_REVISION') && (
+                <Button
+                  onClick={() => setMostrarRechazoModal(true)}
+                  disabled={isDisbursing}
+                  className="flex-1 border border-rose-200 hover:bg-rose-50 text-rose-600 font-bold rounded-2xl h-11 text-xs cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                >
+                  <Ban className="h-4 w-4" />
+                  Rechazar Solicitud
+                </Button>
+              )}
+
+              {/* Botón Aprobar y Desembolsar (Interceptado para Compliance Documental) */}
+              {(creditoSeleccionado.estado === 'SOLICITADO' || creditoSeleccionado.estado === 'EN_REVISION') && (
+                <Button
+                  onClick={() => handleImprimirPagare(creditoSeleccionado)}
+                  disabled={isDisbursing}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl h-11 text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md shadow-emerald-700/10"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Aprobar y Desembolsar Fondos
+                </Button>
+              )}
+
+              {/* Cerrar / Imprimir para Aprobados/Rechazados */}
+              {(creditoSeleccionado.estado === 'APROBADO' || 
+                creditoSeleccionado.estado === 'DESEMBOLSADO' || 
+                creditoSeleccionado.estado === 'RECHAZADO') && (
+                <div className="flex w-full gap-4">
+                  {(creditoSeleccionado.estado === 'APROBADO' || creditoSeleccionado.estado === 'DESEMBOLSADO') && (
+                    <Button
+                      onClick={() => {
+                        descargarTablaAmortizacionPdf(creditoSeleccionado, tablaAmortizacion);
+                      }}
+                      disabled={cargandoAmortizacion}
+                      className="flex-1 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-2xl h-11 text-xs cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-blue-800/10 disabled:opacity-50"
+                    >
+                      {cargandoAmortizacion ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                          Cargando...
+                        </>
+                      ) : (
+                        <>📄 Imprimir Tabla de Amortización</>
+                      )}
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => setCreditoSeleccionado(null)}
+                    className="flex-1 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-2xl h-11 text-xs cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-blue-805/10"
+                  >
+                    Cerrar Ficha de Detalle
+                  </Button>
+                </div>
+              )}
+
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Modal Split de Previsualización e Impresión (Aesthetic Apple Light) */}
+      {pagareCredito && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 md:p-6 no-print select-text">
+          
+          <div className="flex flex-col lg:flex-row gap-6 max-w-6xl w-full max-h-[92vh] overflow-hidden">
+            
+            {/* Panel de Compliance Izquierdo */}
+            <div className="w-full lg:w-[320px] bg-white rounded-[2rem] border border-slate-100 p-6 shadow-2xl flex flex-col justify-between shrink-0 overflow-y-auto max-h-[92vh]">
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                    <Layers className="h-4.5 w-4.5 text-[#0054A6]" />
+                    Documentación Legal
+                  </h4>
+                  <p className="text-[10px] text-slate-500 font-medium tracking-wide uppercase mt-0.5">
+                    Autorización de Desembolso
+                  </p>
+                </div>
+
+                <div className="border-t border-slate-50 my-4" />
+
+                {/* Si está pendiente / en revisión: Proceso de 3 Pasos */}
+                {pagareCredito.estado === 'SOLICITADO' || pagareCredito.estado === 'EN_REVISION' ? (
+                  <div className="space-y-6 text-left">
+                    {/* PASO 1 */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-semibold text-[#0054A6] uppercase tracking-wider block">
+                        Paso 1: Generar Pagaré
+                      </span>
+                      <p className="text-[11px] text-slate-450 font-medium leading-relaxed">
+                        Genere e imprima el Pagaré a la Orden para la firma física del deudor principal y del garante.
+                      </p>
+                      <Button
+                        onClick={() => {
+                          descargarPagarePdf(pagareCredito, pagareCuotas, user?.nombresCompletos || 'Oficial');
+                        }}
+                        disabled={cargandoPagareCuotas || isDisbursing}
+                        className="w-full bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-xl h-9 text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                      >
+                        <Printer className="h-3.5 w-3.5" />
+                        Generar Pagaré (PDF)
+                      </Button>
+                    </div>
+
+                    {/* PASO 2 */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-semibold text-[#0054A6] uppercase tracking-wider block">
+                        Paso 2: Cargar Pagaré Firmado
+                      </span>
+                      <p className="text-[11px] text-slate-450 font-medium leading-relaxed">
+                        Suba el documento digitalizado (PDF o imagen) que contenga las firmas físicas obligatorias.
+                      </p>
+                      
+                      {/* Dropzone minimalista */}
+                      <div className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+                        pagareFirmadoFile 
+                          ? 'border-emerald-250 bg-emerald-50/20' 
+                          : 'border-slate-200 hover:border-[#0054A6]/30 bg-slate-50/50 hover:bg-slate-50'
+                      }`}>
+                        <label className="cursor-pointer block space-y-1">
+                          <input 
+                            type="file" 
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={handleFileChange}
+                            disabled={isDisbursing}
+                            className="hidden" 
+                          />
+                          {pagareFirmadoFile ? (
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-bold text-emerald-700 block truncate" title={pagareFirmadoName}>
+                                {pagareFirmadoName}
+                              </span>
+                              <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest block">
+                                ARCHIVO LISTO
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <span className="text-[11px] font-bold text-slate-500 block">
+                                Subir Pagaré Firmado (PDF/JPG)
+                              </span>
+                              <span className="text-[9px] text-slate-400 block">
+                                Clic para buscar archivo
+                              </span>
+                            </div>
+                          )}
+                        </label>
+                      </div>
+                      
+                      {pagareFirmadoFile && (
+                        <button
+                          onClick={() => {
+                            setPagareFirmadoFile(null);
+                            setPagareFirmadoName('');
+                          }}
+                          disabled={isDisbursing}
+                          className="text-[9px] font-black text-rose-500 hover:text-rose-600 uppercase tracking-widest block mx-auto cursor-pointer"
+                        >
+                          [ Remover Archivo ]
+                        </button>
+                      )}
+                    </div>
+
+                    {/* PASO 3 */}
+                    <div className="space-y-2 pt-2">
+                      <span className="text-[10px] font-semibold text-[#0054A6] uppercase tracking-wider block">
+                        Paso 3: Desembolso
+                      </span>
+                      <p className="text-[11px] text-slate-450 font-medium leading-relaxed">
+                        Proceda al desembolso de los fondos en la cuenta del socio una vez verificado el pagaré firmado.
+                      </p>
+                      <Button
+                        onClick={handleAprobarYDesembolsar}
+                        disabled={cargandoPagareCuotas || !pagareFirmadoFile || isDisbursing}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl h-10 text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:bg-slate-100 disabled:text-slate-350 disabled:border-slate-150 disabled:shadow-none shadow-sm shadow-emerald-600/10"
+                      >
+                        {isDisbursing ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Procesando Desembolso...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Ejecutar Desembolso
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  // Si ya está aprobado o desembolsado: Vista de reimpresión de tabla
+                  <div className="space-y-5 text-left">
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-semibold text-[#0054A6] uppercase tracking-wider block">
+                        Crédito Resuelto
+                      </span>
+                      <p className="text-[11px] text-slate-450 font-medium leading-relaxed">
+                        Este crédito ya fue resuelto y desembolsado. Puede descargar la tabla de amortización para reimpresión.
+                      </p>
+                      <Button
+                        onClick={() => {
+                          descargarTablaAmortizacionPdf(pagareCredito, pagareCuotas);
+                        }}
+                        disabled={cargandoPagareCuotas}
+                        className="w-full bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-xl h-9 text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                      >
+                        <Printer className="h-3.5 w-3.5" />
+                        Imprimir Tabla de Amortización
+                      </Button>
+                    </div>
+                    
+                    <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                      <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest block mb-0.5">Archivo SEPS:</span>
+                      <p className="text-[10px] text-emerald-650 leading-relaxed font-bold">
+                        Pagaré digitalizado cargado y custodiado en bóveda digital.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Botón de Cierre al fondo */}
+              <div className="pt-4 border-t border-slate-50 mt-6">
+                <Button
+                  onClick={() => {
+                    setPagareCredito(null);
+                    setPagareCuotas([]);
+                    setPagareFirmadoFile(null);
+                    setPagareFirmadoName('');
+                  }}
+                  disabled={isDisbursing}
+                  variant="outline"
+                  className="w-full border-slate-200 text-slate-650 hover:bg-slate-50 font-bold rounded-xl h-9 text-xs cursor-pointer disabled:opacity-50"
+                >
+                  Cerrar Vista Previa
+                </Button>
+              </div>
+            </div>
+
+            {/* Previsualización del Pagaré Derecho */}
+            <div className="flex-1 bg-slate-50 rounded-[2rem] p-6 shadow-inner overflow-y-auto max-h-[92vh] flex justify-center items-start">
+              
+              {/* Cuerpo de la Hoja A4 */}
+              <div className="max-w-[700px] w-full bg-white shadow-lg border border-slate-200/50 p-12 rounded-lg min-h-[900px] font-serif text-slate-900 leading-relaxed text-xs select-text flex flex-col justify-between" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
+                
+                {cargandoPagareCuotas ? (
+                  <div className="py-24 flex flex-col items-center justify-center text-slate-400 gap-2 font-sans w-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-[#0054A6]" />
+                    <span className="text-xs font-bold">Cargando previsualización...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-6 flex-1 flex flex-col justify-between w-full">
+                    
+                    {/* Si está pendiente / en revisión: mostrar Pagaré + Amortización */}
+                    {pagareCredito.estado === 'SOLICITADO' || pagareCredito.estado === 'EN_REVISION' ? (
+                      <div className="space-y-6 w-full">
+                        {/* Membrete */}
+                        <div className="text-center space-y-1 w-full">
+                          <h2 className="text-sm font-bold tracking-tight uppercase">COOPERATIVA DE AHORRO Y CRÉDITO ITQ</h2>
+                          <p className="text-[9px] text-slate-500 font-bold">RUC: 1791234567001  |  Dirección Matriz: Av. Antonio de Ulloa N28-30, Quito</p>
+                          <div className="border-b border-double border-slate-350 my-1" />
+                          <h3 className="text-xs font-bold uppercase pt-2">PAGARÉ A LA ORDEN</h3>
+                          <p className="text-[10px] font-bold">Por USD: {formatCurrency(pagareCredito.montoSolicitado)}</p>
+                        </div>
+
+                        {/* Texto Legal */}
+                        <p className="text-justify text-[10px] leading-relaxed indent-6">
+                          Debo y pagaré incondicionalmente a la orden de la <strong>COOPERATIVA DE AHORRO Y CRÉDITO ITQ</strong>, 
+                          en esta ciudad o en el lugar que se me requiera, la cantidad de <strong>{formatCurrency(pagareCredito.montoSolicitado)}</strong> 
+                          (<strong>{numeroALetras(pagareCredito.montoSolicitado)}</strong>) dólares de los Estados Unidos de América, 
+                          reconociendo una tasa de interés del <strong>{pagareCredito.tasaInteresAnual}%</strong> anual. En caso de mora, me 
+                          sujeto a la tasa de interés máxima de mora permitida por la Junta de Política y Regulación Financiera del Ecuador. 
+                          Renuncio expresamente a fuero y domicilio, y me someto a los jueces competentes de esta jurisdicción y al trámite 
+                          ejecutivo o coactivo a elección del acreedor.
+                        </p>
+
+                        {/* Firmas en Pág 1 */}
+                        <div className="grid grid-cols-3 gap-4 pt-10 text-[9px] text-center font-sans">
+                          <div className="flex flex-col justify-end items-center space-y-0.5">
+                            <div className="border-t border-slate-400 w-full pt-1">
+                              <strong>DEUDOR PRINCIPAL</strong>
+                            </div>
+                            <span className="uppercase text-[8px] font-bold">{pagareCredito.socio?.nombresCompletos}</span>
+                            <span className="font-mono text-[8px]">C.I.: {pagareCredito.socio?.identificacion}</span>
+                          </div>
+                          <div className="flex flex-col justify-end items-center space-y-0.5">
+                            <div className="border-t border-slate-400 w-full pt-1">
+                              <strong>CÓNYUGE / GARANTE</strong>
+                            </div>
+                            <span className="text-slate-400 italic text-[8px]">Firma Garante</span>
+                            <span className="text-slate-400 text-[8px]">C.I.: _________________</span>
+                          </div>
+                          <div className="flex flex-col justify-end items-center space-y-0.5">
+                            <div className="border-t border-slate-400 w-full pt-1">
+                              <strong>OFICIAL DE CRÉDITO</strong>
+                            </div>
+                            <span className="uppercase text-[8px] font-bold">{user?.nombresCompletos || 'Oficial de Crédito'}</span>
+                            <span className="text-[8px] text-slate-400 font-bold">COOP. ITQ</span>
+                          </div>
+                        </div>
+
+                        {/* Indicador de Salto de Página Visual */}
+                        <div className="flex items-center justify-center gap-2 text-[#0054A6] font-sans text-[9px] border-t border-dashed border-slate-200 pt-4 mt-6 font-bold">
+                        </div>
+                      </div>
+                    ) : (
+                      // Si ya está aprobado / desembolsado: Previsualización de sólo la tabla
+                      <div className="space-y-6 w-full">
+                        {/* Membrete */}
+                        <div className="text-center space-y-1 w-full">
+                          <h2 className="text-sm font-bold tracking-tight uppercase">COOPERATIVA DE AHORRO Y CRÉDITO ITQ</h2>
+                          <p className="text-[9px] text-slate-500 font-bold">RUC: 1791234567001  |  Dirección Matriz: Av. Antonio de Ulloa N28-30, Quito</p>
+                          <div className="border-b border-double border-slate-350 my-1" />
+                          <h3 className="text-xs font-bold uppercase pt-2">TABLA DE AMORTIZACIÓN</h3>
+                          <p className="text-[9px] font-bold text-slate-600 mt-1">
+                            Crédito Nro: {pagareCredito.numeroCredito}  |  Socio: {pagareCredito.socio?.nombresCompletos}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tabla de amortización */}
+                    <div className="space-y-2 mt-4 w-full">
+                      <h3 className="text-[10px] font-bold uppercase tracking-wider text-left border-b pb-1">Tabla de Amortización</h3>
+                      <table className="w-full text-[9px] border-collapse border border-slate-350 text-left">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-300 font-bold text-slate-800">
+                            <th className="border border-slate-300 p-1">Cuota</th>
+                            <th className="border border-slate-300 p-1 text-center">Vencimiento</th>
+                            <th className="border border-slate-300 p-1">Capital</th>
+                            <th className="border border-slate-300 p-1">Interés</th>
+                            <th className="border border-slate-300 p-1 font-bold">Cuota Total</th>
+                            <th className="border border-slate-300 p-1 text-right pr-2">Saldo Restante</th>
+                          </tr>
+                        </thead>
+                        <tbody className="font-mono text-[8.5px]">
+                          {pagareCuotas.map(cuo => (
+                            <tr key={cuo.num} className="border-b border-slate-200">
+                              <td className="border border-slate-250 p-1 text-center font-bold">{cuo.num}</td>
+                              <td className="border border-slate-250 p-1 text-center">{cuo.fecha}</td>
+                              <td className="border border-slate-250 p-1">{formatCurrency(cuo.capital)}</td>
+                              <td className="border border-slate-250 p-1">{formatCurrency(cuo.interes)}</td>
+                              <td className="border border-slate-250 p-1 font-bold">{formatCurrency(cuo.total)}</td>
+                              <td className="border border-slate-250 p-1 text-right pr-2">{formatCurrency(cuo.saldo)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                  </div>
+                )}
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Ingresar Motivo de Rechazo */}
+      {mostrarRechazoModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in select-none">
+          <Card className="w-full max-w-sm bg-white rounded-[2rem] border border-slate-100 p-6 md:p-8 shadow-2xl flex flex-col justify-between relative overflow-hidden animate-scale-up">
+            
+            <button 
+              onClick={() => setMostrarRechazoModal(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-650 hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="flex flex-col items-center text-center">
+              <div className="h-12 w-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 border border-rose-100/50">
+                <Ban className="h-5 w-5" />
+              </div>
+              <h3 className="text-base font-semibold text-slate-800 tracking-tight">Rechazar Solicitud de Crédito</h3>
+              <p className="text-xs text-slate-500 font-medium tracking-wide mt-1 max-w-[280px]">
+                Debe ingresar de forma obligatoria la justificación del rechazo para notificar al socio.
+              </p>
+            </div>
+
+            <form onSubmit={handleRechazarSubmit} className="mt-5 space-y-4 text-left">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-500">Motivo del Rechazo</label>
+                <textarea
+                  placeholder="Ej: Flujo de caja insuficiente, capacidad de pago supera el 40% del ingreso familiar..."
+                  value={motivoRechazo}
+                  onChange={(e) => setMotivoRechazo(e.target.value)}
+                  rows={3}
+                  required
+                  className="w-full p-3 rounded-2xl border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 focus:border-[#0054A6] bg-slate-50/35 leading-relaxed resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="button"
+                  onClick={() => setMostrarRechazoModal(false)}
+                  variant="outline"
+                  className="flex-1 border-slate-200 text-slate-650 hover:bg-slate-50 font-bold rounded-xl h-10 text-xs cursor-pointer"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl h-10 flex items-center justify-center text-xs cursor-pointer shadow-md shadow-rose-600/10"
+                >
+                  Confirmar Rechazo
+                </Button>
+              </div>
+            </form>
+
+          </Card>
+        </div>
+      )}
+
+      {/* Alertas Flotantes (Toast) */}
+      {toast.show && (
+        <div className="fixed bottom-5 right-5 z-[100] animate-slide-in select-none text-left">
+          <div className="bg-white rounded-[2rem] border border-slate-100 p-4 shadow-2xl flex items-center gap-3.5 max-w-sm">
+            <div className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 border ${
+              toast.type === 'success' ? 'bg-emerald-50 text-emerald-500 border-emerald-100/50' : 'bg-red-50 text-red-500 border-red-100/50'
+            }`}>
+              {toast.type === 'success' ? <CheckCircle2 className="h-4.5 w-4.5" /> : <AlertCircle className="h-4.5 w-4.5" />}
+            </div>
+            <div>
+              <h5 className="text-xs font-black text-slate-800 leading-none">
+                {toast.type === 'success' ? 'Operación Exitosa' : 'Ocurrió un Error'}
+              </h5>
+              <p className="text-[10px] text-slate-500 truncate mt-1 leading-none max-w-[200px]" title={toast.message}>
+                {toast.message}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+};
+
+// Subcomponente Tarjeta de Solicitud en Kanban
+interface CardSolicitudProps {
+  cred: Credito;
+  onClick: () => void;
+  getElapsedTime: (date: string) => string;
+  onPrintClick: (cred: Credito) => void;
+}
+
+const CardSolicitud: React.FC<CardSolicitudProps> = ({ cred, onClick, getElapsedTime, onPrintClick }) => {
+  const isResolved = cred.estado === 'APROBADO' || cred.estado === 'DESEMBOLSADO';
+  
+  return (
+    <div 
+      onClick={onClick}
+      className="bg-white rounded-3xl border border-slate-100 p-4 shadow-[0_4px_12px_rgba(0,0,0,0.01)] hover:shadow-[0_12px_25px_rgba(0,84,166,0.04)] hover:border-[#0054A6]/20 transition-all duration-300 cursor-pointer hover:-translate-y-0.5 animate-scale-up"
+    >
+      <div className="space-y-3 flex flex-col justify-between h-full">
+        <div className="space-y-3">
+          {/* Superior: Nombre y Tiempo */}
+          <div className="flex justify-between items-start gap-1">
+            <div className="space-y-1">
+              <h4 className="text-xs font-black text-slate-700 truncate max-w-[110px] uppercase" title={cred.socio?.nombresCompletos}>
+                {cred.socio?.nombresCompletos}
+              </h4>
+              <span className={`inline-flex items-center text-[8px] font-black px-1.5 py-0.5 rounded-md border uppercase tracking-wider ${
+                cred.estado === 'SOLICITADO'
+                  ? 'bg-amber-50 text-amber-600 border-amber-100'
+                  : cred.estado === 'EN_REVISION'
+                    ? 'bg-blue-50 text-blue-600 border-blue-100'
+                    : cred.estado === 'DESEMBOLSADO' || cred.estado === 'APROBADO'
+                      ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                      : 'bg-rose-50 text-rose-600 border-rose-100'
+              }`}>
+                {cred.estado === 'EN_REVISION' ? 'En Análisis' : cred.estado}
+              </span>
+            </div>
+            <span className="text-[9px] font-bold text-slate-400 flex items-center gap-0.5 shrink-0 bg-slate-50 px-1.5 py-0.5 rounded-lg border border-slate-100/50">
+              <Clock className="h-2.5 w-2.5 text-slate-350" />
+              {getElapsedTime(cred.fechaSolicitud)}
+            </span>
+          </div>
+
+          {/* Separador Fino */}
+          <div className="border-t border-slate-50" />
+
+          {/* Cuerpo: Monto y Plazo */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="space-y-0.5">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Monto</span>
+              <span className="font-extrabold text-[#0054A6] font-mono text-[13px]">
+                {formatCurrency(cred.montoSolicitado)}
+              </span>
+            </div>
+            <div className="space-y-0.5 text-right">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Plazo</span>
+              <span className="font-bold text-slate-700">
+                {cred.plazoMeses} meses
+              </span>
+            </div>
+          </div>
+
+          {/* Tipo de Amortización */}
+          <div className="flex justify-between items-center text-[10px] bg-slate-50 p-2 rounded-xl border border-slate-100/50 font-bold">
+            <span className="text-slate-450 uppercase">Amortización:</span>
+            <span className="text-slate-650 uppercase font-extrabold">{cred.tipoAmortizacion}</span>
+          </div>
+
+          {/* Garantía Corta */}
+          <div className="text-[10px] text-slate-450 italic line-clamp-1 border-t border-slate-50 pt-2 font-medium">
+            {cred.garantiaDescripcion}
+          </div>
+        </div>
+
+        {isResolved && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPrintClick(cred);
+            }}
+            className="w-full mt-3 bg-slate-50 hover:bg-[#0054A6]/10 border border-slate-200/50 hover:border-[#0054A6]/30 text-slate-650 hover:text-[#0054A6] font-extrabold rounded-xl h-8 text-[10px] flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+          >
+            <Printer className="h-3.5 w-3.5" />
+                        Imprimir Tabla de Amortización
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};

@@ -1,0 +1,2217 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Search, 
+  User, 
+  Lock, 
+  Printer, 
+  AlertCircle, 
+  CheckCircle2, 
+  Coins, 
+  ArrowUpRight, 
+  ArrowDownLeft, 
+  X, 
+  Fingerprint, 
+  FileText, 
+  Building,
+  Clock
+} from 'lucide-react';
+import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
+import { Card } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+
+interface CajaActiva {
+  id: number;
+  fechaContable: string;
+  montoApertura: number;
+  montoCierreSistema: number;
+  montoCierreEfectivoReal: number | null;
+  diferencia: number;
+  estado: 'APERTURADA' | 'CERRADA';
+}
+
+interface SocioDetails {
+  id: number;
+  identificacion: string;
+  nombresCompletos: string;
+  estado: string;
+  fotoPerfilUrl: string;
+  fotoCedulaFrontalUrl: string;
+  fotoCedulaPosteriorUrl: string;
+}
+
+interface CuentaCajaInfo {
+  cuentaId: number;
+  numeroCuenta: string;
+  saldo: number;
+  socio: SocioDetails;
+}
+
+interface MovimientoCaja {
+  id: number;
+  tipoTransaccion: 'CREDITO' | 'DEBITO';
+  monto: number;
+  saldoAnterior: number;
+  saldoResultante: number;
+  canal: string;
+  referencia: string;
+  descripcion: string;
+  fechaContable: string;
+  cuenta?: {
+    id: number;
+    numeroCuenta: string;
+    tipo: string;
+    socio?: {
+      id: number;
+      identificacion: string;
+      nombresCompletos: string;
+      estado: string;
+      fotoPerfilUrl?: string;
+    };
+  };
+}
+
+const CedulaFrontalMockup: React.FC<{ nombres: string, cedula: string, avatarUrl: string | null }> = ({ nombres, cedula, avatarUrl }) => {
+  return (
+    <div className="w-full max-w-sm h-52 rounded-2xl bg-gradient-to-br from-blue-50/90 via-sky-50/70 to-slate-100 border border-slate-200/70 p-4 shadow-md flex flex-col justify-between relative overflow-hidden font-sans text-[9px] text-slate-800 select-none">
+      <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#0054a6_1px,transparent_1px)] [background-size:8px_8px]" />
+      
+      <div className="flex justify-between items-start border-b border-sky-200 pb-1.5 z-10">
+        <div className="flex gap-1.5 items-center">
+          <div className="h-6 w-6 rounded-full bg-yellow-400/20 border border-yellow-500/30 flex items-center justify-center text-[7px] font-bold text-yellow-700 font-mono">DNI</div>
+          <div>
+            <h4 className="font-bold text-[8px] uppercase tracking-wider text-slate-700 leading-none">República del Ecuador</h4>
+            <span className="text-[6px] font-semibold text-slate-500 uppercase tracking-widest block mt-0.5">Dirección General de Registro Civil</span>
+          </div>
+        </div>
+        <div className="text-right">
+          <span className="font-black text-rose-600 text-[10px] tracking-wider font-mono">{cedula}</span>
+          <span className="text-[6px] text-slate-400 block font-bold leading-none mt-0.5">DOCUMENTO DE IDENTIDAD</span>
+        </div>
+      </div>
+
+      <div className="flex gap-3 pt-2 z-10 flex-1">
+        <div className="w-16 h-20 bg-slate-200/50 border border-slate-300/60 rounded-lg overflow-hidden flex items-center justify-center shrink-0 shadow-inner bg-white relative">
+          {avatarUrl ? (
+            <img src={`http://localhost:8080/api/v1${avatarUrl}`} alt="Foto Cedula" className="h-full w-full object-cover" />
+          ) : (
+            <User className="h-8 w-8 text-slate-400" />
+          )}
+          <div className="absolute bottom-0 inset-x-0 bg-sky-500/20 text-center py-0.5 text-[5px] text-sky-800 font-black">Ecuador</div>
+        </div>
+
+        <div className="flex-1 flex flex-col justify-between py-0.5">
+          <div className="space-y-1">
+            <div>
+              <span className="text-[6px] font-bold text-slate-400 uppercase leading-none block">Apellidos y Nombres</span>
+              <span className="font-bold text-slate-800 text-[9px] uppercase leading-tight block">{nombres}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-[6px] font-bold text-slate-400 uppercase leading-none block">Nacionalidad</span>
+                <span className="font-bold text-slate-700 text-[8px] block">ECUATORIANA</span>
+              </div>
+              <div>
+                <span className="text-[6px] font-bold text-slate-400 uppercase leading-none block">Fecha Nacimiento</span>
+                <span className="font-bold text-slate-700 text-[8px] block font-mono">14 ENE 1989</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-dashed border-sky-300 pt-1 flex justify-between items-end">
+            <div>
+              <span className="text-[5px] font-bold text-slate-400 uppercase block">Firma del Titular</span>
+              <span className="font-serif italic font-semibold text-blue-900 tracking-wide text-xs lowercase mt-0.5 block" style={{ fontFamily: 'Georgia, serif' }}>
+                {nombres.split(' ').slice(0, 2).join(' ')}
+              </span>
+            </div>
+            <span className="text-[5px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 rounded px-1 tracking-widest uppercase">Verificado</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CedulaPosteriorMockup: React.FC<{ cedula: string }> = ({ cedula }) => {
+  return (
+    <div className="w-full max-w-sm h-52 rounded-2xl bg-gradient-to-br from-slate-100 via-sky-50/30 to-slate-200/80 border border-slate-200/70 p-4 shadow-md flex flex-col justify-between relative overflow-hidden font-sans text-[9px] text-slate-800 select-none">
+      <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#0054a6_1px,transparent_1px)] [background-size:8px_8px]" />
+
+      <div className="flex gap-4 items-stretch flex-1 z-10">
+        <div className="w-16 bg-white border border-slate-200 rounded-lg p-2 flex flex-col items-center justify-center gap-1.5 shadow-sm">
+          <Fingerprint className="h-10 w-10 text-slate-600/80" />
+          <span className="text-[5px] font-black text-slate-400 uppercase tracking-wider">Índice Derecho</span>
+        </div>
+
+        <div className="flex-1 flex flex-col justify-between">
+          <div className="space-y-1 bg-white/50 border border-slate-200/50 rounded-lg p-1.5">
+            <div>
+              <span className="text-[6px] font-bold text-slate-400 uppercase block leading-none">Instrucción / Profesión</span>
+              <span className="font-bold text-slate-700 text-[8px] uppercase">SUPERIOR / DESARROLLADOR</span>
+            </div>
+            <div>
+              <span className="text-[6px] font-bold text-slate-400 uppercase block leading-none">Estado Civil / Sexo</span>
+              <span className="font-bold text-slate-700 text-[8px] uppercase">SOLTERO / MASCULINO</span>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <span className="text-[5px] font-bold text-slate-400 uppercase block leading-none">Firma del Director General</span>
+            <span className="font-serif italic text-slate-500 text-[8px] mt-0.5 block">Director Registro Civil</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-2.5 pt-2.5 border-t border-slate-200 z-10 flex flex-col gap-1 items-center bg-white/40 p-1.5 rounded-lg border border-slate-200/40">
+        <div className="h-5 w-full flex items-center justify-between opacity-80">
+          {[1,2,4,1,3,1,2,1,4,2,1,3,2,1,4,1,2,3,1,4,2,1,3,1,2,4,1,2,3,1,4,2,1].map((w, i) => (
+            <div key={i} className="bg-slate-800 h-full shrink-0" style={{ width: `${w * 1.5}px` }} />
+          ))}
+        </div>
+        <span className="font-mono text-[7px] text-slate-500 font-bold tracking-widest">I&lt;ECU{cedula}M8901140&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</span>
+      </div>
+    </div>
+  );
+};
+
+export const CajaVentanilla: React.FC = () => {
+  const { user } = useAuth();
+  const { activeTenant } = useTenant();
+  
+  // Ciclo Diario
+  const [caja, setCaja] = useState<CajaActiva | null>(null);
+  const [cargandoCaja, setCargandoCaja] = useState<boolean>(true);
+  const [montoApertura, setMontoApertura] = useState<string>('');
+  const [aperturaLoading, setAperturaLoading] = useState<boolean>(false);
+  const [aperturaError, setAperturaError] = useState<string | null>(null);
+  
+  // Arqueo / Cierre
+  const [mostrarCierre, setMostrarCierre] = useState<boolean>(false);
+  const [efectivoReal, setEfectivoReal] = useState<string>('');
+  const [cierreLoading, setCierreLoading] = useState<boolean>(false);
+  const [cierreError, setCierreError] = useState<string | null>(null);
+
+  // Doble confirmación de Cierre
+  const [mostrarPreCierre, setMostrarPreCierre] = useState<boolean>(false);
+
+  // Filtros del Diario Inferior
+  const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'CREDITO' | 'DEBITO'>('TODOS');
+  const [filtroBusqueda, setFiltroBusqueda] = useState<string>('');
+  
+  // Justificación UAFE
+  const [uafeJustificacion, setUafeJustificacion] = useState<string>('');
+
+  // Ficha de Socio
+  const [busqueda, setBusqueda] = useState<string>('');
+  const [buscandoSocio, setBuscandoSocio] = useState<boolean>(false);
+  const [socioInfo, setSocioInfo] = useState<CuentaCajaInfo | null>(null);
+  const [busquedaError, setBusquedaError] = useState<string | null>(null);
+
+  // Transacciones
+  const [activeTab, setActiveTab] = useState<'DEPOSITO' | 'RETIRO' | 'PAGO_CREDITO' | 'APORTACIONES'>('DEPOSITO');
+  const [montoTx, setMontoTx] = useState<string>('');
+  const [conceptoTx, setConceptoTx] = useState<string>('');
+  const [depositante, setDepositante] = useState<string>('');
+  const [declaracionUafe, setDeclaracionUafe] = useState<boolean>(false);
+  const [procesandoTx, setProcesandoTx] = useState<boolean>(false);
+  const [txError, setTxError] = useState<string | null>(null);
+
+  // Crédito y Aportaciones
+  const [creditosSocio, setCreditosSocio] = useState<any[]>([]);
+  const [creditoSeleccionado, setCreditoSeleccionado] = useState<any>(null);
+  const [cuotaPendiente, setCuotaPendiente] = useState<any>(null);
+  const [cargandoCredito, setCargandoCredito] = useState<boolean>(false);
+  const [cuentaAportaciones, setCuentaAportaciones] = useState<any>(null);
+  const [cargandoAportaciones, setCargandoAportaciones] = useState<boolean>(false);
+
+  // Reversos / Anulación
+  const [txParaAnular, setTxParaAnular] = useState<any>(null);
+  const [claveSupervisor, setClaveSupervisor] = useState<string>('');
+  const [mostrarSupervisorModal, setMostrarSupervisorModal] = useState<boolean>(false);
+  const [anulandoTx, setAnulandoTx] = useState<boolean>(false);
+  const [anulacionError, setAnulacionError] = useState<string | null>(null);
+
+  // Modal de Confirmación de Transacción
+  const [confirmTxData, setConfirmTxData] = useState<{
+    monto: number;
+    tipo: 'DEPOSITO' | 'RETIRO' | 'PAGO_CREDITO' | 'APORTACIONES';
+    concepto: string;
+    depositante?: string;
+    declaracionUafe: boolean;
+    uafeJustificacion?: string;
+  } | null>(null);
+
+  // Ticket de Ventanilla (Exito)
+  const [ticketData, setTicketData] = useState<{
+    referencia: string;
+    tipo: 'DEPOSITO' | 'RETIRO' | 'PAGO_CREDITO' | 'APORTACIONES';
+    monto: number;
+    concepto: string;
+    socioNombre: string;
+    cuentaNumero: string;
+    fechaHora: string;
+    depositante?: string;
+    saldoResultante: number;
+    socioCedula: string;
+  } | null>(null);
+
+  // Historial Diario
+  const [movimientos, setMovimientos] = useState<MovimientoCaja[]>([]);
+
+  // Toast Global
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
+    show: false,
+    message: '',
+    type: 'success'
+  });
+
+  const ticketRef = useRef<HTMLDivElement>(null);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 4000);
+  };
+
+  const fetchCajaActiva = async () => {
+    setCargandoCaja(true);
+    setCaja(null);
+    try {
+      const res = await api.get('/cajas/activa');
+      setCaja(res.data);
+      // Cargar movimientos e historial si está abierta
+      await fetchMovimientos();
+    } catch (err: any) {
+      if (err.response && err.response.status === 404) {
+        // Caja cerrada
+        setCaja(null);
+      } else {
+        console.error('Error al obtener estado de caja:', err);
+        showToast('Error al conectar con el servidor de cajas.', 'error');
+      }
+    } finally {
+      setCargandoCaja(false);
+    }
+  };
+
+  const fetchMovimientos = async () => {
+    try {
+      const res = await api.get('/cajas/movimientos');
+      setMovimientos(res.data);
+    } catch (err) {
+      console.error('Error al obtener movimientos diarios:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchCajaActiva();
+  }, []);
+
+  useEffect(() => {
+    const handleTriggerArqueo = () => {
+      setMostrarPreCierre(true);
+    };
+    window.addEventListener('trigger-arqueo', handleTriggerArqueo);
+    return () => {
+      window.removeEventListener('trigger-arqueo', handleTriggerArqueo);
+    };
+  }, []);
+
+  // Helper para identificar depósitos puente para pago de crédito
+  const esPuenteCredito = (mov: MovimientoCaja) => {
+    const desc = (mov.descripcion || '').toLowerCase();
+    return mov.tipoTransaccion === 'CREDITO' && (
+      desc.includes('para pago de crédito') ||
+      desc.includes('para pago de credito') ||
+      desc.includes('para pago de cuota')
+    );
+  };
+
+  // Helper para identificar ingresos físicos reales a la caja
+  const esIngresoEfectivo = (mov: MovimientoCaja) => {
+    const desc = (mov.descripcion || '').toLowerCase();
+    if (desc.startsWith('[anulada]')) return false;
+    if (esPuenteCredito(mov)) return false;
+    if (mov.tipoTransaccion === 'CREDITO') return true;
+    if (mov.tipoTransaccion === 'DEBITO' && (
+      desc.includes('pago de cuota') ||
+      desc.includes('pago de crédito') ||
+      desc.includes('pago de credito')
+    )) {
+      return true;
+    }
+    return false;
+  };
+
+  // Helper para identificar egresos físicos reales de la caja
+  const esEgresoEfectivo = (mov: MovimientoCaja) => {
+    const desc = (mov.descripcion || '').toLowerCase();
+    if (desc.startsWith('[anulada]')) return false;
+    if (mov.tipoTransaccion === 'DEBITO' && (
+      desc.includes('pago de cuota') ||
+      desc.includes('pago de crédito') ||
+      desc.includes('pago de credito')
+    )) {
+      return false;
+    }
+    return mov.tipoTransaccion === 'DEBITO';
+  };
+
+  // Calcular teóricos para el arqueo
+  const ingresosCaja = movimientos
+    .filter(m => esIngresoEfectivo(m))
+    .reduce((sum, current) => sum + current.monto, 0);
+
+  const egresosCaja = movimientos
+    .filter(m => esEgresoEfectivo(m))
+    .reduce((sum, current) => sum + current.monto, 0);
+
+  const saldoTeoricoCierre = caja ? caja.montoApertura + ingresosCaja - egresosCaja : 0;
+
+  // Filtros del Diario Inferior
+  const movimientosFiltrados = movimientos.filter(mov => {
+    // Ocultar transacciones puente del diario inferior
+    if (esPuenteCredito(mov)) {
+      return false;
+    }
+
+    let cumpleTipo = true;
+    if (filtroTipo === 'CREDITO') {
+      cumpleTipo = esIngresoEfectivo(mov);
+    } else if (filtroTipo === 'DEBITO') {
+      cumpleTipo = esEgresoEfectivo(mov);
+    }
+    
+    const cuentaStr = (mov.cuenta?.numeroCuenta || '').toLowerCase();
+    const cedulaStr = (mov.cuenta?.socio?.identificacion || '').toLowerCase();
+    const socioNombreStr = (mov.cuenta?.socio?.nombresCompletos || '').toLowerCase();
+    const busquedaLower = filtroBusqueda.trim().toLowerCase();
+    
+    return cumpleTipo && (
+      busquedaLower === '' || 
+      cuentaStr.includes(busquedaLower) || 
+      cedulaStr.includes(busquedaLower) ||
+      socioNombreStr.includes(busquedaLower)
+    );
+  });
+
+  // Aperturar Caja
+  const handleAperturar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAperturaError(null);
+
+    const val = parseFloat(montoApertura);
+    if (isNaN(val) || val < 0) {
+      setAperturaError('El monto de apertura debe ser un número igual o mayor a 0.');
+      return;
+    }
+
+    setAperturaLoading(true);
+    try {
+      const res = await api.post('/cajas/aperturar', { montoApertura: val });
+      setCaja(res.data);
+      setMontoApertura('');
+      showToast('Caja diaria aperturada con éxito para el día de hoy.', 'success');
+      await fetchMovimientos();
+      window.dispatchEvent(new CustomEvent('caja-updated'));
+    } catch (err: any) {
+      console.error('Error aperturando caja:', err);
+      setAperturaError(err.response?.data || 'No se pudo aperturar la caja. Inténtalo de nuevo.');
+    } finally {
+      setAperturaLoading(false);
+    }
+  };
+
+  // Cerrar Caja
+  const handleCerrarCaja = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCierreError(null);
+
+    const val = parseFloat(efectivoReal);
+    if (isNaN(val) || val < 0) {
+      setCierreError('El monto físico real de efectivo debe ser igual o mayor a 0.');
+      return;
+    }
+
+    setCierreLoading(true);
+    try {
+      await api.post('/cajas/cerrar', { montoCierreEfectivoReal: val });
+      showToast('Caja cerrada y arqueada con éxito. Fondos transferidos a Bóveda.', 'success');
+      setMostrarCierre(false);
+      setEfectivoReal('');
+      setCaja(null);
+      setSocioInfo(null);
+      setMovimientos([]);
+      window.dispatchEvent(new CustomEvent('caja-updated'));
+    } catch (err: any) {
+      console.error('Error cerrando caja:', err);
+      setCierreError(err.response?.data || 'No se pudo procesar el arqueo de caja.');
+    } finally {
+      setCierreLoading(false);
+    }
+  };
+
+  const fetchAmortizacion = async (creditoId: number) => {
+    try {
+      const res = await api.get(`/creditos/${creditoId}/amortizacion`);
+      const cuotas = res.data || [];
+      const pendiente = cuotas.find((c: any) => c.estado !== 'PAGADA');
+      setCuotaPendiente(pendiente || null);
+      if (pendiente && activeTab === 'PAGO_CREDITO') {
+        const val = (pendiente.capitalProyectado - pendiente.capitalPagado) +
+                    (pendiente.interesProyectado - pendiente.interesPagado) +
+                    (pendiente.montoMoraAcumulado - pendiente.montoMoraPagado);
+        setMontoTx(val.toFixed(2));
+      }
+    } catch (err) {
+      console.error('Error fetching amortization:', err);
+    }
+  };
+
+  const fetchCreditos = async (socioId: number) => {
+    setCargandoCredito(true);
+    try {
+      const res = await api.get('/creditos');
+      const todos = res.data || [];
+      const activos = todos.filter((c: any) => c.socio?.id === socioId && (c.estado === 'DESEMBOLSADO' || c.estado === 'EN_MORA'));
+      setCreditosSocio(activos);
+      if (activos.length > 0) {
+        setCreditoSeleccionado(activos[0]);
+        await fetchAmortizacion(activos[0].id);
+      } else {
+        setCreditoSeleccionado(null);
+        setCuotaPendiente(null);
+      }
+    } catch (err) {
+      console.error('Error fetching credits:', err);
+    } finally {
+      setCargandoCredito(false);
+    }
+  };
+
+  const fetchAportaciones = async (socioId: number) => {
+    setCargandoAportaciones(true);
+    try {
+      const res = await api.get(`/cuentas/socio/${socioId}`);
+      const cuentas = res.data || [];
+      const aportaciones = cuentas.find((c: any) => c.tipo === 'APORTACIONES');
+      setCuentaAportaciones(aportaciones || null);
+    } catch (err) {
+      console.error('Error fetching aportaciones:', err);
+    } finally {
+      setCargandoAportaciones(false);
+    }
+  };
+
+  // Buscar Socio/Cuenta
+  const handleBuscarSocio = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusquedaError(null);
+    setSocioInfo(null);
+    setCreditosSocio([]);
+    setCreditoSeleccionado(null);
+    setCuotaPendiente(null);
+    setCuentaAportaciones(null);
+
+    if (!busqueda.trim()) {
+      setBusquedaError('Ingresa un número de cuenta o de cédula.');
+      return;
+    }
+
+    setBuscandoSocio(true);
+    try {
+      const res = await api.get(`/cuentas/buscar-caja?query=${encodeURIComponent(busqueda.trim())}`);
+      setSocioInfo(res.data);
+      if (res.data?.socio?.id) {
+        fetchCreditos(res.data.socio.id);
+        fetchAportaciones(res.data.socio.id);
+      }
+    } catch (err: any) {
+      console.error('Error buscando socio para caja:', err);
+      setBusquedaError(err.response?.data || 'No se encontró ninguna cuenta o socio con el valor provisto.');
+    } finally {
+      setBuscandoSocio(false);
+    }
+  };
+
+  // Procesar Transacción (Depósito, Retiro, Pago de Crédito, Aportación)
+  const handleTransaccionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTxError(null);
+
+    if (!socioInfo) {
+      setTxError('Busca y valida la cédula de un socio antes de realizar operaciones.');
+      return;
+    }
+
+    const montoNum = parseFloat(montoTx);
+    if (isNaN(montoNum) || montoNum <= 0.00) {
+      setTxError('El monto a transferir debe ser mayor a $0.00.');
+      return;
+    }
+
+    if (activeTab === 'RETIRO' && montoNum > socioInfo.saldo) {
+      setTxError('Fondos insuficientes: El monto de retiro supera el saldo disponible del socio.');
+      return;
+    }
+
+    if (activeTab === 'PAGO_CREDITO') {
+      if (!creditoSeleccionado || !cuotaPendiente) {
+        setTxError('No hay cuotas pendientes para pagar.');
+        return;
+      }
+      setConfirmTxData({
+        monto: montoNum,
+        tipo: 'PAGO_CREDITO',
+        concepto: `Pago de cuota de crédito Contrato: ${creditoSeleccionado.numeroCredito}`,
+        declaracionUafe: false
+      });
+      return;
+    }
+
+    if (activeTab === 'APORTACIONES') {
+      if (!cuentaAportaciones) {
+        setTxError('No existe una cuenta de aportaciones para depositar.');
+        return;
+      }
+      // Validación UAFE
+      if (montoNum >= 10000 && (!declaracionUafe || !uafeJustificacion.trim())) {
+        setTxError('Control UAFE: Se requiere ingresar la justificación escrita del origen de fondos y marcar el checkbox.');
+        return;
+      }
+      setConfirmTxData({
+        monto: montoNum,
+        tipo: 'APORTACIONES',
+        concepto: conceptoTx.trim() || 'Aportación en efectivo / Certificados de aportación',
+        declaracionUafe: declaracionUafe,
+        uafeJustificacion: montoNum >= 10000 ? uafeJustificacion.trim() : undefined
+      });
+      return;
+    }
+
+    // Validación UAFE
+    if (montoNum >= 10000 && (!declaracionUafe || !uafeJustificacion.trim())) {
+      setTxError('Control UAFE: Se requiere ingresar la justificación escrita del origen de fondos y marcar el checkbox.');
+      return;
+    }
+
+    const conceptoDefecto = activeTab === 'DEPOSITO' 
+      ? `Depósito en efectivo en ventanilla`
+      : `Retiro en efectivo en ventanilla`;
+
+    const finalConcepto = (conceptoTx.trim() || conceptoDefecto) + 
+      (activeTab === 'DEPOSITO' && depositante.trim() ? ` (Depositante: ${depositante.trim()})` : '') +
+      (montoNum >= 10000 ? ` [UAFE Origen: ${uafeJustificacion.trim()}]` : '');
+
+    // Abrir Modal de Confirmación
+    setConfirmTxData({
+      monto: montoNum,
+      tipo: activeTab,
+      concepto: finalConcepto,
+      depositante: activeTab === 'DEPOSITO' && depositante.trim() ? depositante.trim() : undefined,
+      declaracionUafe: declaracionUafe,
+      uafeJustificacion: montoNum >= 10000 ? uafeJustificacion.trim() : undefined
+    });
+  };
+
+  const executeTransaccion = async () => {
+    if (!confirmTxData || !socioInfo) return;
+
+    setProcesandoTx(true);
+    setTxError(null);
+    try {
+      if (confirmTxData.tipo === 'PAGO_CREDITO') {
+        if (!creditoSeleccionado || !cuotaPendiente) return;
+        // 1. Depósito del efectivo en la cuenta de ahorros
+        await api.post('/cuentas/deposito', {
+          cuentaAhorrosId: socioInfo.cuentaId,
+          monto: confirmTxData.monto,
+          concepto: `Depósito en efectivo para pago de crédito Contrato: ${creditoSeleccionado.numeroCredito}`,
+          declaracionOrigenFondos: false
+        });
+
+        // 2. Cobro/Pago del crédito
+        await api.post('/creditos/pagar', {
+          creditoId: creditoSeleccionado.id,
+          cuentaAhorrosId: socioInfo.cuentaId,
+          monto: confirmTxData.monto
+        });
+
+        // Refrescar saldos de socio y amortización
+        const resCuenta = await api.get(`/cuentas/buscar-caja?query=${socioInfo.numeroCuenta}`);
+        setSocioInfo(resCuenta.data);
+        await fetchCreditos(socioInfo.socio.id);
+
+        showToast('Pago de crédito registrado y aplicado con éxito.', 'success');
+
+        // Set ticket
+        setTicketData({
+          referencia: 'TX-VENT-' + Date.now(),
+          tipo: 'PAGO_CREDITO',
+          monto: confirmTxData.monto,
+          concepto: confirmTxData.concepto,
+          socioNombre: socioInfo.socio.nombresCompletos,
+          cuentaNumero: socioInfo.numeroCuenta,
+          fechaHora: new Date().toLocaleString('es-ES', { 
+            day: '2-digit', month: '2-digit', year: 'numeric', 
+            hour: '2-digit', minute: '2-digit', second: '2-digit' 
+          }),
+          saldoResultante: resCuenta.data.saldo,
+          socioCedula: socioInfo.socio.identificacion
+        });
+      }
+      else if (confirmTxData.tipo === 'APORTACIONES') {
+        if (!cuentaAportaciones) return;
+        
+        await api.post('/cuentas/deposito', {
+          cuentaAhorrosId: cuentaAportaciones.id,
+          monto: confirmTxData.monto,
+          concepto: confirmTxData.concepto,
+          declaracionOrigenFondos: confirmTxData.declaracionUafe
+        });
+
+        // Refrescar aportaciones
+        await fetchAportaciones(socioInfo.socio.id);
+
+        showToast('Aportación social registrada y acreditada con éxito.', 'success');
+
+        setTicketData({
+          referencia: 'TX-VENT-' + Date.now(),
+          tipo: 'APORTACIONES',
+          monto: confirmTxData.monto,
+          concepto: confirmTxData.concepto,
+          socioNombre: socioInfo.socio.nombresCompletos,
+          cuentaNumero: cuentaAportaciones.numeroCuenta,
+          fechaHora: new Date().toLocaleString('es-ES', { 
+            day: '2-digit', month: '2-digit', year: 'numeric', 
+            hour: '2-digit', minute: '2-digit', second: '2-digit' 
+          }),
+          saldoResultante: cuentaAportaciones.saldo + confirmTxData.monto,
+          socioCedula: socioInfo.socio.identificacion
+        });
+      }
+      else {
+        // Depósitos / Retiros regulares
+        const payload = {
+          cuentaAhorrosId: socioInfo.cuentaId,
+          monto: confirmTxData.monto,
+          concepto: confirmTxData.concepto,
+          declaracionOrigenFondos: confirmTxData.declaracionUafe
+        };
+        const endpoint = confirmTxData.tipo === 'DEPOSITO' ? '/cuentas/deposito' : '/cuentas/retiro';
+        await api.post(endpoint, payload);
+
+        showToast('Transacción procesada correctamente en los registros contables.', 'success');
+        
+        const nuevoSaldo = confirmTxData.tipo === 'DEPOSITO' 
+          ? socioInfo.saldo + confirmTxData.monto 
+          : socioInfo.saldo - confirmTxData.monto;
+
+        setSocioInfo(prev => {
+          if (!prev) return null;
+          return { ...prev, saldo: nuevoSaldo };
+        });
+
+        setTicketData({
+          referencia: 'TX-VENT-' + Date.now(),
+          tipo: confirmTxData.tipo,
+          monto: confirmTxData.monto,
+          concepto: confirmTxData.concepto,
+          socioNombre: socioInfo.socio.nombresCompletos,
+          cuentaNumero: socioInfo.numeroCuenta,
+          fechaHora: new Date().toLocaleString('es-ES', { 
+            day: '2-digit', month: '2-digit', year: 'numeric', 
+            hour: '2-digit', minute: '2-digit', second: '2-digit' 
+          }),
+          depositante: confirmTxData.depositante,
+          saldoResultante: nuevoSaldo,
+          socioCedula: socioInfo.socio.identificacion
+        });
+      }
+
+      // Limpiar campos comunes
+      setMontoTx('');
+      setConceptoTx('');
+      setDepositante('');
+      setDeclaracionUafe(false);
+      setUafeJustificacion('');
+      setConfirmTxData(null);
+      await fetchMovimientos();
+      window.dispatchEvent(new CustomEvent('caja-updated'));
+    } catch (err: any) {
+      console.error('Error procesando transacción:', err);
+      setTxError(err.response?.data || 'Error interno del servidor al procesar la operación.');
+      setConfirmTxData(null);
+    } finally {
+      setProcesandoTx(false);
+    }
+  };
+
+  const handleVerTicket = (mov: MovimientoCaja) => {
+    let depositanteExtracted: string | undefined = undefined;
+    if (mov.descripcion.includes('(Depositante: ')) {
+      const match = mov.descripcion.match(/\(Depositante:\s*([^)]+)\)/);
+      if (match && match[1]) {
+        depositanteExtracted = match[1].trim();
+      }
+    }
+
+    let tipoTx: 'DEPOSITO' | 'RETIRO' | 'PAGO_CREDITO' | 'APORTACIONES' = mov.tipoTransaccion === 'CREDITO' ? 'DEPOSITO' : 'RETIRO';
+    const desc = (mov.descripcion || '').toLowerCase();
+    if (desc.includes('aportación') || desc.includes('aportacion')) {
+      tipoTx = 'APORTACIONES';
+    } else if (desc.includes('pago de cuota') || desc.includes('pago de crédito') || desc.includes('pago de credito')) {
+      tipoTx = 'PAGO_CREDITO';
+    }
+
+    setTicketData({
+      referencia: mov.referencia,
+      tipo: tipoTx,
+      monto: mov.monto,
+      concepto: mov.descripcion,
+      socioNombre: mov.cuenta?.socio?.nombresCompletos || socioInfo?.socio?.nombresCompletos || 'Socio Cooperativa',
+      cuentaNumero: mov.cuenta?.numeroCuenta || 'N/A',
+      fechaHora: new Date(mov.fechaContable).toLocaleString('es-ES', { 
+        day: '2-digit', month: '2-digit', year: 'numeric', 
+        hour: '2-digit', minute: '2-digit', second: '2-digit' 
+      }),
+      depositante: depositanteExtracted,
+      saldoResultante: mov.saldoResultante,
+      socioCedula: mov.cuenta?.socio?.identificacion || socioInfo?.socio?.identificacion || ''
+    });
+  };
+
+  const getOperationBadge = (mov: MovimientoCaja) => {
+    const desc = (mov.descripcion || '').toLowerCase();
+    const esIngreso = esIngresoEfectivo(mov);
+    
+    if (desc.startsWith('[anulada]')) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-400 border border-slate-200/50 uppercase tracking-wider">
+          Anulada
+        </span>
+      );
+    }
+    
+    if (desc.includes('aportación') || desc.includes('aportacion')) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-100 uppercase tracking-wider">
+          <Coins className="h-3 w-3 text-teal-500" />
+          Aportación
+        </span>
+      );
+    }
+    
+    if (desc.includes('pago de cuota') || desc.includes('pago de crédito') || desc.includes('pago de credito')) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wider">
+          <FileText className="h-3 w-3 text-blue-500" />
+          Crédito
+        </span>
+      );
+    }
+    
+    return (
+      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border uppercase tracking-wider ${
+        esIngreso ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+      }`}>
+        {esIngreso ? <ArrowDownLeft className="h-3 w-3 text-emerald-500" /> : <ArrowUpRight className="h-3 w-3 text-rose-500" />}
+        {esIngreso ? 'DEPÓSITO' : 'RETIRO'}
+      </span>
+    );
+  };
+
+  const handleAnularClick = (e: React.MouseEvent, mov: any) => {
+    e.stopPropagation();
+    if (mov.descripcion.startsWith('[ANULADA]')) {
+      showToast('Esta transacción ya ha sido anulada.', 'error');
+      return;
+    }
+    setTxParaAnular(mov);
+    setClaveSupervisor('');
+    setAnulacionError(null);
+    setMostrarSupervisorModal(true);
+  };
+
+  const handleCloseSupervisorModal = () => {
+    setMostrarSupervisorModal(false);
+    setTxParaAnular(null);
+    setClaveSupervisor('');
+    setAnulacionError(null);
+  };
+
+  const handleConfirmarAnulacion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!txParaAnular) return;
+    if (!claveSupervisor.trim()) {
+      setAnulacionError('Ingrese la clave de supervisor.');
+      return;
+    }
+
+    setAnulandoTx(true);
+    setAnulacionError(null);
+    try {
+      await api.post(`/cuentas/transacciones/${txParaAnular.id}/anular`, {
+        claveSupervisor: claveSupervisor.trim()
+      });
+
+      showToast('Transacción anulada y reversada con éxito.', 'success');
+      setMostrarSupervisorModal(false);
+      setTxParaAnular(null);
+      setClaveSupervisor('');
+      
+      // Refrescar movimientos y saldo del socio
+      await fetchMovimientos();
+      if (socioInfo) {
+        const resCuenta = await api.get(`/cuentas/buscar-caja?query=${socioInfo.numeroCuenta}`);
+        setSocioInfo(resCuenta.data);
+        fetchAportaciones(socioInfo.socio.id);
+        fetchCreditos(socioInfo.socio.id);
+      }
+      window.dispatchEvent(new CustomEvent('caja-updated'));
+    } catch (err: any) {
+      console.error('Error anulando transacción:', err);
+      setAnulacionError(err.response?.data || 'No se pudo anular la transacción. Verifique la clave.');
+    } finally {
+      setAnulandoTx(false);
+    }
+  };
+
+  const handlePrintTicket = () => {
+    if (!ticketRef.current) return;
+    
+    const printContent = ticketRef.current.innerHTML;
+
+    // Crear una ventana o elemento de impresión minimalista
+    const windowPrint = window.open('', '', 'width=600,height=600');
+    if (windowPrint) {
+      windowPrint.document.write(`
+        <html>
+          <head>
+            <title>Imprimir Ticket de Ventanilla</title>
+            <style>
+              body {
+                font-family: monospace;
+                padding: 30px;
+                color: #000;
+                line-height: 1.4;
+              }
+              .ticket {
+                max-width: 380px;
+                margin: 0 auto;
+                white-space: pre-wrap;
+              }
+              .text-center { text-align: center; }
+              .divider { border-top: 1px dashed #000; margin: 10px 0; }
+              .firma-area { margin-top: 40px; text-align: center; }
+              .btn-no-print { display: none; }
+            </style>
+          </head>
+          <body>
+            <div class="ticket">
+              ${printContent}
+            </div>
+            <script>
+              window.onload = function() {
+                window.print();
+                window.close();
+              }
+            </script>
+          </body>
+        </html>
+      `);
+      windowPrint.document.close();
+    }
+  };
+
+  // Renderizar loaders iniciales
+  if (cargandoCaja) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Clock className="h-8 w-8 animate-spin text-[#0054A6]" />
+          <p className="text-sm text-slate-500 font-medium">Validando estado de bóveda y diario...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Vista de Caja Cerrada (Apertura Obligatoria)
+  if (!caja) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <Card className="w-full max-w-md bg-white rounded-[2rem] border border-slate-100 p-8 shadow-[0_15px_50px_-15px_rgba(0,84,166,0.06)] flex flex-col items-center select-none text-center">
+          <div className="h-16 w-16 rounded-3xl bg-[#0054A6]/10 text-[#0054A6] flex items-center justify-center mb-6">
+            <Lock className="h-7 w-7" />
+          </div>
+
+          <h2 className="text-xl font-extrabold text-slate-800 tracking-tight">Caja Diaria Cerrada</h2>
+          <p className="text-xs text-slate-500 mt-2 max-w-[280px]">
+            Para operar transacciones de ventanilla de depósitos y retiros, debes abrir tu ciclo diario de arqueo.
+          </p>
+
+          {aperturaError && (
+            <div className="w-full mt-6 p-3.5 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-600 font-semibold flex gap-2 text-left items-start">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{aperturaError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleAperturar} className="w-full mt-6 space-y-4 text-left">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-500">Monto Inicial en Efectivo (Apertura)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">$</span>
+                <Input 
+                  type="text"
+                  placeholder="0.00"
+                  value={montoApertura}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
+                      setMontoApertura(val);
+                    }
+                  }}
+                  disabled={aperturaLoading}
+                  className="pl-8 text-lg font-bold text-slate-800"
+                />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={aperturaLoading}
+              className="w-full bg-[#0054A6] hover:bg-[#004080] text-white font-bold rounded-2xl h-12 flex items-center justify-center gap-2 cursor-pointer shadow-md mt-2"
+            >
+              {aperturaLoading ? 'Aperturando canales...' : 'Abrir Caja Diaria'}
+            </Button>
+          </form>
+        </Card>
+      </div>
+    );
+  }
+
+  // Freno de sobregiro
+  const sobregiroDetectado = activeTab === 'RETIRO' && montoTx.trim() !== '' && parseFloat(montoTx) > (socioInfo?.saldo || 0);
+  const limiteUafeExcedido = montoTx.trim() !== '' && parseFloat(montoTx) >= 10000;
+
+  return (
+    <div className="space-y-8 animate-fade-in relative pt-4">
+
+      {/* Panel de Operaciones en Dos Columnas */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+        
+        {/* Columna Izquierda: Búsqueda y Validación Legal (3/5) */}
+        <div className="lg:col-span-3 space-y-6">
+          
+          {/* Card Búsqueda */}
+          <Card className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_12px_30px_-8px_rgba(0,84,166,0.01)]">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Buscar Socio</h3>
+            <form onSubmit={handleBuscarSocio} className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input 
+                  type="text"
+                  placeholder="Nro. Cuenta o Cédula (ej. 1710034065)"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value.replace(/\D/g, ''))}
+                  className="pl-10 pr-10"
+                />
+                {busqueda && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBusqueda('');
+                      setSocioInfo(null);
+                      setBusquedaError(null);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
+                    title="Limpiar búsqueda"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              <Button
+                type="submit"
+                disabled={buscandoSocio}
+                className="bg-[#0054A6] hover:bg-[#004080] text-white font-bold px-6 rounded-xl shrink-0 h-10.5 text-xs cursor-pointer shadow-sm flex items-center gap-1.5"
+              >
+                {buscandoSocio ? 'Buscando...' : 'Buscar'}
+              </Button>
+            </form>
+            {busquedaError && (
+              <p className="text-xs text-rose-600 font-medium mt-2 flex items-center gap-1">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {busquedaError}
+              </p>
+            )}
+          </Card>
+
+          {/* Ficha Socio y Validación */}
+          {socioInfo ? (
+            <Card className="rounded-[2.2rem] border border-slate-100 bg-white p-6 md:p-8 shadow-[0_15px_40px_-10px_rgba(0,84,166,0.015)] space-y-6 animate-scale-up">
+              <div className="pb-4 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0 relative shadow-sm">
+                    {socioInfo.socio.fotoPerfilUrl ? (
+                      <img 
+                        src={`http://localhost:8080/api/v1${socioInfo.socio.fotoPerfilUrl}`} 
+                        alt="Foto Perfil Socio" 
+                        className="h-full w-full object-cover" 
+                      />
+                    ) : (
+                      <User className="h-6 w-6 text-slate-400" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-sm leading-tight">{socioInfo.socio.nombresCompletos}</h3>
+                    <span className="text-[10px] font-bold text-slate-400 tracking-wider font-mono">SOC-{String(socioInfo.socio.id).padStart(6, '0')}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2.5 py-0.5 rounded-full border uppercase tracking-widest ${
+                    socioInfo.socio.estado === 'ACTIVO' 
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                      : 'bg-amber-50 text-amber-700 border-amber-100'
+                  }`}>
+                    {socioInfo.socio.estado}
+                  </span>
+                  <div className="text-right">
+                    <span className="text-[9px] font-semibold text-slate-400 block uppercase">Saldo Disponible</span>
+                    <span className="text-base font-black text-[#0054A6] block font-mono leading-none mt-0.5">${socioInfo.saldo.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Información Adicional Corta */}
+              <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50/70 p-4 rounded-2xl border border-slate-100/50">
+                <div>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">Nro. Cuenta Ahorros</span>
+                  <span className="font-bold text-slate-700 font-mono mt-0.5 block">{socioInfo.numeroCuenta}</span>
+                </div>
+                <div>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">Identificación C.I.</span>
+                  <span className="font-bold text-slate-700 font-mono mt-0.5 block">{socioInfo.socio.identificacion}</span>
+                </div>
+              </div>
+
+              {/* Bloque: Validación Cédula / Firma */}
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center gap-2 border-b border-slate-50 pb-2">
+                  <FileText className="h-4.5 w-4.5 text-[#0054A6]" />
+                  <h4 className="text-xs font-bold text-slate-800">Verificación Documental de Cédula y Firma</h4>
+                </div>
+
+                {socioInfo.socio.fotoCedulaFrontalUrl && socioInfo.socio.fotoCedulaPosteriorUrl ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Render de imágenes físicas cargadas */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-semibold text-slate-400 block text-center">Cédula Frontal</span>
+                      <div className="h-40 rounded-xl border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
+                        <img 
+                          src={`http://localhost:8080/api/v1${socioInfo.socio.fotoCedulaFrontalUrl}`} 
+                          alt="Cédula Frontal" 
+                          className="h-full w-full object-cover" 
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-semibold text-slate-400 block text-center">Cédula Posterior / Firma</span>
+                      <div className="h-40 rounded-xl border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
+                        <img 
+                          src={`http://localhost:8080/api/v1${socioInfo.socio.fotoCedulaPosteriorUrl}`} 
+                          alt="Cédula Posterior" 
+                          className="h-full w-full object-cover" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // Mockups Vectoriales SVG interactivos
+                  <div className="space-y-4">
+                    <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl text-[11px] text-amber-700 font-semibold flex gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                      <span>Socio sin documentos cargados en el servidor. Visualizando simulaciones vectoriales para cotejar firmas oficiales.</span>
+                    </div>
+                    <div className="flex flex-col xl:flex-row gap-6 justify-center items-center">
+                      <div className="space-y-1 w-full max-w-sm">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center block">Cédula Frontal</span>
+                        <CedulaFrontalMockup 
+                          nombres={socioInfo.socio.nombresCompletos} 
+                          cedula={socioInfo.socio.identificacion}
+                          avatarUrl={socioInfo.socio.fotoPerfilUrl || null}
+                        />
+                      </div>
+                      <div className="space-y-1 w-full max-w-sm">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center block">Cédula Posterior (Firma)</span>
+                        <CedulaPosteriorMockup 
+                          cedula={socioInfo.socio.identificacion}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+          ) : (
+            <Card className="rounded-[2.2rem] border border-slate-100 bg-white p-12 shadow-[0_15px_40px_-10px_rgba(0,84,166,0.015)] flex flex-col items-center justify-center text-center select-none min-h-[300px]">
+              <div className="h-14 w-14 rounded-2xl bg-slate-50 text-slate-300 flex items-center justify-center mb-4 border border-slate-100/50">
+                <Search className="h-6 w-6" />
+              </div>
+              <h4 className="text-sm font-bold text-slate-500">Búsqueda Requerida</h4>
+              <p className="text-xs text-slate-400 max-w-[280px] mt-1.5">
+                Ingresa el número de cédula o el número de cuenta de ahorros del socio en la barra superior para cargar su ficha legal.
+              </p>
+            </Card>
+          )}
+
+        </div>
+
+        {/* Columna Derecha: Formulario Transaccional (2/5) */}
+        <div className="lg:col-span-2">
+          
+          <Card className="rounded-[2.2rem] border border-slate-100 bg-white shadow-[0_15px_40px_-10px_rgba(0,84,166,0.02)] overflow-hidden">
+            
+            {/* Tabs Control */}
+            <div className="flex border-b border-slate-100 bg-slate-50/50">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('DEPOSITO');
+                  setTxError(null);
+                }}
+                className={`flex-1 py-3 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 transition-all cursor-pointer border-b-2 ${
+                  activeTab === 'DEPOSITO' 
+                    ? 'border-[#0054A6] text-[#0054A6] bg-white' 
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
+                Depósito
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('RETIRO');
+                  setTxError(null);
+                }}
+                className={`flex-1 py-3 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 transition-all cursor-pointer border-b-2 ${
+                  activeTab === 'RETIRO' 
+                    ? 'border-[#0054A6] text-[#0054A6] bg-white' 
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <ArrowUpRight className="h-4 w-4 text-rose-500" />
+                Retiro
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('PAGO_CREDITO');
+                  setTxError(null);
+                  if (cuotaPendiente) {
+                    const cap = (cuotaPendiente.capitalProyectado || 0) - (cuotaPendiente.capitalPagado || 0);
+                    const int = (cuotaPendiente.interesProyectado || 0) - (cuotaPendiente.interesPagado || 0);
+                    const mor = (cuotaPendiente.montoMoraAcumulado || 0) - (cuotaPendiente.montoMoraPagado || 0);
+                    const val = cap + int + mor;
+                    setMontoTx(val.toFixed(2));
+                  } else {
+                    setMontoTx('');
+                  }
+                }}
+                className={`flex-1 py-3 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 transition-all cursor-pointer border-b-2 ${
+                  activeTab === 'PAGO_CREDITO' 
+                    ? 'border-[#0054A6] text-[#0054A6] bg-white' 
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <FileText className="h-4 w-4 text-blue-500" />
+                Crédito
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('APORTACIONES');
+                  setTxError(null);
+                  setMontoTx('');
+                }}
+                className={`flex-1 py-3 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 transition-all cursor-pointer border-b-2 ${
+                  activeTab === 'APORTACIONES' 
+                    ? 'border-[#0054A6] text-[#0054A6] bg-white' 
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <Coins className="h-4 w-4 text-amber-500" />
+                Aportaciones
+              </button>
+            </div>
+
+            <div className="p-6 md:p-8 space-y-6">
+              
+              {txError && (
+                <div className="p-3.5 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-600 font-semibold flex gap-2 items-start animate-fade-in">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{txError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleTransaccionSubmit} className="space-y-6">
+                
+                {/* Detalles de Crédito Activo */}
+                {activeTab === 'PAGO_CREDITO' && socioInfo && (
+                  <div className="space-y-3 animate-slide-down">
+                    <label className="block text-xs font-bold text-slate-500 uppercase">Información de Crédito</label>
+                    {cargandoCredito ? (
+                      <div className="py-4 text-center text-xs text-slate-400">Cargando datos de crédito...</div>
+                    ) : creditosSocio.length > 0 ? (
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <select
+                            value={creditoSeleccionado?.id || ''}
+                            onChange={async (e) => {
+                              const cred = creditosSocio.find(c => c.id === parseInt(e.target.value));
+                              setCreditoSeleccionado(cred || null);
+                              if (cred) await fetchAmortizacion(cred.id);
+                            }}
+                            className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-[#0054A6]/10"
+                          >
+                            {creditosSocio.map((c: any) => (
+                              <option key={c.id} value={c.id}>
+                                Contrato: {c.numeroCredito} - Desembolsado: ${(c.montoDesembolsado || c.montoSolicitado || 0).toFixed(2)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {cuotaPendiente ? (
+                          <div className="bg-blue-50/40 border border-blue-100/70 rounded-2xl p-4.5 space-y-2.5 text-xs">
+                            <div className="flex justify-between items-center pb-2 border-b border-blue-100/30">
+                              <span className="font-extrabold text-blue-800 uppercase text-[10px]">Detalle de Cuota Nro. {cuotaPendiente.numeroCuota}</span>
+                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100 font-mono">
+                                Vence: {(() => {
+                                  const dt = cuotaPendiente.fechaVencimiento;
+                                  if (Array.isArray(dt)) {
+                                    return `${String(dt[2]).padStart(2, '0')}/${String(dt[1]).padStart(2, '0')}/${dt[0]}`;
+                                  }
+                                  return dt ? new Date(dt).toLocaleDateString('es-ES') : 'N/A';
+                                })()}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-600 font-semibold font-mono">
+                              <div>
+                                <span className="text-[8px] font-bold text-slate-400 block uppercase">Capital</span>
+                                <span>${((cuotaPendiente.capitalProyectado || 0) - (cuotaPendiente.capitalPagado || 0)).toFixed(2)}</span>
+                              </div>
+                              <div>
+                                <span className="text-[8px] font-bold text-slate-400 block uppercase">Interés</span>
+                                <span>${((cuotaPendiente.interesProyectado || 0) - (cuotaPendiente.interesPagado || 0)).toFixed(2)}</span>
+                              </div>
+                              <div>
+                                <span className="text-[8px] font-bold text-slate-400 block uppercase">Mora</span>
+                                <span className={(cuotaPendiente.montoMoraAcumulado || 0) > (cuotaPendiente.montoMoraPagado || 0) ? "text-rose-600 font-bold" : ""}>
+                                  ${((cuotaPendiente.montoMoraAcumulado || 0) - (cuotaPendiente.montoMoraPagado || 0)).toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="border-t border-dashed border-blue-200/50 pt-2 flex justify-between items-center text-xs font-black text-blue-900">
+                              <span>TOTAL CUOTA PENDIENTE:</span>
+                              <span className="font-mono text-[14px]">
+                                ${(((cuotaPendiente.capitalProyectado || 0) - (cuotaPendiente.capitalPagado || 0)) +
+                                  ((cuotaPendiente.interesProyectado || 0) - (cuotaPendiente.interesPagado || 0)) +
+                                  ((cuotaPendiente.montoMoraAcumulado || 0) - (cuotaPendiente.montoMoraPagado || 0))).toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl text-xs text-emerald-700 font-semibold flex gap-2">
+                            <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+                            <span>El socio no registra cuotas pendientes por pagar.</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-3.5 bg-amber-50 border border-amber-100 rounded-2xl text-xs text-amber-700 font-semibold flex gap-2">
+                        <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                        <span>El socio no tiene créditos activos (DESEMBOLSADO / EN_MORA).</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Detalles de Cuenta de Aportaciones */}
+                {activeTab === 'APORTACIONES' && socioInfo && (
+                  <div className="space-y-3 animate-slide-down">
+                    <label className="block text-xs font-bold text-slate-500 uppercase font-sans">Información de Aportación</label>
+                    {cargandoAportaciones ? (
+                      <div className="py-4 text-center text-xs text-slate-400">Cargando cuenta de aportaciones...</div>
+                    ) : cuentaAportaciones ? (
+                      <div className="bg-amber-50/40 border border-amber-100/70 rounded-2xl p-4 space-y-2.5 text-xs">
+                        <div className="flex justify-between items-center pb-1.5 border-b border-amber-100/30">
+                          <span className="font-extrabold text-amber-800 uppercase text-[10px]">Certificados de Aportación</span>
+                          <span className="text-[9px] font-black text-amber-700 uppercase">Capital Social</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <span className="text-[8px] font-bold text-slate-400 block uppercase">Nro. Cuenta</span>
+                            <span className="font-bold text-slate-700 font-mono">{cuentaAportaciones.numeroCuenta}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[8px] font-bold text-slate-400 block uppercase">Saldo Aportado</span>
+                            <span className="font-black text-amber-600 font-mono text-[14px]">${(cuentaAportaciones.saldo || 0).toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-rose-600 font-semibold flex gap-2">
+                        <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                        <span>El socio no posee una cuenta de aportaciones (Capital Social) activa.</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Monto de la Transacción */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-500 uppercase">Monto de la Operación</label>
+                  <div className="relative">
+                    <span className={`absolute left-5 top-1/2 -translate-y-1/2 font-black text-2xl ${
+                      sobregiroDetectado ? 'text-rose-500' : 'text-slate-400'
+                    }`}>$</span>
+                    <Input 
+                      type="text"
+                      placeholder="0.00"
+                      value={montoTx}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
+                          setMontoTx(val);
+                        }
+                      }}
+                      disabled={procesandoTx || !socioInfo}
+                      className={`pl-10 text-3xl font-black rounded-2xl h-16 border-2 focus-visible:ring-4 ${
+                        sobregiroDetectado 
+                          ? 'border-rose-300 text-rose-600 focus-visible:ring-rose-500/10 focus-visible:border-rose-500 bg-rose-50/30' 
+                          : 'text-[#0054A6] bg-slate-50/30'
+                      }`}
+                    />
+                  </div>
+                  {sobregiroDetectado && (
+                    <p className="text-[10px] text-rose-600 font-extrabold flex items-center gap-1 animate-fade-in">
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      Fondos insuficientes (Saldo socio: ${socioInfo?.saldo.toFixed(2)})
+                    </p>
+                  )}
+                </div>
+
+                {/* Concepto (Glosa) */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-500 uppercase">Concepto / Glosa</label>
+                  <Input 
+                    type="text"
+                    placeholder={`Ej. ${
+                      activeTab === 'DEPOSITO' 
+                        ? 'Depósito mensual de ahorros' 
+                        : activeTab === 'RETIRO'
+                          ? 'Retiro por ventanilla'
+                          : activeTab === 'PAGO_CREDITO'
+                            ? 'Pago de cuota de crédito'
+                            : 'Depósito a cuenta de aportaciones'
+                    }`}
+                    value={conceptoTx}
+                    onChange={(e) => setConceptoTx(e.target.value)}
+                    disabled={procesandoTx || !socioInfo}
+                  />
+                </div>
+
+                {/* Depositante Tercero (Solo Depósito) */}
+                {activeTab === 'DEPOSITO' && (
+                  <div className="space-y-1.5 animate-slide-down">
+                    <label className="block text-xs font-bold text-slate-500 uppercase">Nombre Depositante (Si es Tercero)</label>
+                    <Input 
+                      type="text"
+                      placeholder="Ej. María Gómez (Opcional)"
+                      value={depositante}
+                      onChange={(e) => setDepositante(e.target.value)}
+                      disabled={procesandoTx || !socioInfo}
+                    />
+                  </div>
+                )}
+
+                {/* Checkbox UAFE si excede 10k */}
+                {limiteUafeExcedido && (
+                  <div className="p-4 bg-amber-50/70 border border-amber-200/50 rounded-2xl space-y-3.5 animate-slide-down">
+                    <div className="flex gap-2 items-start">
+                      <AlertCircle className="h-4.5 w-4.5 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="text-[11px] font-bold text-amber-800 uppercase">Control Regulatorio SEPS / UAFE</h4>
+                        <p className="text-[10px] text-amber-700 leading-tight mt-0.5">
+                          Toda transacción en efectivo de $10,000.00 USD o más requiere registrar obligatoriamente la Declaración de Origen Lícito de Fondos.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black text-amber-900 uppercase block leading-none">
+                        Declaración Jurada del Origen de los Fondos (Obligatorio)
+                      </label>
+                      <Input
+                        type="text"
+                        placeholder="Ej. Ahorros de sueldo, Venta de inmueble, Préstamo..."
+                        value={uafeJustificacion}
+                        onChange={(e) => setUafeJustificacion(e.target.value)}
+                        disabled={procesandoTx || !socioInfo}
+                        className="h-9 text-xs rounded-xl bg-white border-amber-300 text-slate-800 placeholder-amber-600/50 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <label className="flex items-center gap-2 text-[10px] text-amber-850 font-extrabold cursor-pointer select-none">
+                      <input 
+                        type="checkbox"
+                        checked={declaracionUafe}
+                        onChange={(e) => setDeclaracionUafe(e.target.checked)}
+                        disabled={procesandoTx || !socioInfo}
+                        className="rounded border-amber-300 text-amber-600 focus:ring-amber-500 h-4 w-4"
+                      />
+                      <span>He verificado y tengo en físico la declaración firmada.</span>
+                    </label>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  disabled={
+                    procesandoTx || 
+                    !socioInfo || 
+                    sobregiroDetectado || 
+                    (limiteUafeExcedido && (!declaracionUafe || !uafeJustificacion.trim())) ||
+                    (activeTab === 'PAGO_CREDITO' && (!creditoSeleccionado || !cuotaPendiente)) ||
+                    (activeTab === 'APORTACIONES' && !cuentaAportaciones)
+                  }
+                  className={`w-full !text-white font-bold rounded-2xl h-13 flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all ${
+                    activeTab === 'DEPOSITO' 
+                      ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/10' 
+                      : activeTab === 'APORTACIONES'
+                        ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/10'
+                        : 'bg-[#0054A6] hover:bg-[#004080] shadow-blue-500/10'
+                  }`}
+                >
+                  {procesandoTx ? (
+                    <span className="text-white font-bold">Procesando transacción ACID...</span>
+                  ) : activeTab === 'DEPOSITO' ? (
+                    <span className="flex items-center gap-2 text-white font-bold">
+                      <ArrowDownLeft className="h-4.5 w-4.5 text-white" />
+                      Registrar Depósito
+                    </span>
+                  ) : activeTab === 'RETIRO' ? (
+                    <span className="flex items-center gap-2 text-white font-bold">
+                      <ArrowUpRight className="h-4.5 w-4.5 text-white" />
+                      Registrar Retiro
+                    </span>
+                  ) : activeTab === 'PAGO_CREDITO' ? (
+                    <span className="flex items-center gap-2 text-white font-bold">
+                      <FileText className="h-4.5 w-4.5 text-white" />
+                      Registrar Pago Crédito
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2 text-white font-bold">
+                      <Coins className="h-4.5 w-4.5 text-white" />
+                      Registrar Aportación
+                    </span>
+                  )}
+                </Button>
+
+              </form>
+
+            </div>
+
+          </Card>
+
+        </div>
+
+      </div>
+
+      {/* Tabla del Diario de Caja (Día en curso) */}
+      <Card className="rounded-[2.2rem] border border-slate-100 bg-white p-6 md:p-8 shadow-[0_15px_40px_-10px_rgba(0,84,166,0.015)] space-y-6">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-50">
+          <div className="flex items-center gap-2.5">
+            <Coins className="h-5 w-5 text-[#0054A6]" />
+            <h3 className="text-base font-bold text-slate-800">Transacciones en Ventanilla</h3>
+          </div>
+          <span className="text-[10px] font-bold px-3 py-1 bg-slate-100 rounded-xl text-slate-500">
+            Total Movimientos: {movimientos.filter(m => !esPuenteCredito(m)).length}
+          </span>
+        </div>
+
+        {/* Filtros de Diario */}
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-slate-50/50 p-3.5 rounded-2xl border border-slate-100/70 select-none animate-fade-in">
+          {/* Filtro de Tipo (Pills / Selector) */}
+          <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl self-start">
+            <button
+              onClick={() => setFiltroTipo('TODOS')}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-extrabold tracking-wider transition-all uppercase cursor-pointer ${
+                filtroTipo === 'TODOS'
+                  ? 'bg-white text-[#0054A6] shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setFiltroTipo('CREDITO')}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-extrabold tracking-wider transition-all uppercase cursor-pointer ${
+                filtroTipo === 'CREDITO'
+                  ? 'bg-white text-emerald-700 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Depósitos
+            </button>
+            <button
+              onClick={() => setFiltroTipo('DEBITO')}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-extrabold tracking-wider transition-all uppercase cursor-pointer ${
+                filtroTipo === 'DEBITO'
+                  ? 'bg-white text-rose-700 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Retiros
+            </button>
+          </div>
+
+          {/* Buscador de Diario */}
+          <div className="relative max-w-xs w-full">
+            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+            <Input
+              type="text"
+              placeholder="Buscar por cédula, cuenta o socio..."
+              value={filtroBusqueda}
+              onChange={(e) => setFiltroBusqueda(e.target.value)}
+              className="pl-9 h-9 text-xs rounded-xl bg-white border-slate-200"
+            />
+          </div>
+        </div>
+
+        <div className={`overflow-x-auto transition-all duration-300 ${
+          movimientosFiltrados.length > 10 ? 'max-h-[440px] overflow-y-auto pr-1' : ''
+        }`}>
+          <table className="w-full text-left border-collapse text-xs select-none">
+            <thead className="sticky top-0 bg-white z-10">
+              <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-white">
+                <th className="pb-3.5 pl-2 bg-white">Fecha y Hora</th>
+                <th className="pb-3.5 bg-white">Referencia</th>
+                <th className="pb-3.5 bg-white">Nro. Cuenta</th>
+                <th className="pb-3.5 bg-white">Socio</th>
+                <th className="pb-3.5 bg-white">Operación</th>
+                <th className="pb-3.5 text-right bg-white">Monto</th>
+                <th className="pb-3.5 text-center bg-white">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50 font-medium text-slate-700">
+              {movimientosFiltrados.length > 0 ? (
+                [...movimientosFiltrados].reverse().map((mov) => {
+                  const esIngreso = esIngresoEfectivo(mov);
+                  const esAnulada = mov.descripcion.startsWith('[ANULADA]');
+                  return (
+                    <tr 
+                      key={mov.id} 
+                      className={`hover:bg-slate-50/50 transition-colors cursor-pointer ${
+                        esAnulada ? 'opacity-60 bg-slate-50/30' : ''
+                      }`}
+                      onClick={() => handleVerTicket(mov)}
+                      title="Haga clic para ver e imprimir el comprobante de esta transacción"
+                    >
+                      <td className="py-3.5 pl-2 font-mono text-[11px] text-slate-500">
+                        {new Date(mov.fechaContable).toLocaleString('es-ES', { 
+                          day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+                        })}
+                      </td>
+                      <td className="py-3.5 font-mono text-[11px] text-slate-500">{mov.referencia}</td>
+                      <td className="py-3.5 font-mono text-[11px] text-slate-600">{mov.cuenta?.numeroCuenta || 'N/A'}</td>
+                      <td className="py-3.5 text-slate-700 font-bold uppercase truncate max-w-[150px]" title={mov.cuenta?.socio?.nombresCompletos || socioInfo?.socio?.nombresCompletos}>
+                        {mov.cuenta?.socio?.nombresCompletos || socioInfo?.socio?.nombresCompletos || 'Socio Cooperativa'}
+                      </td>
+                      <td className="py-3.5">
+                        {getOperationBadge(mov)}
+                      </td>
+                      <td className={`py-3.5 text-right font-bold font-mono text-[12px] ${
+                        esAnulada ? 'text-slate-400 line-through' : esIngreso ? 'text-emerald-600' : 'text-slate-800'
+                      }`}>
+                        {esAnulada ? '' : esIngreso ? '+' : '-'}${mov.monto.toFixed(2)}
+                      </td>
+                      <td className="py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                        {!esAnulada ? (
+                          <button
+                            type="button"
+                            onClick={(e) => handleAnularClick(e, mov)}
+                            className="text-[10px] font-bold text-rose-500/80 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-lg transition-all cursor-pointer border border-transparent hover:border-rose-100"
+                          >
+                            Anular
+                          </button>
+                        ) : (
+                          <span className="text-[10px] font-medium text-slate-450 italic">
+                            Reversado
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                    No se han registrado depósitos ni retiros por ventanilla el día de hoy.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Modal: Ticket de Ventanilla */}
+      {ticketData && (
+        <div 
+          onClick={() => setTicketData(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in select-none cursor-default"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm bg-white rounded-[2rem] border border-slate-100 p-6 md:p-8 shadow-2xl flex flex-col justify-between relative overflow-hidden animate-scale-up cursor-default"
+          >
+            
+            <button 
+              onClick={() => setTicketData(null)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            {/* Area de Impresión */}
+            <div ref={ticketRef} className="font-mono text-[11px] text-slate-800 space-y-4 pt-2">
+              <div className="text-center space-y-1">
+                <Building className="h-6 w-6 text-[#0054A6] mx-auto mb-1.5" />
+                <h4 className="font-extrabold text-[12px] uppercase tracking-wide">
+                  {activeTenant?.name?.toUpperCase() || 'ITQ'}
+                </h4>
+                <p className="text-[10px] text-slate-500 uppercase leading-none">Canal Ventanilla</p>
+                <p className="text-[9px] text-slate-400 font-bold tracking-widest">{ticketData.referencia}</p>
+              </div>
+
+              <div className="border-t border-dashed border-slate-200 my-2" />
+
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span>FECHA/HORA:</span>
+                  <span className="font-bold">{ticketData.fechaHora}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>CAJERO:</span>
+                  <span className="font-bold uppercase">{user?.nombresCompletos.split(' ').slice(0, 2).join(' ')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>SOCIO:</span>
+                  <span className="font-bold uppercase">{ticketData.socioNombre}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>CÉDULA / DNI:</span>
+                  <span className="font-bold">{ticketData.socioCedula}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>NRO. CUENTA:</span>
+                  <span className="font-bold">{ticketData.cuentaNumero}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-dashed border-slate-200 my-2" />
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-[12px] font-black">
+                  <span>OPERACIÓN:</span>
+                  <span className={
+                    ticketData.tipo === 'DEPOSITO' 
+                      ? 'text-emerald-600' 
+                      : ticketData.tipo === 'RETIRO' 
+                        ? 'text-rose-600'
+                        : ticketData.tipo === 'PAGO_CREDITO'
+                          ? 'text-blue-600'
+                          : 'text-amber-600'
+                  }>
+                    {ticketData.tipo === 'DEPOSITO' && 'DEPÓSITO EN EFECTIVO'}
+                    {ticketData.tipo === 'RETIRO' && 'RETIRO EN EFECTIVO'}
+                    {ticketData.tipo === 'PAGO_CREDITO' && 'PAGO DE CRÉDITO'}
+                    {ticketData.tipo === 'APORTACIONES' && 'CERTIFICADO DE APORTACIÓN'}
+                  </span>
+                </div>
+                {ticketData.depositante && (
+                  <div className="flex justify-between">
+                    <span>DEPOSITANTE:</span>
+                    <span className="font-bold uppercase">{ticketData.depositante}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-[13px] font-black bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                  <span>MONTO NETO:</span>
+                  <span>${ticketData.monto.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-[11px] font-bold bg-slate-50/50 p-1.5 rounded-lg border border-slate-100/50 border-dashed">
+                  <span>SALDO TOTAL:</span>
+                  <span>${ticketData.saldoResultante.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-[9px] text-slate-400">
+                  <span>GLOSA:</span>
+                  <span className="font-bold text-right max-w-[180px] break-words">{ticketData.concepto}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-dashed border-slate-200 my-3" />
+
+              <div className="pt-8 text-center space-y-1">
+                <p className="text-[9px] text-slate-400">------------------------------------</p>
+                <p className="font-extrabold uppercase text-slate-600">Firma del Socio / Cliente</p>
+                <p className="text-[9px] text-slate-400 font-bold uppercase">C.I. {ticketData.socioCedula}</p>
+              </div>
+
+              <div className="text-center pt-3 text-[9px] text-slate-400">
+                <p>Comprobante de Ventanilla Electrónico</p>
+              </div>
+            </div>
+
+            {/* Controles de Ticket */}
+            <div className="mt-6">
+              <Button
+                onClick={handlePrintTicket}
+                className="w-full bg-[#0054A6] hover:bg-[#004080] text-white font-bold rounded-xl h-11 flex items-center justify-center gap-2 text-xs cursor-pointer shadow-md"
+              >
+                <Printer className="h-4 w-4" />
+                Imprimir Comprobante
+              </Button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmación de Transacción */}
+      {confirmTxData && socioInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in select-none">
+          <div className="w-full max-w-md bg-white rounded-[2rem] border border-slate-100 p-6 md:p-8 shadow-2xl flex flex-col justify-between relative overflow-hidden animate-scale-up">
+            
+            <button 
+              onClick={() => setConfirmTxData(null)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="space-y-4 pt-2">
+              <div className="text-center space-y-1">
+                <AlertCircle className="h-8 w-8 text-[#0054A6] mx-auto mb-1.5" />
+                <h4 className="font-extrabold text-[14px] text-slate-800 uppercase tracking-wide">
+                  Confirmación de Transacción
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Por favor, verifique detalladamente los datos de la operación antes de procesarla en el sistema contable.
+                </p>
+              </div>
+
+              <div className="border-t border-slate-100 my-2" />
+
+              <div className="space-y-2.5 text-xs text-slate-700">
+                <div className="flex justify-between items-center py-1 border-b border-slate-50">
+                  <span className="font-bold text-slate-400 uppercase text-[10px]">Operación:</span>
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-lg ${
+                    confirmTxData.tipo === 'DEPOSITO' 
+                      ? 'bg-emerald-50 text-emerald-700' 
+                      : confirmTxData.tipo === 'RETIRO' 
+                        ? 'bg-rose-50 text-rose-700'
+                        : confirmTxData.tipo === 'PAGO_CREDITO'
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'bg-amber-50 text-amber-700'
+                  }`}>
+                    {confirmTxData.tipo === 'DEPOSITO' && 'DEPÓSITO EN EFECTIVO'}
+                    {confirmTxData.tipo === 'RETIRO' && 'RETIRO EN EFECTIVO'}
+                    {confirmTxData.tipo === 'PAGO_CREDITO' && 'PAGO DE CRÉDITO'}
+                    {confirmTxData.tipo === 'APORTACIONES' && 'CERTIFICADO DE APORTACIÓN'}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between py-1 border-b border-slate-50">
+                  <span className="font-bold text-slate-400 uppercase text-[10px]">Socio:</span>
+                  <span className="font-bold text-slate-800 uppercase">{socioInfo.socio.nombresCompletos}</span>
+                </div>
+
+                <div className="flex justify-between py-1 border-b border-slate-50">
+                  <span className="font-bold text-slate-400 uppercase text-[10px]">Identificación:</span>
+                  <span className="font-mono text-slate-800">{socioInfo.socio.identificacion}</span>
+                </div>
+
+                <div className="flex justify-between py-1 border-b border-slate-50">
+                  <span className="font-bold text-slate-400 uppercase text-[10px]">Número de Cuenta:</span>
+                  <span className="font-mono text-slate-800 font-bold">{socioInfo.numeroCuenta}</span>
+                </div>
+
+                {confirmTxData.depositante && (
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="font-bold text-slate-400 uppercase text-[10px]">Depositante:</span>
+                    <span className="font-bold text-slate-800 uppercase">{confirmTxData.depositante}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between py-1 border-b border-slate-50">
+                  <span className="font-bold text-slate-400 uppercase text-[10px]">Concepto:</span>
+                  <span className="font-semibold text-slate-600 text-right max-w-[200px] break-words">{confirmTxData.concepto}</span>
+                </div>
+
+                {confirmTxData.declaracionUafe && (
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="font-bold text-slate-400 uppercase text-[10px]">Origen de Fondos (UAFE):</span>
+                    <span className="font-black text-emerald-600 uppercase">Declarado &gt;= $10k</span>
+                  </div>
+                )}
+
+                {confirmTxData.uafeJustificacion && (
+                  <div className="flex flex-col py-1 border-b border-slate-50 gap-0.5">
+                    <span className="font-bold text-slate-400 uppercase text-[10px]">Justificación UAFE:</span>
+                    <span className="font-semibold text-amber-700 font-mono break-words">{confirmTxData.uafeJustificacion}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between text-sm font-black bg-slate-50 p-2.5 rounded-2xl border border-slate-100 mt-2">
+                  <span className="text-slate-500">MONTO A PROCESAR:</span>
+                  <span className={`font-mono text-[16px] ${
+                    confirmTxData.tipo === 'DEPOSITO' 
+                      ? 'text-emerald-600' 
+                      : confirmTxData.tipo === 'RETIRO' 
+                        ? 'text-rose-600'
+                        : confirmTxData.tipo === 'PAGO_CREDITO'
+                          ? 'text-blue-600'
+                          : 'text-amber-600'
+                  }`}>
+                    ${confirmTxData.monto.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Controles del Modal de Confirmación */}
+            <div className="mt-6 flex gap-3">
+              <Button
+                onClick={() => setConfirmTxData(null)}
+                variant="outline"
+                className="flex-1 border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-xl h-11 text-xs cursor-pointer"
+                disabled={procesandoTx}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={executeTransaccion}
+                className="flex-1 bg-[#0054A6] hover:bg-[#004080] text-white font-bold rounded-xl h-11 flex items-center justify-center gap-2 text-xs cursor-pointer shadow-md"
+                disabled={procesandoTx}
+              >
+                {procesandoTx ? 'Procesando...' : 'Confirmar Operación'}
+              </Button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Pre-Confirmación de Arqueo */}
+      {mostrarPreCierre && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in select-none">
+          <Card className="w-full max-w-md bg-white rounded-[2rem] border border-slate-100 p-8 shadow-2xl flex flex-col justify-between relative overflow-hidden animate-scale-up">
+            
+            <button 
+              onClick={() => setMostrarPreCierre(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="h-14 w-14 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-100 shadow-inner">
+                <AlertCircle className="h-7 w-7 animate-pulse" />
+              </div>
+              
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-extrabold text-slate-800 tracking-tight">¿Iniciar Arqueo de Caja?</h3>
+                <p className="text-xs text-slate-500 leading-relaxed max-w-[320px]">
+                  Está por iniciar el arqueo físico y conciliación. 
+                  <span className="font-bold text-amber-600"> Esta acción suspenderá temporalmente</span> la ventanilla para realizar el balance teórico final.
+                </p>
+              </div>
+
+              <div className="w-full border-t border-slate-100 py-3.5 space-y-2 text-[11px]">
+                <div className="flex justify-between text-slate-500">
+                  <span>Monto de Apertura:</span>
+                  <span className="font-mono font-bold">${caja.montoApertura.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Total Depósitos ({movimientos.filter(m => esIngresoEfectivo(m)).length}):</span>
+                  <span className="font-mono font-bold text-emerald-600">+${ingresosCaja.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Total Retiros ({movimientos.filter(m => esEgresoEfectivo(m)).length}):</span>
+                  <span className="font-mono font-bold text-rose-600">-${egresosCaja.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-slate-800 font-bold border-t border-dashed border-slate-200 pt-2 text-xs">
+                  <span>Saldo Teórico Contable:</span>
+                  <span className="font-mono text-[#0054A6]">${saldoTeoricoCierre.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <Button
+                onClick={() => setMostrarPreCierre(false)}
+                variant="outline"
+                className="flex-1 border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-xl h-11 text-xs cursor-pointer"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  setMostrarPreCierre(false);
+                  setMostrarCierre(true);
+                  setCierreError(null);
+                }}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl h-11 flex items-center justify-center text-xs cursor-pointer shadow-md"
+              >
+                Iniciar Arqueo
+              </Button>
+            </div>
+
+          </Card>
+        </div>
+      )}
+
+      {/* Modal: Cierre de Caja / Arqueo */}
+      {mostrarCierre && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in select-none">
+          <Card className="w-full max-w-md bg-white rounded-[2rem] border border-slate-100 p-8 shadow-2xl flex flex-col justify-between relative overflow-hidden animate-scale-up">
+            
+            <button 
+              onClick={() => setMostrarCierre(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="flex flex-col items-center text-center">
+              <div className="h-14 w-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 border border-rose-100/50">
+                <Lock className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-extrabold text-slate-800 tracking-tight">Arqueo y Cierre Diario de Caja</h3>
+              <p className="text-xs text-slate-400 mt-1 max-w-[280px]">
+                Consolida e ingresa el efectivo real para conciliar diferencias contables.
+              </p>
+            </div>
+
+            {cierreError && (
+              <div className="p-3.5 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-600 font-semibold flex gap-2 items-start mt-4 animate-fade-in">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{cierreError}</span>
+              </div>
+            )}
+
+            <div className="mt-5 space-y-3.5 text-xs">
+              <div className="flex justify-between py-2 border-b border-slate-50">
+                <span className="text-slate-400 font-bold uppercase text-[9px] tracking-widest">Efectivo Apertura:</span>
+                <span className="font-bold text-slate-700 font-mono">${caja.montoApertura.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-50">
+                <span className="text-slate-400 font-bold uppercase text-[9px] tracking-widest">Total Depósitos (+):</span>
+                <span className="font-bold text-emerald-600 font-mono">+${ingresosCaja.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-50">
+                <span className="text-slate-400 font-bold uppercase text-[9px] tracking-widest">Total Retiros (-):</span>
+                <span className="font-bold text-rose-600 font-mono">-${egresosCaja.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between py-2.5 border-b border-slate-100 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                <span className="text-[#0054A6] font-extrabold uppercase text-[9px] tracking-widest">Saldo Teórico Contable:</span>
+                <span className="font-black text-[#0054A6] font-mono text-[13px]">${saldoTeoricoCierre.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleCerrarCaja} className="mt-6 space-y-4 text-left">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-500">Monto Físico Real en Efectivo</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">$</span>
+                  <Input 
+                    type="text"
+                    placeholder="0.00"
+                    value={efectivoReal}
+                    onChange={(e) => setEfectivoReal(e.target.value)}
+                    disabled={cierreLoading}
+                    className="pl-8 text-lg font-bold text-slate-800"
+                  />
+                </div>
+              </div>
+
+              {/* Diferencia Informativa */}
+              {efectivoReal.trim() !== '' && !isNaN(parseFloat(efectivoReal)) && (() => {
+                const diff = parseFloat(efectivoReal) - saldoTeoricoCierre;
+                const esCabal = Math.abs(diff) < 0.01;
+                const esFaltante = diff < 0;
+                
+                return (
+                  <div className={`p-3 rounded-2xl border text-xs font-bold flex gap-2 items-center animate-fade-in ${
+                    esCabal 
+                      ? 'bg-emerald-50 border-emerald-100 text-emerald-700' 
+                      : esFaltante 
+                        ? 'bg-rose-50 border-rose-100 text-rose-700' 
+                        : 'bg-amber-50 border-amber-100 text-amber-700'
+                  }`}>
+                    {esCabal ? (
+                      <>
+                        <CheckCircle2 className="h-4.5 w-4.5" />
+                        <span>Caja cuadra perfectamente (${diff.toFixed(2)}).</span>
+                      </>
+                    ) : esFaltante ? (
+                      <>
+                        <AlertCircle className="h-4.5 w-4.5" />
+                        <span>Faltante de $({Math.abs(diff).toFixed(2)}) a cobrar al cajero.</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4.5 w-4.5" />
+                        <span>Sobrante de $({diff.toFixed(2)}) catalogado como ingreso.</span>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="submit"
+                  disabled={cierreLoading}
+                  className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-2xl h-11 flex items-center justify-center gap-2 text-xs cursor-pointer shadow-md shadow-rose-500/10"
+                >
+                  {cierreLoading ? 'Procesando cierre...' : 'Confirmar Cierre'}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setMostrarCierre(false)}
+                  variant="outline"
+                  className="flex-1 border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-2xl h-11 text-xs cursor-pointer"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal: Autorización de Supervisor */}
+      {mostrarSupervisorModal && txParaAnular && (
+        <div 
+          onClick={handleCloseSupervisorModal}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in select-none"
+        >
+          <Card 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white rounded-[2rem] border border-slate-100 p-8 shadow-2xl flex flex-col justify-between relative overflow-hidden animate-scale-up"
+          >
+            <button 
+              onClick={handleCloseSupervisorModal}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="h-14 w-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100 shadow-inner">
+                <Lock className="h-7 w-7" />
+              </div>
+              
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-extrabold text-slate-800 tracking-tight">Requiere Clave de Supervisor</h3>
+                <p className="text-xs text-slate-500 leading-relaxed max-w-[320px]">
+                  Para anular y reversar la transacción <span className="font-mono font-bold text-slate-700">{txParaAnular.referencia}</span> por un monto de <span className="font-bold text-rose-600">${txParaAnular.monto.toFixed(2)}</span>, es obligatoria la autorización de un Oficial de Crédito o Gerente.
+                </p>
+              </div>
+            </div>
+
+            {anulacionError && (
+              <div className="p-3.5 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-600 font-semibold flex gap-2 items-start mt-4 animate-fade-in">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{anulacionError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleConfirmarAnulacion} className="mt-6 space-y-4 text-left">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-500">Clave de Autorización</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">
+                    <Lock className="h-4 w-4" />
+                  </span>
+                  <Input 
+                    type="password"
+                    placeholder="••••••••"
+                    value={claveSupervisor}
+                    onChange={(e) => setClaveSupervisor(e.target.value)}
+                    disabled={anulandoTx}
+                    className="pl-10 text-lg font-bold text-slate-800"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="submit"
+                  disabled={anulandoTx || !claveSupervisor.trim()}
+                  className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-2xl h-11 flex items-center justify-center gap-2 text-xs cursor-pointer shadow-md shadow-rose-500/10"
+                >
+                  {anulandoTx ? 'Procesando reverso...' : 'Autorizar Reverso'}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleCloseSupervisorModal}
+                  variant="outline"
+                  className="flex-1 border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-2xl h-11 text-xs cursor-pointer"
+                  disabled={anulandoTx}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* Alerta flotante tipo Toast */}
+      {toast.show && (
+        <div className="fixed bottom-6 right-6 z-50 p-4 bg-white rounded-2xl border border-slate-100 shadow-2xl flex items-center gap-3 animate-slide-up max-w-sm">
+          <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
+            toast.type === 'success' ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'
+          }`}>
+            {toast.type === 'success' ? <CheckCircle2 className="h-4.5 w-4.5" /> : <AlertCircle className="h-4.5 w-4.5" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-slate-800">
+              {toast.type === 'success' ? 'Operación Exitosa' : 'Ocurrió un Error'}
+            </p>
+            <p className="text-[11px] text-slate-500 truncate mt-0.5">{toast.message}</p>
+          </div>
+          <button 
+            onClick={() => setToast(prev => ({ ...prev, show: false }))}
+            className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-all cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+    </div>
+  );
+};
+
+export default CajaVentanilla;
