@@ -928,6 +928,27 @@ export const AprobacionCreditos: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  // Verificar si hay algún filtro activo
+  const isFilterActive = 
+    searchQuery.trim() !== '' || 
+    dateFilter !== 'all' || 
+    startDate !== '' || 
+    endDate !== '' || 
+    minAmount !== '' || 
+    maxAmount !== '' || 
+    selectedOfficer !== 'all';
+
+  // Limpiar todos los filtros
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setDateFilter('all');
+    setStartDate('');
+    setEndDate('');
+    setMinAmount('');
+    setMaxAmount('');
+    setSelectedOfficer('all');
+  };
+
   // Clasificación de Columnas Kanban (usando data filtrada)
   const colPendientes = filteredSolicitudes.filter(s => s.estado === 'SOLICITADO');
   const colAnalisis = filteredSolicitudes.filter(s => s.estado === 'EN_REVISION');
@@ -1063,11 +1084,23 @@ export const AprobacionCreditos: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2.5">
+            {/* Botón X Limpiar */}
+            {isFilterActive && (
+              <Button
+                onClick={handleClearFilters}
+                variant="outline"
+                className="border-rose-200 text-rose-700 hover:bg-rose-50 font-bold rounded-2xl text-xs h-9.5 px-3.5 flex items-center gap-1.5 cursor-pointer shadow-sm animate-fade-in"
+              >
+                <X className="h-3.5 w-3.5" />
+                Limpiar
+              </Button>
+            )}
+
             {/* Botón Filtros Avanzados */}
             <Button
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
               variant="outline"
-              className={`border-slate-200 text-slate-650 font-bold rounded-2xl text-xs h-9.5 px-3.5 flex items-center gap-1.5 cursor-pointer shadow-sm transition-all ${
+              className={`w-40 border-slate-200 text-slate-650 font-bold rounded-2xl text-xs h-9.5 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all ${
                 showAdvancedFilters ? 'bg-slate-100 border-slate-300' : 'hover:bg-slate-50'
               }`}
             >
@@ -1091,10 +1124,10 @@ export const AprobacionCreditos: React.FC = () => {
             <div className="bg-slate-100/80 p-0.5 rounded-2xl border border-slate-200/50 flex gap-0.5 shadow-inner">
               <button
                 onClick={() => setViewMode('kanban')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                className={`w-40 h-8.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   viewMode === 'kanban'
-                    ? 'bg-white text-slate-800 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
+                    ? 'bg-[#0054A6] text-white shadow-sm'
+                    : 'text-slate-500 hover:text-[#0054A6] hover:bg-blue-50/50'
                 }`}
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
@@ -1102,10 +1135,10 @@ export const AprobacionCreditos: React.FC = () => {
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                className={`w-40 h-8.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   viewMode === 'list'
-                    ? 'bg-white text-slate-800 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
+                    ? 'bg-[#0054A6] text-white shadow-sm'
+                    : 'text-slate-500 hover:text-[#0054A6] hover:bg-blue-50/50'
                 }`}
               >
                 <List className="h-3.5 w-3.5" />
