@@ -21,6 +21,7 @@ import { useTenant } from '../../context/TenantContext';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import { jsPDF } from 'jspdf';
 
 interface CajaActiva {
   id: number;
@@ -209,6 +210,7 @@ export const CajaVentanilla: React.FC = () => {
   const [buscandoSocio, setBuscandoSocio] = useState<boolean>(false);
   const [socioInfo, setSocioInfo] = useState<CuentaCajaInfo | null>(null);
   const [busquedaError, setBusquedaError] = useState<string | null>(null);
+  const [useMockups, setUseMockups] = useState<boolean>(false);
 
   // Transacciones
   const [activeTab, setActiveTab] = useState<'DEPOSITO' | 'RETIRO' | 'PAGO_CREDITO' | 'APORTACIONES'>('DEPOSITO');
@@ -308,6 +310,10 @@ export const CajaVentanilla: React.FC = () => {
   useEffect(() => {
     fetchCajaActiva();
   }, []);
+
+  useEffect(() => {
+    setUseMockups(false);
+  }, [socioInfo]);
 
   useEffect(() => {
     const handleTriggerArqueo = () => {
@@ -672,8 +678,15 @@ export const CajaVentanilla: React.FC = () => {
           declaracionOrigenFondos: confirmTxData.declaracionUafe
         });
 
-        // Refrescar aportaciones
-        await fetchAportaciones(socioInfo.socio.id);
+        // Refrescar aportaciones y socioInfo
+        const resCuenta = await api.get(`/cuentas/buscar-caja?query=${socioInfo.numeroCuenta}`);
+        setSocioInfo(resCuenta.data);
+
+        const resAportaciones = await api.get(`/cuentas/socio/${socioInfo.socio.id}`);
+        const cuentasAportacionesList = resAportaciones.data || [];
+        const aportacionesRefrescadas = cuentasAportacionesList.find((c: any) => c.tipo === 'APORTACIONES');
+        setCuentaAportaciones(aportacionesRefrescadas || null);
+        const saldoResultanteAportaciones = aportacionesRefrescadas ? aportacionesRefrescadas.saldo : 0;
 
         showToast('Aportación social registrada y acreditada con éxito.', 'success');
 
@@ -688,7 +701,7 @@ export const CajaVentanilla: React.FC = () => {
             day: '2-digit', month: '2-digit', year: 'numeric', 
             hour: '2-digit', minute: '2-digit', second: '2-digit' 
           }),
-          saldoResultante: cuentaAportaciones.saldo + confirmTxData.monto,
+          saldoResultante: saldoResultanteAportaciones,
           socioCedula: socioInfo.socio.identificacion
         });
       }
@@ -705,14 +718,9 @@ export const CajaVentanilla: React.FC = () => {
 
         showToast('Transacción procesada correctamente en los registros contables.', 'success');
         
-        const nuevoSaldo = confirmTxData.tipo === 'DEPOSITO' 
-          ? socioInfo.saldo + confirmTxData.monto 
-          : socioInfo.saldo - confirmTxData.monto;
-
-        setSocioInfo(prev => {
-          if (!prev) return null;
-          return { ...prev, saldo: nuevoSaldo };
-        });
+        // Volver a consultar la cuenta del socio para que refleje estados y saldos actualizados
+        const resCuenta = await api.get(`/cuentas/buscar-caja?query=${socioInfo.numeroCuenta}`);
+        setSocioInfo(resCuenta.data);
 
         setTicketData({
           referencia: 'TX-VENT-' + Date.now(),
@@ -726,7 +734,7 @@ export const CajaVentanilla: React.FC = () => {
             hour: '2-digit', minute: '2-digit', second: '2-digit' 
           }),
           depositante: confirmTxData.depositante,
-          saldoResultante: nuevoSaldo,
+          saldoResultante: resCuenta.data.saldo,
           socioCedula: socioInfo.socio.identificacion
         });
       }
@@ -880,50 +888,128 @@ export const CajaVentanilla: React.FC = () => {
   };
 
   const handlePrintTicket = () => {
-    if (!ticketRef.current) return;
-    
-    const printContent = ticketRef.current.innerHTML;
+    if (!ticketData) return;
 
-    // Crear una ventana o elemento de impresión minimalista
-    const windowPrint = window.open('', '', 'width=600,height=600');
-    if (windowPrint) {
-      windowPrint.document.write(`
-        <html>
-          <head>
-            <title>Imprimir Ticket de Ventanilla</title>
-            <style>
-              body {
-                font-family: monospace;
-                padding: 30px;
-                color: #000;
-                line-height: 1.4;
-              }
-              .ticket {
-                max-width: 380px;
-                margin: 0 auto;
-                white-space: pre-wrap;
-              }
-              .text-center { text-align: center; }
-              .divider { border-top: 1px dashed #000; margin: 10px 0; }
-              .firma-area { margin-top: 40px; text-align: center; }
-              .btn-no-print { display: none; }
-            </style>
-          </head>
-          <body>
-            <div class="ticket">
-              ${printContent}
-            </div>
-            <script>
-              window.onload = function() {
-                window.print();
-                window.close();
-              }
-            </script>
-          </body>
-        </html>
-      `);
-      windowPrint.document.close();
+    // Formato de ticket POS personalizado: 80 mm de ancho por 130 mm de alto
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: [80, 130]
+    });
+
+    // 1. Dibujar icono de edificio vectorizado (x: 37 a 43, y: 10 a 18)
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.35);
+    doc.roundedRect(37, 10, 6, 8, 1, 1);
+    doc.setFillColor(0, 0, 0);
+    doc.circle(38.5, 12, 0.35, 'F');
+    doc.circle(40, 12, 0.35, 'F');
+    doc.circle(41.5, 12, 0.35, 'F');
+    doc.circle(38.5, 14, 0.35, 'F');
+    doc.circle(40, 14, 0.35, 'F');
+    doc.circle(41.5, 14, 0.35, 'F');
+    doc.rect(39.2, 16.2, 1.6, 1.8);
+
+    // 2. Cabecera Centrada
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    
+    const instName = activeTenant?.name?.toUpperCase().replace(" LTDA.", "").trim() || "COOPERATIVA DE AHORRO Y CRÉDITO ITQ";
+    doc.text(instName, 40, 23, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.text("Canal Ventanilla", 40, 28, { align: "center" });
+    doc.text(ticketData.referencia, 40, 33, { align: "center" });
+
+    // 3. Tabla de Detalles alineada a la izquierda (x = 8)
+    let currentY = 40;
+    doc.setFontSize(8.5);
+
+    const printLine = (label: string, value: string) => {
+      doc.setFont("helvetica", "bold");
+      const labelText = label + ": ";
+      doc.text(labelText, 8, currentY);
+      
+      doc.setFont("helvetica", "normal");
+      const textWidth = doc.getTextWidth(labelText);
+      doc.text(value || 'N/A', 8 + textWidth, currentY);
+      currentY += 5;
+    };
+
+    // Fecha/Hora
+    printLine("FECHA/HORA", ticketData.fechaHora);
+
+    // Cajero (Format: Luis Paz)
+    const cajeroNombre = user?.nombresCompletos 
+      ? user.nombresCompletos.split(' ').slice(0, 2).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') 
+      : 'Cajero';
+    printLine("CAJERO", cajeroNombre);
+
+    // Socio
+    printLine("SOCIO", ticketData.socioNombre.toUpperCase());
+
+    // Cédula / DNI
+    printLine("CÉDULA / DNI", ticketData.socioCedula);
+
+    // Nro Cuenta
+    printLine("NRO. CUENTA", ticketData.cuentaNumero);
+
+    // Operación
+    let tipoTxStr = "";
+    if (ticketData.tipo === 'DEPOSITO') tipoTxStr = "DEPÓSITO EN EFECTIVO";
+    else if (ticketData.tipo === 'RETIRO') tipoTxStr = "RETIRO EN EFECTIVO";
+    else if (ticketData.tipo === 'PAGO_CREDITO') tipoTxStr = "PAGO DE CRÉDITO";
+    else if (ticketData.tipo === 'APORTACIONES') tipoTxStr = "CERTIFICADO DE APORTACIÓN";
+    printLine("OPERACIÓN", tipoTxStr);
+
+    // Monto Neto
+    printLine("MONTO NETO", `$${ticketData.monto.toFixed(2)}`);
+
+    // Saldo Total
+    printLine("SALDO TOTAL", `$${ticketData.saldoResultante.toFixed(2)}`);
+
+    // Glosa (Salto de línea inteligente con alineación de margen)
+    doc.setFont("helvetica", "bold");
+    const glosaLabel = "GLOSA: ";
+    doc.text(glosaLabel, 8, currentY);
+    doc.setFont("helvetica", "normal");
+    const glosaWidth = doc.getTextWidth(glosaLabel);
+    
+    // Obtener la primera línea del concepto que encaje junto al label
+    const firstLineMaxW = 80 - 16 - glosaWidth;
+    const firstLineSplit = doc.splitTextToSize(ticketData.concepto, firstLineMaxW);
+    const firstLineText = firstLineSplit[0] || '';
+    doc.text(firstLineText, 8 + glosaWidth, currentY);
+    currentY += 5;
+    
+    // Escribir el resto del concepto alineado a la izquierda (x = 8)
+    const remainingText = ticketData.concepto.substring(firstLineText.length).trim();
+    if (remainingText) {
+      const remainingSplit = doc.splitTextToSize(remainingText, 80 - 16);
+      for (let i = 0; i < remainingSplit.length; i++) {
+        doc.text(remainingSplit[i], 8, currentY);
+        currentY += 5;
+      }
     }
+
+    // 4. Firmas y pie de página
+    currentY += 2;
+    doc.setFont("helvetica", "normal");
+    doc.text("------------------------------------", 40, currentY, { align: "center" });
+    
+    currentY += 8;
+    doc.text("Firma del Socio / Cliente", 40, currentY, { align: "center" });
+
+    currentY += 6;
+    doc.text(`C.I. ${ticketData.socioCedula}`, 40, currentY, { align: "center" });
+
+    currentY += 8;
+    doc.text("Comprobante de Ventanilla Electrónico", 40, currentY, { align: "center" });
+
+    // Guardar / Descargar PDF
+    doc.save(`Comprobante_${ticketData.referencia}.pdf`);
   };
 
   // Renderizar loaders iniciales
@@ -1106,7 +1192,7 @@ export const CajaVentanilla: React.FC = () => {
                   <h4 className="text-xs font-bold text-slate-800">Verificación Documental de Cédula y Firma</h4>
                 </div>
 
-                {socioInfo.socio.fotoCedulaFrontalUrl && socioInfo.socio.fotoCedulaPosteriorUrl ? (
+                {socioInfo.socio.fotoCedulaFrontalUrl && socioInfo.socio.fotoCedulaPosteriorUrl && !useMockups ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Render de imágenes físicas cargadas */}
                     <div className="space-y-1.5">
@@ -1116,6 +1202,7 @@ export const CajaVentanilla: React.FC = () => {
                           src={`http://localhost:8080/api/v1${socioInfo.socio.fotoCedulaFrontalUrl}`} 
                           alt="Cédula Frontal" 
                           className="h-full w-full object-cover" 
+                          onError={() => setUseMockups(true)}
                         />
                       </div>
                     </div>
@@ -1126,6 +1213,7 @@ export const CajaVentanilla: React.FC = () => {
                           src={`http://localhost:8080/api/v1${socioInfo.socio.fotoCedulaPosteriorUrl}`} 
                           alt="Cédula Posterior" 
                           className="h-full w-full object-cover" 
+                          onError={() => setUseMockups(true)}
                         />
                       </div>
                     </div>

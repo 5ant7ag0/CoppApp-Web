@@ -2,12 +2,13 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { LogOut, AlertTriangle } from 'lucide-react';
+import { LogOut, AlertTriangle, Users, Layers } from 'lucide-react';
 import { CajaVentanilla } from '../pages/admin/CajaVentanilla';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 
 export const DashboardScreen: React.FC = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   if (!user) return null;
 
@@ -17,6 +18,10 @@ export const DashboardScreen: React.FC = () => {
 
   if (user.rol === 'CAJERO') {
     return <CajaVentanilla />;
+  }
+
+  if (user.rol === 'ASESOR' || user.rol === 'ASESOR_DE_SERVICIOS') {
+    return <Navigate to="/admin/socios" replace />;
   }
 
   // Función para obtener el mensaje de bienvenida según el rol del usuario
@@ -89,22 +94,45 @@ export const DashboardScreen: React.FC = () => {
   // Perfil de ADMINISTRADOR
   const renderAdminDetails = (admin: any) => {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-4 rounded-lg border border-neutral-200 bg-neutral-50">
-          <span className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Usuario</span>
-          <p className="text-sm font-bold text-neutral-800 mt-1">{admin.username}</p>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 rounded-lg border border-neutral-200 bg-neutral-50">
+            <span className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Usuario</span>
+            <p className="text-sm font-bold text-neutral-800 mt-1">{admin.username}</p>
+          </div>
+          <div className="p-4 rounded-lg border border-neutral-200 bg-neutral-50">
+            <span className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Correo</span>
+            <p className="text-sm font-bold text-neutral-800 mt-1">{admin.correo}</p>
+          </div>
+          <div className="p-4 rounded-lg border border-neutral-200 bg-neutral-50">
+            <span className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Rol Administrativo</span>
+            <p className="text-sm font-bold text-neutral-800 mt-1">{admin.rol}</p>
+          </div>
+          <div className="p-4 rounded-lg border border-neutral-200 bg-neutral-50">
+            <span className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Estado de Operación</span>
+            <p className="text-sm font-bold text-neutral-800 mt-1">{admin.estado}</p>
+          </div>
         </div>
-        <div className="p-4 rounded-lg border border-neutral-200 bg-neutral-50">
-          <span className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Correo</span>
-          <p className="text-sm font-bold text-neutral-800 mt-1">{admin.correo}</p>
-        </div>
-        <div className="p-4 rounded-lg border border-neutral-200 bg-neutral-50">
-          <span className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Rol Administrativo</span>
-          <p className="text-sm font-bold text-neutral-800 mt-1">{admin.rol}</p>
-        </div>
-        <div className="p-4 rounded-lg border border-neutral-200 bg-neutral-50">
-          <span className="text-xs text-neutral-500 font-semibold uppercase tracking-wider">Estado de Operación</span>
-          <p className="text-sm font-bold text-neutral-800 mt-1">{admin.estado}</p>
+
+        {/* Accesos Rápidos de Administración */}
+        <div className="border-t border-neutral-200 pt-5 space-y-3">
+          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Módulos Administrativos</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Button
+              onClick={() => navigate('/admin/socios')}
+              className="bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-350 text-slate-700 font-bold rounded-2xl h-12 px-4 shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98"
+            >
+              <Users className="h-4.5 w-4.5 text-[#0054A6]" />
+              Creación de Socios y Cuentas
+            </Button>
+            <Button
+              onClick={() => navigate('/admin/creditos')}
+              className="bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-350 text-slate-700 font-bold rounded-2xl h-12 px-4 shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98"
+            >
+              <Layers className="h-4.5 w-4.5 text-amber-500" />
+              Mesa de Aprobación de Créditos
+            </Button>
+          </div>
         </div>
       </div>
     );

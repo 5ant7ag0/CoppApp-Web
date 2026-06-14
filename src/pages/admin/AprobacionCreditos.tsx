@@ -12,7 +12,7 @@ import {
   Eye, FileText, LayoutGrid, List,
   SlidersHorizontal, FileDown,
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
-  Search
+  Search, RefreshCcw
 } from 'lucide-react';
 
 interface Socio {
@@ -251,6 +251,25 @@ export const AprobacionCreditos: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, dateFilter, startDate, endDate, minAmount, maxAmount, selectedOfficer, selectedStatus]);
+
+  // Notas de Crédito / Bitácora
+  const [notasCredito, setNotasCredito] = useState<Record<number, string>>(() => {
+    try {
+      const saved = localStorage.getItem('coop_credito_notas');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const handleNotaChange = (creditoId: number, nota: string) => {
+    const updated = {
+      ...notasCredito,
+      [creditoId]: nota
+    };
+    setNotasCredito(updated);
+    localStorage.setItem('coop_credito_notas', JSON.stringify(updated));
+  };
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type });
@@ -1013,17 +1032,6 @@ export const AprobacionCreditos: React.FC = () => {
             Evalúa el flujo neto del socio, simula la tabla de amortización y desembolsa de forma segura.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={fetchSolicitudes}
-            variant="outline"
-            disabled={cargando}
-            className="border-slate-200 text-slate-650 hover:bg-slate-50 font-bold rounded-xl text-xs h-9 shadow-sm cursor-pointer"
-          >
-            {cargando ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
-            Actualizar Tablero
-          </Button>
-        </div>
       </div>
 
       {/* Cinta de Métricas Ejecutivas */}
@@ -1169,13 +1177,24 @@ export const AprobacionCreditos: React.FC = () => {
                 Lista
               </button>
             </div>
+
+            {/* Botón Circular Minimalista de Actualizar (Refresh) */}
+            <Button
+              onClick={fetchSolicitudes}
+              variant="outline"
+              disabled={cargando}
+              className="h-9.5 w-9.5 rounded-full border border-slate-200 text-slate-650 hover:bg-slate-50 hover:text-[#0054A6] hover:border-blue-200 flex items-center justify-center p-0 cursor-pointer shadow-sm shrink-0 transition-all"
+              title="Actualizar Tablero"
+            >
+              <RefreshCcw className={`h-4 w-4 ${cargando ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
 
         {/* Panel de Filtros Avanzados (Colapsable) */}
         {showAdvancedFilters && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-slate-100 animate-slide-down">
-            {/* Filtro de Fecha */}
+             {/* Filtro de Fecha */}
             <div className="space-y-1.5">
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 Filtro de Fecha
@@ -1183,7 +1202,7 @@ export const AprobacionCreditos: React.FC = () => {
               <select
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 bg-slate-50/30"
+                className="w-full border border-slate-200 text-slate-655 font-bold rounded-xl text-xs h-9.5 pl-3.5 pr-8 appearance-none bg-white bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%252364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[size:1rem_1rem] bg-[position:right_0.75rem_center] bg-no-repeat cursor-pointer shadow-sm transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20"
               >
                 <option value="all">Todas las fechas</option>
                 <option value="today">Hoy</option>
@@ -1202,7 +1221,7 @@ export const AprobacionCreditos: React.FC = () => {
               <select
                 value={selectedOfficer}
                 onChange={(e) => setSelectedOfficer(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 bg-slate-50/30"
+                className="w-full border border-slate-200 text-slate-655 font-bold rounded-xl text-xs h-9.5 pl-3.5 pr-8 appearance-none bg-white bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%252364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[size:1rem_1rem] bg-[position:right_0.75rem_center] bg-no-repeat cursor-pointer shadow-sm transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20"
               >
                 <option value="all">Todos los oficiales</option>
                 {oficialesDisponibles.map(id => (
@@ -1221,7 +1240,7 @@ export const AprobacionCreditos: React.FC = () => {
                 placeholder="Mínimo"
                 value={minAmount}
                 onChange={(e) => setMinAmount(e.target.value)}
-                className="w-full p-2 text-xs font-semibold text-slate-700 bg-slate-50/30 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20"
+                className="w-full border border-slate-200 text-slate-655 font-bold rounded-xl text-xs h-9.5 pl-3.5 pr-3 bg-white cursor-text shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20"
               />
             </div>
 
@@ -1235,7 +1254,7 @@ export const AprobacionCreditos: React.FC = () => {
                 placeholder="Máximo"
                 value={maxAmount}
                 onChange={(e) => setMaxAmount(e.target.value)}
-                className="w-full p-2 text-xs font-semibold text-slate-700 bg-slate-50/30 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20"
+                className="w-full border border-slate-200 text-slate-655 font-bold rounded-xl text-xs h-9.5 pl-3.5 pr-3 bg-white cursor-text shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20"
               />
             </div>
 
@@ -1754,6 +1773,20 @@ export const AprobacionCreditos: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Notas Internas / Bitácora */}
+                <div className="space-y-2.5">
+                  <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
+                    Notas Internas / Bitácora
+                  </h4>
+                  <textarea
+                    placeholder="Escriba comentarios o notas de seguimiento del crédito aquí (se autoguarda)..."
+                    value={notasCredito[creditoSeleccionado.id] || ''}
+                    onChange={(e) => handleNotaChange(creditoSeleccionado.id, e.target.value)}
+                    rows={4}
+                    className="w-full text-xs font-semibold text-slate-700 placeholder-slate-400 bg-white border border-slate-100 rounded-3xl p-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 focus:border-[#0054A6]/60 resize-none leading-relaxed"
+                  />
+                </div>
               </div>
 
               {/* Columna Derecha: Proyección Financiera */}
@@ -2453,6 +2486,28 @@ interface CardSolicitudProps {
 }
 
 const CardSolicitud: React.FC<CardSolicitudProps> = ({ cred, onClick, getElapsedTime }) => {
+  const getSlaAlert = () => {
+    if (cred.estado !== 'SOLICITADO' && cred.estado !== 'EN_REVISION') return null;
+    const date = new Date(cred.fechaSolicitud);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    if (isNaN(diffMs)) return null;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays > 2) {
+      const colorClass = diffDays > 5 
+        ? 'text-rose-600 bg-rose-50 border-rose-100' 
+        : 'text-amber-600 bg-amber-50 border-amber-100';
+      return (
+        <span className={`inline-flex items-center gap-1 text-[9px] font-extrabold px-2 py-0.5 rounded-lg border uppercase tracking-wider ${colorClass}`}>
+          <span>⏳</span>
+          <span>{diffDays} {diffDays === 1 ? 'día' : 'días'} en espera</span>
+        </span>
+      );
+    }
+    return null;
+  };
+
+  const slaAlert = getSlaAlert();
   
   return (
     <div 
@@ -2510,8 +2565,17 @@ const CardSolicitud: React.FC<CardSolicitudProps> = ({ cred, onClick, getElapsed
             <span className="text-slate-650 uppercase font-extrabold">{cred.tipoAmortizacion}</span>
           </div>
 
+          {/* Alerta de SLA */}
+          {slaAlert && (
+            <div className="pt-2 border-t border-slate-50 flex justify-start">
+              {slaAlert}
+            </div>
+          )}
+
           {/* Garantía Corta */}
-          <div className="text-[10px] text-slate-450 italic line-clamp-1 border-t border-slate-50 pt-2 font-medium">
+          <div className={`text-[10px] text-slate-450 italic line-clamp-1 pt-2 font-medium ${
+            slaAlert ? '' : 'border-t border-slate-50'
+          }`}>
             {cred.garantiaDescripcion}
           </div>
         </div>
