@@ -16,6 +16,8 @@ import { Perfil } from './pages/socio/Perfil';
 import { Movimientos } from './pages/socio/Movimientos';
 import { AprobacionCreditos } from './pages/admin/AprobacionCreditos';
 import { CreacionSocios } from './pages/admin/CreacionSocios';
+import { ContabilidadDashboard } from './pages/admin/ContabilidadDashboard';
+import { Parametrizacion } from './pages/admin/Parametrizacion';
 import { Loader2 } from 'lucide-react';
 
 const RootRouter: React.FC = () => {
@@ -56,6 +58,8 @@ const RootRouter: React.FC = () => {
           <Route path="/admin/dashboard" element={<DashboardScreen />} />
           <Route path="/admin/creditos" element={<AprobacionCreditos />} />
           <Route path="/admin/socios" element={<CreacionSocios />} />
+          <Route path="/admin/contabilidad" element={<ContabilidadDashboard />} />
+          <Route path="/admin/parametrizacion" element={<Parametrizacion />} />
         </Route>
 
         {/* Redirecciones Generales */}

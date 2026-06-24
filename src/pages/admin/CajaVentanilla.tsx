@@ -48,6 +48,13 @@ interface CuentaCajaInfo {
   numeroCuenta: string;
   saldo: number;
   socio: SocioDetails;
+  cuentas?: Array<{
+    id: number;
+    numeroCuenta: string;
+    tipo: string;
+    saldo: number;
+    estado: string;
+  }>;
 }
 
 interface MovimientoCaja {
@@ -209,6 +216,27 @@ export const CajaVentanilla: React.FC = () => {
   const [busqueda, setBusqueda] = useState<string>('');
   const [buscandoSocio, setBuscandoSocio] = useState<boolean>(false);
   const [socioInfo, setSocioInfo] = useState<CuentaCajaInfo | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+
+  // Derivación de la cuenta seleccionada con compatibilidad hacia atrás
+  const getActiveAccount = () => {
+    if (!socioInfo) return null;
+    if (socioInfo.cuentas && socioInfo.cuentas.length > 0) {
+      return socioInfo.cuentas.find(c => c.id === selectedAccountId) || socioInfo.cuentas[0];
+    }
+    return {
+      id: socioInfo.cuentaId,
+      numeroCuenta: socioInfo.numeroCuenta,
+      saldo: socioInfo.saldo,
+      tipo: 'AHORRO_VISTA',
+      estado: 'ACTIVA'
+    };
+  };
+
+  const activeAccount = getActiveAccount();
+  const isAhorroVista = activeAccount ? activeAccount.tipo === 'AHORRO_VISTA' : true;
+  const isAportaciones = activeAccount ? activeAccount.tipo === 'APORTACIONES' : false;
+
   const [busquedaError, setBusquedaError] = useState<string | null>(null);
   const [useMockups, setUseMockups] = useState<boolean>(false);
 
@@ -530,6 +558,15 @@ export const CajaVentanilla: React.FC = () => {
     try {
       const res = await api.get(`/cuentas/buscar-caja?query=${encodeURIComponent(busqueda.trim())}`);
       setSocioInfo(res.data);
+      if (res.data?.cuentaId) {
+        setSelectedAccountId(res.data.cuentaId);
+        const defaultAcc = res.data.cuentas?.find((c: any) => c.id === res.data.cuentaId);
+        if (defaultAcc?.tipo === 'APORTACIONES') {
+          setActiveTab('APORTACIONES');
+        } else {
+          setActiveTab('DEPOSITO');
+        }
+      }
       if (res.data?.socio?.id) {
         fetchCreditos(res.data.socio.id);
         fetchAportaciones(res.data.socio.id);
@@ -558,7 +595,7 @@ export const CajaVentanilla: React.FC = () => {
       return;
     }
 
-    if (activeTab === 'RETIRO' && montoNum > socioInfo.saldo) {
+    if (activeTab === 'RETIRO' && activeAccount && montoNum > activeAccount.saldo) {
       setTxError('Fondos insuficientes: El monto de retiro supera el saldo disponible del socio.');
       return;
     }
@@ -628,11 +665,14 @@ export const CajaVentanilla: React.FC = () => {
     setProcesandoTx(true);
     setTxError(null);
     try {
+      const targetAccountId = activeAccount?.id || socioInfo.cuentaId;
+      const targetCuentaNumero = activeAccount?.numeroCuenta || socioInfo.numeroCuenta;
+
       if (confirmTxData.tipo === 'PAGO_CREDITO') {
         if (!creditoSeleccionado || !cuotaPendiente) return;
         // 1. Depósito del efectivo en la cuenta de ahorros
         await api.post('/cuentas/deposito', {
-          cuentaAhorrosId: socioInfo.cuentaId,
+          cuentaAhorrosId: targetAccountId,
           monto: confirmTxData.monto,
           concepto: `Depósito en efectivo para pago de crédito Contrato: ${creditoSeleccionado.numeroCredito}`,
           declaracionOrigenFondos: false
@@ -641,16 +681,19 @@ export const CajaVentanilla: React.FC = () => {
         // 2. Cobro/Pago del crédito
         await api.post('/creditos/pagar', {
           creditoId: creditoSeleccionado.id,
-          cuentaAhorrosId: socioInfo.cuentaId,
+          cuentaAhorrosId: targetAccountId,
           monto: confirmTxData.monto
         });
 
         // Refrescar saldos de socio y amortización
-        const resCuenta = await api.get(`/cuentas/buscar-caja?query=${socioInfo.numeroCuenta}`);
+        const resCuenta = await api.get(`/cuentas/buscar-caja?query=${encodeURIComponent(socioInfo.socio.identificacion)}`);
         setSocioInfo(resCuenta.data);
         await fetchCreditos(socioInfo.socio.id);
 
         showToast('Pago de crédito registrado y aplicado con éxito.', 'success');
+
+        const updatedAcc = resCuenta.data.cuentas?.find((c: any) => c.id === targetAccountId);
+        const saldoResultante = updatedAcc ? updatedAcc.saldo : resCuenta.data.saldo;
 
         // Set ticket
         setTicketData({
@@ -659,12 +702,12 @@ export const CajaVentanilla: React.FC = () => {
           monto: confirmTxData.monto,
           concepto: confirmTxData.concepto,
           socioNombre: socioInfo.socio.nombresCompletos,
-          cuentaNumero: socioInfo.numeroCuenta,
+          cuentaNumero: targetCuentaNumero,
           fechaHora: new Date().toLocaleString('es-ES', { 
             day: '2-digit', month: '2-digit', year: 'numeric', 
             hour: '2-digit', minute: '2-digit', second: '2-digit' 
           }),
-          saldoResultante: resCuenta.data.saldo,
+          saldoResultante: saldoResultante,
           socioCedula: socioInfo.socio.identificacion
         });
       }
@@ -679,7 +722,7 @@ export const CajaVentanilla: React.FC = () => {
         });
 
         // Refrescar aportaciones y socioInfo
-        const resCuenta = await api.get(`/cuentas/buscar-caja?query=${socioInfo.numeroCuenta}`);
+        const resCuenta = await api.get(`/cuentas/buscar-caja?query=${encodeURIComponent(socioInfo.socio.identificacion)}`);
         setSocioInfo(resCuenta.data);
 
         const resAportaciones = await api.get(`/cuentas/socio/${socioInfo.socio.id}`);
@@ -708,7 +751,7 @@ export const CajaVentanilla: React.FC = () => {
       else {
         // Depósitos / Retiros regulares
         const payload = {
-          cuentaAhorrosId: socioInfo.cuentaId,
+          cuentaAhorrosId: targetAccountId,
           monto: confirmTxData.monto,
           concepto: confirmTxData.concepto,
           declaracionOrigenFondos: confirmTxData.declaracionUafe
@@ -719,8 +762,11 @@ export const CajaVentanilla: React.FC = () => {
         showToast('Transacción procesada correctamente en los registros contables.', 'success');
         
         // Volver a consultar la cuenta del socio para que refleje estados y saldos actualizados
-        const resCuenta = await api.get(`/cuentas/buscar-caja?query=${socioInfo.numeroCuenta}`);
+        const resCuenta = await api.get(`/cuentas/buscar-caja?query=${encodeURIComponent(socioInfo.socio.identificacion)}`);
         setSocioInfo(resCuenta.data);
+
+        const updatedAcc = resCuenta.data.cuentas?.find((c: any) => c.id === targetAccountId);
+        const saldoResultante = updatedAcc ? updatedAcc.saldo : resCuenta.data.saldo;
 
         setTicketData({
           referencia: 'TX-VENT-' + Date.now(),
@@ -728,13 +774,13 @@ export const CajaVentanilla: React.FC = () => {
           monto: confirmTxData.monto,
           concepto: confirmTxData.concepto,
           socioNombre: socioInfo.socio.nombresCompletos,
-          cuentaNumero: socioInfo.numeroCuenta,
+          cuentaNumero: targetCuentaNumero,
           fechaHora: new Date().toLocaleString('es-ES', { 
             day: '2-digit', month: '2-digit', year: 'numeric', 
             hour: '2-digit', minute: '2-digit', second: '2-digit' 
           }),
           depositante: confirmTxData.depositante,
-          saldoResultante: resCuenta.data.saldo,
+          saldoResultante: saldoResultante,
           socioCedula: socioInfo.socio.identificacion
         });
       }
@@ -873,7 +919,7 @@ export const CajaVentanilla: React.FC = () => {
       // Refrescar movimientos y saldo del socio
       await fetchMovimientos();
       if (socioInfo) {
-        const resCuenta = await api.get(`/cuentas/buscar-caja?query=${socioInfo.numeroCuenta}`);
+        const resCuenta = await api.get(`/cuentas/buscar-caja?query=${encodeURIComponent(socioInfo.socio.identificacion)}`);
         setSocioInfo(resCuenta.data);
         fetchAportaciones(socioInfo.socio.id);
         fetchCreditos(socioInfo.socio.id);
@@ -1080,7 +1126,7 @@ export const CajaVentanilla: React.FC = () => {
   }
 
   // Freno de sobregiro
-  const sobregiroDetectado = activeTab === 'RETIRO' && montoTx.trim() !== '' && parseFloat(montoTx) > (socioInfo?.saldo || 0);
+  const sobregiroDetectado = activeTab === 'RETIRO' && montoTx.trim() !== '' && parseFloat(montoTx) > (activeAccount?.saldo || 0);
   const limiteUafeExcedido = montoTx.trim() !== '' && parseFloat(montoTx) >= 10000;
 
   return (
@@ -1167,21 +1213,88 @@ export const CajaVentanilla: React.FC = () => {
                     {socioInfo.socio.estado}
                   </span>
                   <div className="text-right">
-                    <span className="text-[9px] font-semibold text-slate-400 block uppercase">Saldo Disponible</span>
-                    <span className="text-base font-black text-[#0054A6] block font-mono leading-none mt-0.5">${socioInfo.saldo.toFixed(2)}</span>
+                    <span className="text-[9px] font-semibold text-slate-400 block uppercase">Saldo Seleccionado</span>
+                    <span className="text-base font-black text-[#0054A6] block font-mono leading-none mt-0.5 text-right shrink-0">
+                      ${activeAccount ? activeAccount.saldo.toFixed(2) : socioInfo.saldo.toFixed(2)}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Información Adicional Corta */}
-              <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50/70 p-4 rounded-2xl border border-slate-100/50">
-                <div>
-                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">Nro. Cuenta Ahorros</span>
-                  <span className="font-bold text-slate-700 font-mono mt-0.5 block">{socioInfo.numeroCuenta}</span>
+              {/* Selector de Portafolio */}
+              <div className="space-y-3 pt-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Portafolio de Cuentas Activas</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {socioInfo.cuentas && socioInfo.cuentas.length > 0 ? (
+                    socioInfo.cuentas.map((cta) => {
+                      const isSelected = selectedAccountId === cta.id;
+                      const isAhorro = cta.tipo === 'AHORRO_VISTA';
+                      
+                      return (
+                        <div
+                          key={cta.id}
+                          onClick={() => {
+                            setSelectedAccountId(cta.id);
+                            if (cta.tipo === 'APORTACIONES') {
+                              setActiveTab('APORTACIONES');
+                            } else {
+                              setActiveTab('DEPOSITO');
+                            }
+                            setTxError(null);
+                          }}
+                          className={`p-4 rounded-2xl border transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[90px] ${
+                            isSelected
+                              ? 'border-[#0054A6] bg-blue-50/20 shadow-md ring-1 ring-[#0054A6]/20'
+                              : 'border-slate-100 bg-white hover:border-slate-200 shadow-sm hover:shadow'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <span className={`text-[8px] font-extrabold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                                isAhorro
+                                  ? 'bg-blue-50 text-blue-700 border-blue-100'
+                                  : 'bg-amber-50 text-amber-700 border-amber-100'
+                              }`}>
+                                {isAhorro ? 'Ahorro a la Vista' : 'Aportaciones'}
+                              </span>
+                              <span className="text-[10px] font-mono font-bold text-slate-500 block mt-2">{cta.numeroCuenta}</span>
+                            </div>
+                            {isSelected && (
+                              <span className="h-4 w-4 rounded-full bg-[#0054A6] text-white flex items-center justify-center text-[8px] font-black shrink-0 font-sans">✓</span>
+                            )}
+                          </div>
+                          <div className="mt-3 flex justify-between items-end">
+                            <span className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">Saldo</span>
+                            <span className="text-xs font-black text-slate-800 font-mono leading-none">${cta.saldo.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div
+                      onClick={() => setSelectedAccountId(socioInfo.cuentaId)}
+                      className="p-4 rounded-2xl border border-[#0054A6] bg-blue-50/20 shadow-md flex flex-col justify-between cursor-pointer min-h-[90px]"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="text-[8px] font-extrabold px-2 py-0.5 rounded-full border border-blue-100 bg-blue-50 text-blue-700 uppercase tracking-wider">
+                            Ahorro a la Vista
+                          </span>
+                          <span className="text-[10px] font-mono font-bold text-slate-500 block mt-2">{socioInfo.numeroCuenta}</span>
+                        </div>
+                        <span className="h-4 w-4 rounded-full bg-[#0054A6] text-white flex items-center justify-center text-[8px] font-black">✓</span>
+                      </div>
+                      <div className="mt-3 flex justify-between items-end">
+                        <span className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">Saldo</span>
+                        <span className="text-xs font-black text-slate-800 font-mono leading-none">${socioInfo.saldo.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">Identificación C.I.</span>
-                  <span className="font-bold text-slate-700 font-mono mt-0.5 block">{socioInfo.socio.identificacion}</span>
+                
+                <div className="text-[10px] text-slate-400 font-medium pt-1.5 flex gap-4">
+                  <span>C.I. Titular: <strong className="text-slate-600 font-semibold">{socioInfo.socio.identificacion}</strong></span>
+                  <span>Código Socio: <strong className="text-slate-600 font-semibold">SOC-{String(socioInfo.socio.id).padStart(6, '0')}</strong></span>
                 </div>
               </div>
 
@@ -1269,13 +1382,17 @@ export const CajaVentanilla: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
+                  if (!isAhorroVista) return;
                   setActiveTab('DEPOSITO');
                   setTxError(null);
                 }}
+                title={!isAhorroVista ? 'Transacción no permitida para este tipo de cuenta' : ''}
                 className={`flex-1 py-3 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 transition-all cursor-pointer border-b-2 ${
-                  activeTab === 'DEPOSITO' 
-                    ? 'border-[#0054A6] text-[#0054A6] bg-white' 
-                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                  !isAhorroVista 
+                    ? 'opacity-40 cursor-not-allowed border-transparent text-slate-400' 
+                    : activeTab === 'DEPOSITO' 
+                      ? 'border-[#0054A6] text-[#0054A6] bg-white' 
+                      : 'border-transparent text-slate-400 hover:text-slate-600'
                 }`}
               >
                 <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
@@ -1284,13 +1401,17 @@ export const CajaVentanilla: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
+                  if (!isAhorroVista) return;
                   setActiveTab('RETIRO');
                   setTxError(null);
                 }}
+                title={!isAhorroVista ? 'Transacción no permitida para este tipo de cuenta' : ''}
                 className={`flex-1 py-3 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 transition-all cursor-pointer border-b-2 ${
-                  activeTab === 'RETIRO' 
-                    ? 'border-[#0054A6] text-[#0054A6] bg-white' 
-                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                  !isAhorroVista 
+                    ? 'opacity-40 cursor-not-allowed border-transparent text-slate-400' 
+                    : activeTab === 'RETIRO' 
+                      ? 'border-[#0054A6] text-[#0054A6] bg-white' 
+                      : 'border-transparent text-slate-400 hover:text-slate-600'
                 }`}
               >
                 <ArrowUpRight className="h-4 w-4 text-rose-500" />
@@ -1299,6 +1420,7 @@ export const CajaVentanilla: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
+                  if (!isAhorroVista) return;
                   setActiveTab('PAGO_CREDITO');
                   setTxError(null);
                   if (cuotaPendiente) {
@@ -1311,10 +1433,13 @@ export const CajaVentanilla: React.FC = () => {
                     setMontoTx('');
                   }
                 }}
+                title={!isAhorroVista ? 'Transacción no permitida para este tipo de cuenta' : ''}
                 className={`flex-1 py-3 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 transition-all cursor-pointer border-b-2 ${
-                  activeTab === 'PAGO_CREDITO' 
-                    ? 'border-[#0054A6] text-[#0054A6] bg-white' 
-                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                  !isAhorroVista 
+                    ? 'opacity-40 cursor-not-allowed border-transparent text-slate-400' 
+                    : activeTab === 'PAGO_CREDITO' 
+                      ? 'border-[#0054A6] text-[#0054A6] bg-white' 
+                      : 'border-transparent text-slate-400 hover:text-slate-600'
                 }`}
               >
                 <FileText className="h-4 w-4 text-blue-500" />
@@ -1323,14 +1448,18 @@ export const CajaVentanilla: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
+                  if (!isAportaciones) return;
                   setActiveTab('APORTACIONES');
                   setTxError(null);
                   setMontoTx('');
                 }}
+                title={!isAportaciones ? 'Transacción no permitida para este tipo de cuenta' : ''}
                 className={`flex-1 py-3 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 transition-all cursor-pointer border-b-2 ${
-                  activeTab === 'APORTACIONES' 
-                    ? 'border-[#0054A6] text-[#0054A6] bg-white' 
-                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                  !isAportaciones 
+                    ? 'opacity-40 cursor-not-allowed border-transparent text-slate-400' 
+                    : activeTab === 'APORTACIONES' 
+                      ? 'border-[#0054A6] text-[#0054A6] bg-white' 
+                      : 'border-transparent text-slate-400 hover:text-slate-600'
                 }`}
               >
                 <Coins className="h-4 w-4 text-amber-500" />
@@ -1938,7 +2067,7 @@ export const CajaVentanilla: React.FC = () => {
 
                 <div className="flex justify-between py-1 border-b border-slate-50">
                   <span className="font-bold text-slate-400 uppercase text-[10px]">Número de Cuenta:</span>
-                  <span className="font-mono text-slate-800 font-bold">{socioInfo.numeroCuenta}</span>
+                  <span className="font-mono text-slate-800 font-bold">{activeAccount?.numeroCuenta || socioInfo.numeroCuenta}</span>
                 </div>
 
                 {confirmTxData.depositante && (

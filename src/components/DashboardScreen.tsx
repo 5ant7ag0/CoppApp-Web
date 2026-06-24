@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { LogOut, AlertTriangle, Users, Layers } from 'lucide-react';
+import { LogOut, AlertTriangle, Users, Layers, BookOpen } from 'lucide-react';
 import { CajaVentanilla } from '../pages/admin/CajaVentanilla';
 import { Navigate, useNavigate } from 'react-router-dom';
 
@@ -22,6 +22,10 @@ export const DashboardScreen: React.FC = () => {
 
   if (user.rol === 'ASESOR' || user.rol === 'ASESOR_DE_SERVICIOS') {
     return <Navigate to="/admin/socios" replace />;
+  }
+
+  if (user.rol === 'CONTADOR') {
+    return <Navigate to="/admin/contabilidad" replace />;
   }
 
   // Función para obtener el mensaje de bienvenida según el rol del usuario
@@ -117,7 +121,7 @@ export const DashboardScreen: React.FC = () => {
         {/* Accesos Rápidos de Administración */}
         <div className="border-t border-neutral-200 pt-5 space-y-3">
           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Módulos Administrativos</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Button
               onClick={() => navigate('/admin/socios')}
               className="bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-350 text-slate-700 font-bold rounded-2xl h-12 px-4 shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98"
@@ -131,6 +135,13 @@ export const DashboardScreen: React.FC = () => {
             >
               <Layers className="h-4.5 w-4.5 text-amber-500" />
               Mesa de Aprobación de Créditos
+            </Button>
+            <Button
+              onClick={() => navigate('/admin/contabilidad')}
+              className="bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-350 text-slate-700 font-bold rounded-2xl h-12 px-4 shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98"
+            >
+              <BookOpen className="h-4.5 w-4.5 text-emerald-500" />
+              Módulo de Contabilidad
             </Button>
           </div>
         </div>

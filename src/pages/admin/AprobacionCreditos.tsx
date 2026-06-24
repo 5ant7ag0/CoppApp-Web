@@ -14,6 +14,7 @@ import {
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
   Search, RefreshCcw
 } from 'lucide-react';
+import { SimuladorCredito } from '../../components/SimuladorCredito';
 
 interface Socio {
   id: number;
@@ -27,6 +28,7 @@ interface Socio {
   gastosMensuales: number;
   deudasActuales: number;
   capacidadPago: number;
+  estado?: string;
 }
 
 interface Credito {
@@ -83,6 +85,38 @@ const formatFechaStr = (dateStr?: string) => {
   }
 };
 
+const getEstadoLabel = (estado: string) => {
+  switch (estado) {
+    case 'SOLICITADO': return 'Pendiente';
+    case 'EN_REVISION': return 'En Análisis';
+    case 'APROBADO': return 'Aprobado';
+    case 'DESEMBOLSADO': return 'Desembolsado';
+    case 'RECHAZADO': return 'Rechazado';
+    default: return estado;
+  }
+};
+
+const getEstadoStyles = (estado: string) => {
+  switch (estado) {
+    case 'SOLICITADO': return 'bg-amber-50 text-amber-700 border-amber-100';
+    case 'EN_REVISION': return 'bg-blue-50 text-blue-700 border-blue-100';
+    case 'APROBADO': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+    case 'DESEMBOLSADO': return 'bg-indigo-50 text-indigo-700 border-indigo-100';
+    case 'RECHAZADO': return 'bg-rose-50 text-rose-700 border-rose-100';
+    default: return 'bg-slate-50 text-slate-700 border-slate-100';
+  }
+};
+
+const getEstadoCardStyles = (estado: string) => {
+  switch (estado) {
+    case 'SOLICITADO': return 'bg-amber-50 text-amber-600 border-amber-100';
+    case 'EN_REVISION': return 'bg-blue-50 text-blue-600 border-blue-100';
+    case 'APROBADO': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+    case 'DESEMBOLSADO': return 'bg-indigo-50 text-indigo-600 border-indigo-100';
+    case 'RECHAZADO': return 'bg-rose-50 text-rose-600 border-rose-100';
+    default: return 'bg-slate-50 text-slate-650 border-slate-100';
+  }
+};
 
 // Conversor de Números a Letras en Español para Respaldo Legal
 const numeroALetras = (num: number): string => {
@@ -193,6 +227,13 @@ const getCreditScore = (socio: Socio | undefined, cuota: number) => {
 export const AprobacionCreditos: React.FC = () => {
   const { user } = useAuth();
   
+  // Estados para solicitud presencial
+  const [mostrarPresencialModal, setMostrarPresencialModal] = useState<boolean>(false);
+  const [presencialCedula, setPresencialCedula] = useState<string>('');
+  const [presencialSocio, setPresencialSocio] = useState<Socio | null>(null);
+  const [buscarSocioLoading, setBuscarSocioLoading] = useState<boolean>(false);
+  const [buscarSocioError, setBuscarSocioError] = useState<string | null>(null);
+  
   const [solicitudes, setSolicitudes] = useState<Credito[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
   const [creditoSeleccionado, setCreditoSeleccionado] = useState<Credito | null>(null);
@@ -218,7 +259,9 @@ export const AprobacionCreditos: React.FC = () => {
 
   // Modals y Resoluciones
   const [mostrarRechazoModal, setMostrarRechazoModal] = useState<boolean>(false);
+  const [mostrarAprobacionModal, setMostrarAprobacionModal] = useState<boolean>(false);
   const [motivoRechazo, setMotivoRechazo] = useState<string>('');
+  const [isApproving, setIsApproving] = useState<boolean>(false);
   const [isDisbursing, setIsDisbursing] = useState<boolean>(false);
   const [disburseError, setDisburseError] = useState<string | null>(null);
   
@@ -297,7 +340,7 @@ export const AprobacionCreditos: React.FC = () => {
     setTablaAmortizacion([]);
     setCargandoAmortizacion(true);
     try {
-      if (credito.estado === 'DESEMBOLSADO' || credito.estado === 'APROBADO') {
+      if (credito.estado === 'DESEMBOLSADO') {
         const res = await api.get(`/creditos/${credito.id}/amortizacion`);
         const cuotas = res.data || [];
         
@@ -359,7 +402,7 @@ export const AprobacionCreditos: React.FC = () => {
     setPagareFirmadoName('');
     setDisburseError(null);
     try {
-      if (cred.estado === 'DESEMBOLSADO' || cred.estado === 'APROBADO') {
+      if (cred.estado === 'DESEMBOLSADO') {
         const res = await api.get(`/creditos/${cred.id}/amortizacion`);
         const cuotas = res.data || [];
         
@@ -685,36 +728,70 @@ export const AprobacionCreditos: React.FC = () => {
   };
 
   // Secuencia de Aprobación y Desembolso blindada (Compliance Legal)
-  const handleAprobarYDesembolsar = async () => {
+  const triggerAprobarCreditoConfirm = () => {
+    const targetCredito = pagareCredito || creditoSeleccionado;
+    if (!targetCredito) return;
+    setMostrarAprobacionModal(true);
+  };
+
+  const handleAprobarCreditoConfirmado = async () => {
+    const targetCredito = pagareCredito || creditoSeleccionado;
+    if (!targetCredito) return;
+
+    setMostrarAprobacionModal(false);
+    setIsApproving(true);
+    try {
+      await api.put(`/creditos/${targetCredito.id}/aprobar`);
+      
+      showToast('Solicitud de crédito aprobada con éxito.', 'success');
+      
+      const aprobadoCredito = { ...targetCredito, estado: 'APROBADO' as const };
+      
+      // Actualizar el estado local para reflejar que ahora está APROBADO
+      if (pagareCredito && pagareCredito.id === targetCredito.id) {
+        setPagareCredito(aprobadoCredito);
+      }
+      if (creditoSeleccionado && creditoSeleccionado.id === targetCredito.id) {
+        setCreditoSeleccionado(aprobadoCredito);
+      }
+      
+      fetchSolicitudes();
+
+      // Iniciar de forma automática el flujo del pagaré
+      handleImprimirPagare(aprobadoCredito);
+    } catch (err: any) {
+      console.error('Error al aprobar el crédito:', err);
+      showToast(err.response?.data || 'Error al aprobar el crédito.', 'error');
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  const handleDesembolsarCredito = async () => {
     const targetCredito = pagareCredito || creditoSeleccionado;
     if (!targetCredito) return;
     
     setIsDisbursing(true);
     setDisburseError(null);
-    let paso1Completado = false;
     
     try {
-      // Paso 1: Aprobar el crédito (Estado -> APROBADO)
-      await api.put(`/creditos/${targetCredito.id}/aprobar`);
-      paso1Completado = true;
-      
-      // Paso 2: Consultar cuentas del socio para encontrar la cuenta de ahorros activa
+      // Paso 1: Consultar cuentas del socio para encontrar la cuenta de ahorros activa
       const resCuentas = await api.get(`/cuentas/socio/${targetCredito.socio.id}`);
       const cuentas = resCuentas.data || [];
       const cuentaAhorro = cuentas.find((c: any) => c.tipo === 'AHORRO_VISTA');
       
       if (!cuentaAhorro) {
-        throw new Error('EL_CREDITO_FUE_APROBADO_PERO_SIN_CUENTA');
+        throw new Error('EL_SOCIO_NO_POSEE_CUENTA_AHORRO_ACTIVA');
       }
       
-      // Paso 3: Ejecutar el desembolso transaccional
+      // Paso 2: Ejecutar el desembolso transaccional
       await api.post('/creditos/desembolsar', {
         creditoId: targetCredito.id,
         cuentaAhorrosId: cuentaAhorro.id,
         referenciaDocumental: pagareFirmadoName || 'pagare_firmado.pdf'
       });
       
-      showToast('Crédito aprobado y desembolsado con éxito.', 'success');
+      showToast('Crédito desembolsado con éxito.', 'success');
       
       // Guardar referencia del documento firmado
       const updatedDocs = {
@@ -734,21 +811,17 @@ export const AprobacionCreditos: React.FC = () => {
       fetchSolicitudes();
       
     } catch (err: any) {
-      console.error('Error crítico en el pipeline de desembolso:', err);
-      
-      if (err.message === 'EL_CREDITO_FUE_APROBADO_PERO_SIN_CUENTA') {
+      console.error('Error crítico en desembolso:', err);
+      if (err.message === 'EL_SOCIO_NO_POSEE_CUENTA_AHORRO_ACTIVA') {
         setDisburseError(
-          'El crédito fue aprobado, pero el desembolso falló porque el socio no posee una cuenta de ahorros activa para recibir el desembolso. Intente desembolsar manualmente.'
+          'El desembolso falló porque el socio no posee una cuenta de ahorros activa para recibir los fondos.'
         );
-        showToast('Error en la secuencia de desembolso.', 'error');
-      } else if (paso1Completado) {
-        setDisburseError(
-          'El crédito fue aprobado, pero el desembolso falló por error de red. Intente desembolsar manualmente.'
-        );
-        showToast('Error en la secuencia de desembolso.', 'error');
       } else {
-        showToast(err.response?.data || 'Error al aprobar el crédito.', 'error');
+        setDisburseError(
+          err.response?.data || err.message || 'Error al ejecutar el desembolso.'
+        );
       }
+      showToast('Error al ejecutar el desembolso.', 'error');
     } finally {
       setIsDisbursing(false);
     }
@@ -980,12 +1053,12 @@ export const AprobacionCreditos: React.FC = () => {
   // Clasificación de Columnas Kanban (usando data filtrada)
   const colPendientes = filteredSolicitudes.filter(s => s.estado === 'SOLICITADO');
   const colAnalisis = filteredSolicitudes.filter(s => s.estado === 'EN_REVISION');
-  const colAprobados = filteredSolicitudes.filter(s => s.estado === 'APROBADO' || s.estado === 'DESEMBOLSADO');
-  const colRechazados = filteredSolicitudes.filter(s => s.estado === 'RECHAZADO');
+  const colAprobados = filteredSolicitudes.filter(s => s.estado === 'APROBADO');
+  const colDesembolsados = filteredSolicitudes.filter(s => s.estado === 'DESEMBOLSADO');
 
   // Límite de Kanban a 30 tarjetas
   const colAprobadosSliced = colAprobados.slice(0, 30);
-  const colRechazadosSliced = colRechazados.slice(0, 30);
+  const colDesembolsadosSliced = colDesembolsados.slice(0, 30);
 
   // Cálculos de riesgo con verificaciones nulas y fallbacks lógicos
   const ingresos = creditoSeleccionado?.socio?.ingresosMensuales ?? (creditoSeleccionado?.socio as any)?.ingresos ?? 0;
@@ -1032,6 +1105,17 @@ export const AprobacionCreditos: React.FC = () => {
             Evalúa el flujo neto del socio, simula la tabla de amortización y desembolsa de forma segura.
           </p>
         </div>
+        <Button
+          onClick={() => {
+            setPresencialCedula('');
+            setPresencialSocio(null);
+            setBuscarSocioError(null);
+            setMostrarPresencialModal(true);
+          }}
+          className="bg-[#0054A6] hover:bg-[#004080] text-white font-bold rounded-2xl h-10 px-5 text-xs cursor-pointer shadow-sm transition-all duration-300 flex items-center gap-2"
+        >
+          Nueva Solicitud Presencial
+        </Button>
       </div>
 
       {/* Cinta de Métricas Ejecutivas */}
@@ -1111,6 +1195,7 @@ export const AprobacionCreditos: React.FC = () => {
               <option value="SOLICITADO">Pendientes</option>
               <option value="EN_REVISION">En Análisis</option>
               <option value="APROBADO">Aprobados</option>
+              <option value="DESEMBOLSADO">Desembolsados</option>
               <option value="RECHAZADO">Rechazados</option>
             </select>
           </div>
@@ -1347,7 +1432,7 @@ export const AprobacionCreditos: React.FC = () => {
                 </div>
               </div>
 
-              {/* Columna: APROBADOS/DESEMBOLSADOS */}
+              {/* Columna: APROBADOS */}
               <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
                 <div className="flex items-center justify-between px-2">
                   <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
@@ -1358,7 +1443,7 @@ export const AprobacionCreditos: React.FC = () => {
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                   {colAprobados.length === 0 ? (
                     <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
-                      Ningún crédito aprobado hoy
+                      Ningún crédito aprobado
                     </div>
                   ) : (
                     <>
@@ -1377,25 +1462,25 @@ export const AprobacionCreditos: React.FC = () => {
                 </div>
               </div>
 
-              {/* Columna: RECHAZADOS */}
+              {/* Columna: DESEMBOLSADOS */}
               <div className="bg-slate-50/40 rounded-[2rem] border border-slate-100/75 p-4 space-y-4">
                 <div className="flex items-center justify-between px-2">
                   <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-rose-500" />
-                    Rechazados ({colRechazados.length})
+                    <span className="h-2 w-2 rounded-full bg-indigo-500" />
+                    Desembolsados ({colDesembolsados.length})
                   </span>
                 </div>
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-                  {colRechazados.length === 0 ? (
+                  {colDesembolsados.length === 0 ? (
                     <div className="py-8 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-100/50">
-                      Sin solicitudes rechazadas
+                      Ningún crédito desembolsado
                     </div>
                   ) : (
                     <>
-                      {colRechazadosSliced.map(cred => (
+                      {colDesembolsadosSliced.map(cred => (
                         <CardSolicitud key={cred.id} cred={cred} onClick={() => handleSelectCardClick(cred)} getElapsedTime={getElapsedTime} />
                       ))}
-                      {colRechazados.length > 30 && (
+                      {colDesembolsados.length > 30 && (
                         <div className="p-3 bg-amber-50/50 border border-dashed border-amber-200 rounded-2xl text-center">
                           <p className="text-[10px] font-semibold text-amber-700 leading-relaxed">
                             ⚠️ Mostrando las primeras 30 tarjetas. Use la <strong>"Vista Lista"</strong> para consultar el histórico completo.
@@ -1475,16 +1560,8 @@ export const AprobacionCreditos: React.FC = () => {
                             <td className="py-3.5 px-4">{s.plazoMeses} meses</td>
                             <td className="py-3.5 px-4">{formatFechaStr(s.fechaSolicitud)}</td>
                             <td className="py-3.5 px-4">
-                              <span className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-lg border uppercase tracking-wider ${
-                                s.estado === 'SOLICITADO'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-100'
-                                  : s.estado === 'EN_REVISION'
-                                    ? 'bg-blue-50 text-blue-700 border-blue-100'
-                                    : s.estado === 'DESEMBOLSADO' || s.estado === 'APROBADO'
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                      : 'bg-rose-50 text-rose-700 border-rose-100'
-                              }`}>
-                                {s.estado === 'EN_REVISION' ? 'En Análisis' : s.estado}
+                              <span className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-lg border uppercase tracking-wider ${getEstadoStyles(s.estado)}`}>
+                                {getEstadoLabel(s.estado)}
                               </span>
                             </td>
                             <td className="py-3.5 px-4 text-right">
@@ -1558,14 +1635,8 @@ export const AprobacionCreditos: React.FC = () => {
             {/* Header del Modal */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div>
-                <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-lg border uppercase tracking-wider mb-1.5 ${
-                  creditoSeleccionado.estado === 'SOLICITADO' || creditoSeleccionado.estado === 'EN_REVISION'
-                    ? 'bg-amber-50 text-amber-700 border-amber-100'
-                    : creditoSeleccionado.estado === 'DESEMBOLSADO' || creditoSeleccionado.estado === 'APROBADO'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                      : 'bg-rose-50 text-rose-700 border-rose-100'
-                }`}>
-                  {creditoSeleccionado.estado === 'EN_REVISION' ? 'En Análisis' : creditoSeleccionado.estado}
+                <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-lg border uppercase tracking-wider mb-1.5 ${getEstadoStyles(creditoSeleccionado.estado)}`}>
+                  {getEstadoLabel(creditoSeleccionado.estado)}
                 </span>
                 <h3 className="text-lg font-semibold text-slate-800 tracking-tight flex items-center gap-2">
                   Ficha de Evaluación: {creditoSeleccionado.numeroCredito}
@@ -1893,14 +1964,23 @@ export const AprobacionCreditos: React.FC = () => {
                     Rechazar Solicitud
                   </Button>
 
-                  {/* Botón Aprobar y Desembolsar */}
+                  {/* Botón Aprobar Solicitud */}
                   <Button
-                    onClick={() => handleImprimirPagare(creditoSeleccionado)}
-                    disabled={isDisbursing}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl h-11 text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md shadow-emerald-700/10"
+                    onClick={triggerAprobarCreditoConfirm}
+                    disabled={isApproving || isDisbursing}
+                    className="flex-1 bg-[#0054A6] hover:bg-[#004080] text-white font-bold rounded-2xl h-11 text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md shadow-blue-800/10 disabled:opacity-50"
                   >
-                    <CheckCircle2 className="h-4 w-4" />
-                    Aprobar y Desembolsar Fondos
+                    {isApproving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                        Aprobando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        Aprobar Solicitud
+                      </>
+                    )}
                   </Button>
 
                   {/* Botón Imprimir Tabla de Amortización */}
@@ -1915,20 +1995,54 @@ export const AprobacionCreditos: React.FC = () => {
                 </div>
               )}
 
-              {/* Acciones para Aprobados/Desembolsados */}
-              {(creditoSeleccionado.estado === 'APROBADO' || 
-                creditoSeleccionado.estado === 'DESEMBOLSADO') && (
-                <div className="flex w-full gap-4">
-                  {/* Botón Ver Pagaré Firmado (Mover a la izquierda con icono Eye) */}
+              {/* Controles para Créditos en APROBADO */}
+              {creditoSeleccionado.estado === 'APROBADO' && (
+                <div className="flex w-full gap-4 animate-fade-in">
+                  {/* Botón Desembolsar Fondos */}
+                  <Button
+                    onClick={() => handleImprimirPagare(creditoSeleccionado)}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl h-11 text-xs cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-emerald-700/10"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Desembolsar Fondos
+                  </Button>
+
+                  {/* Botón Imprimir Tabla de Amortización */}
+                  <Button
+                    onClick={() => {
+                      descargarTablaAmortizacionPdf(creditoSeleccionado, tablaAmortizacion);
+                    }}
+                    disabled={cargandoAmortizacion}
+                    className="flex-1 bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-2xl h-11 text-xs cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-blue-800/10 disabled:opacity-50"
+                  >
+                    {cargandoAmortizacion ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                        Cargando...
+                      </>
+                    ) : (
+                      <>
+                        <Printer className="h-3.5 w-3.5" />
+                        Imprimir Tabla de Amortización
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {/* Controles para Créditos en DESEMBOLSADO */}
+              {creditoSeleccionado.estado === 'DESEMBOLSADO' && (
+                <div className="flex w-full gap-4 animate-fade-in">
+                  {/* Botón Ver Pagaré Firmado */}
                   <Button
                     onClick={() => setVerPagareCredito(creditoSeleccionado)}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl h-11 text-xs cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-emerald-700/10"
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl h-11 text-xs cursor-pointer flex items-center justify-center gap-2"
                   >
                     <Eye className="h-4 w-4" />
                     Ver Pagaré Firmado
                   </Button>
 
-                  {/* Botón Imprimir Tabla de Amortización (Mover a la derecha con icono Printer) */}
+                  {/* Botón Imprimir Tabla de Amortización */}
                   <Button
                     onClick={() => {
                       descargarTablaAmortizacionPdf(creditoSeleccionado, tablaAmortizacion);
@@ -1990,15 +2104,42 @@ export const AprobacionCreditos: React.FC = () => {
 
                 <div className="border-t border-slate-50 my-4" />
 
-                {/* Si está pendiente / en revisión: Proceso de 3 Pasos */}
                 {pagareCredito.estado === 'SOLICITADO' || pagareCredito.estado === 'EN_REVISION' ? (
-                  <div className="space-y-6 text-left">
+                  <div className="space-y-4 text-left animate-fade-in">
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-[#0054A6] uppercase tracking-wider block">
+                        Paso 1: Aprobar Solicitud
+                      </span>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Apruebe la solicitud en el sistema para permitir la posterior generación y firma del pagaré por parte del socio.
+                      </p>
+                      <Button
+                        onClick={triggerAprobarCreditoConfirm}
+                        disabled={isApproving}
+                        className="w-full bg-[#0054A6] hover:bg-[#004080] text-white font-bold rounded-xl h-10 text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm animate-pulse"
+                      >
+                        {isApproving ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Aprobando...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Aprobar Solicitud
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ) : pagareCredito.estado === 'APROBADO' ? (
+                  <div className="space-y-6 text-left animate-fade-in">
                     {/* PASO 1 */}
                     <div className="space-y-2">
                       <span className="text-[10px] font-semibold text-[#0054A6] uppercase tracking-wider block">
                         Paso 1: Generar Pagaré
                       </span>
-                      <p className="text-[11px] text-slate-450 font-medium leading-relaxed">
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
                         Genere e imprima el Pagaré a la Orden para la firma física del deudor principal y del garante.
                       </p>
                       <Button
@@ -2018,14 +2159,14 @@ export const AprobacionCreditos: React.FC = () => {
                       <span className="text-[10px] font-semibold text-[#0054A6] uppercase tracking-wider block">
                         Paso 2: Cargar Pagaré Firmado
                       </span>
-                      <p className="text-[11px] text-slate-450 font-medium leading-relaxed">
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
                         Suba el documento digitalizado (PDF o imagen) que contenga las firmas físicas obligatorias.
                       </p>
                       
                       {/* Dropzone minimalista */}
                       <div className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
                         pagareFirmadoFile 
-                          ? 'border-emerald-250 bg-emerald-50/20' 
+                          ? 'border-emerald-200 bg-emerald-50/20' 
                           : 'border-slate-200 hover:border-[#0054A6]/30 bg-slate-50/50 hover:bg-slate-50'
                       }`}>
                         <label className="cursor-pointer block space-y-1">
@@ -2077,11 +2218,35 @@ export const AprobacionCreditos: React.FC = () => {
                       <span className="text-[10px] font-semibold text-[#0054A6] uppercase tracking-wider block">
                         Paso 3: Desembolso
                       </span>
-                      <p className="text-[11px] text-slate-450 font-medium leading-relaxed">
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
                         Proceda al desembolso de los fondos en la cuenta del socio una vez verificado el pagaré firmado.
                       </p>
+
+                      {/* Desglose de Liquidación de Desembolso */}
+                      <div className="space-y-1.5 p-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] my-3">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400 font-medium">Monto Aprobado:</span>
+                          <span className="font-bold text-slate-700">{formatCurrency(pagareCredito.montoSolicitado)}</span>
+                        </div>
+                        <div className="flex justify-between text-rose-600">
+                          <span className="font-medium">(-) Seguro Desgravamen (1%):</span>
+                          <span className="font-bold">-{formatCurrency(pagareCredito.montoSolicitado * 0.01)}</span>
+                        </div>
+                        <div className="border-t border-dashed border-slate-200 my-1.5" />
+                        <div className="flex justify-between text-emerald-700 font-bold text-xs">
+                          <span>Monto Líquido Acreditado:</span>
+                          <span>{formatCurrency(pagareCredito.montoSolicitado * 0.99)}</span>
+                        </div>
+                      </div>
+                      
+                      {disburseError && (
+                        <div className="p-2.5 bg-rose-50 border border-rose-100 rounded-xl text-[10px] text-rose-600 font-medium">
+                          {disburseError}
+                        </div>
+                      )}
+
                       <Button
-                        onClick={handleAprobarYDesembolsar}
+                        onClick={handleDesembolsarCredito}
                         disabled={cargandoPagareCuotas || !pagareFirmadoFile || isDisbursing}
                         className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl h-10 text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:bg-slate-100 disabled:text-slate-350 disabled:border-slate-150 disabled:shadow-none shadow-sm shadow-emerald-600/10"
                       >
@@ -2100,13 +2265,13 @@ export const AprobacionCreditos: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  // Si ya está aprobado o desembolsado: Vista de reimpresión de tabla
+                  // Si ya está desembolsado o cancelado: Vista de reimpresión de tabla
                   <div className="space-y-5 text-left">
                     <div className="space-y-2">
                       <span className="text-[10px] font-semibold text-[#0054A6] uppercase tracking-wider block">
                         Crédito Resuelto
                       </span>
-                      <p className="text-[11px] text-slate-450 font-medium leading-relaxed">
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
                         Este crédito ya fue resuelto y desembolsado. Puede descargar la tabla de amortización para reimpresión.
                       </p>
                       <Button
@@ -2123,7 +2288,7 @@ export const AprobacionCreditos: React.FC = () => {
                     
                     <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
                       <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest block mb-0.5">Archivo SEPS:</span>
-                      <p className="text-[10px] text-emerald-650 leading-relaxed font-bold">
+                      <p className="text-[10px] text-emerald-600 leading-relaxed font-bold">
                         Pagaré digitalizado cargado y custodiado en bóveda digital.
                       </p>
                     </div>
@@ -2163,8 +2328,8 @@ export const AprobacionCreditos: React.FC = () => {
                 ) : (
                   <div className="space-y-6 flex-1 flex flex-col justify-between w-full">
                     
-                    {/* Si está pendiente / en revisión: mostrar Pagaré + Amortización */}
-                    {pagareCredito.estado === 'SOLICITADO' || pagareCredito.estado === 'EN_REVISION' ? (
+                    {/* Si está pendiente / en revisión / aprobado: mostrar Pagaré + Amortización */}
+                    {pagareCredito.estado === 'SOLICITADO' || pagareCredito.estado === 'EN_REVISION' || pagareCredito.estado === 'APROBADO' ? (
                       <div className="space-y-6 w-full">
                         {/* Membrete */}
                         <div className="text-center space-y-1 w-full">
@@ -2216,7 +2381,7 @@ export const AprobacionCreditos: React.FC = () => {
                         </div>
                       </div>
                     ) : (
-                      // Si ya está aprobado / desembolsado: Previsualización de sólo la tabla
+                      // Si ya está desembolsado: Previsualización de sólo la tabla
                       <div className="space-y-6 w-full">
                         {/* Membrete */}
                         <div className="text-center space-y-1 w-full">
@@ -2267,6 +2432,78 @@ export const AprobacionCreditos: React.FC = () => {
             </div>
 
           </div>
+        </div>
+      )}
+
+      {/* Modal Premium: Confirmación de Aprobación de Crédito (Apple Light Style) */}
+      {mostrarAprobacionModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-md animate-fade-in select-none">
+          <Card className="w-full max-w-sm bg-white/95 backdrop-blur-2xl rounded-[2.5rem] border border-slate-100 p-6 md:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.1)] flex flex-col justify-between relative overflow-hidden animate-scale-up">
+            
+            <button 
+              onClick={() => setMostrarAprobacionModal(false)}
+              className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-55 rounded-full transition-all cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            {(() => {
+              const targetCredito = pagareCredito || creditoSeleccionado;
+              if (!targetCredito) return null;
+              return (
+                <>
+                  <div className="flex flex-col items-center text-center">
+                    <div className="h-14 w-14 rounded-3xl bg-blue-50/80 text-[#0054A6] flex items-center justify-center mb-4 border border-blue-100/50 shadow-sm">
+                      <CheckCircle2 className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-base font-bold text-slate-800 tracking-tight">Aprobar Solicitud de Crédito</h3>
+                    <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2.5 max-w-[280px]">
+                      ¿Está seguro de que desea aprobar esta solicitud de crédito para <span className="font-bold text-slate-800 uppercase">{targetCredito.socio?.nombresCompletos}</span>?
+                    </p>
+                    <p className="text-[11px] text-slate-400 font-medium tracking-wide mt-1.5 max-w-[280px]">
+                      Esta acción cambiará el estado de la solicitud a APROBADO.
+                    </p>
+                  </div>
+
+                  <div className="mt-5 space-y-3 p-4 bg-slate-50/50 backdrop-blur-sm border border-slate-100 rounded-3xl text-[11px] text-left">
+                    <div className="flex justify-between items-center border-b border-slate-100/50 pb-2">
+                      <span className="text-slate-400 font-medium">Socio:</span>
+                      <span className="font-bold text-slate-700 uppercase text-right leading-none max-w-[160px] truncate">{targetCredito.socio?.nombresCompletos}</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-slate-100/50 pb-2">
+                      <span className="text-slate-400 font-medium">Monto Solicitado:</span>
+                      <span className="font-extrabold text-slate-800">{formatCurrency(targetCredito.montoSolicitado)}</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-slate-100/50 pb-2">
+                      <span className="text-slate-400 font-medium">Plazo:</span>
+                      <span className="font-bold text-slate-700">{targetCredito.plazoMeses} meses</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">Amortización:</span>
+                      <span className="font-bold text-slate-700 capitalize">{targetCredito.tipoAmortizacion.toLowerCase()}</span>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+
+            <div className="flex gap-3 pt-6">
+              <Button
+                onClick={() => setMostrarAprobacionModal(false)}
+                variant="outline"
+                className="flex-1 border-slate-200 text-slate-655 hover:bg-slate-50 font-bold rounded-2xl h-11 text-xs cursor-pointer bg-white transition-all"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleAprobarCreditoConfirmado}
+                className="flex-1 bg-[#0054A6] hover:bg-[#004080] active:scale-[0.98] text-white font-bold rounded-2xl h-11 flex items-center justify-center text-xs cursor-pointer shadow-lg shadow-blue-800/15 transition-all"
+              >
+                Confirmar
+              </Button>
+            </div>
+
+          </Card>
         </div>
       )}
 
@@ -2474,6 +2711,186 @@ export const AprobacionCreditos: React.FC = () => {
         </div>
       )}
 
+      {/* Modal: Nueva Solicitud Presencial */}
+      {mostrarPresencialModal && (
+        <div className="fixed inset-0 z-[120] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 md:p-6 no-print select-none">
+          <Card className="w-full max-w-4xl bg-white rounded-[2.5rem] border border-slate-150 p-6 md:p-8 shadow-2xl flex flex-col justify-between relative max-h-[92vh] overflow-y-auto transform transition-all duration-300 animate-scale-up">
+            
+            {/* Botón de cerrar */}
+            <button 
+              onClick={() => {
+                setMostrarPresencialModal(false);
+                setPresencialSocio(null);
+                setPresencialCedula('');
+                setBuscarSocioError(null);
+              }}
+              className="absolute top-6 right-6 p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-all cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            {/* Encabezado del Modal */}
+            <div className="pb-4 border-b border-slate-100 mb-6">
+              <h3 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
+                <Building className="h-5.5 w-5.5 text-[#0054A6]" />
+                Originación de Crédito Presencial (Ventanilla)
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Cree una nueva solicitud física en ventanilla asociándola a un socio activo.
+              </p>
+            </div>
+
+            {/* Contenido principal */}
+            <div className="space-y-6 flex-1">
+              
+              {/* PASO A: Identificación (Buscador por Cédula) */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-6 w-6 rounded-full bg-blue-50 text-[#0054A6] flex items-center justify-center text-xs font-bold font-mono">
+                    A
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Identificación del Socio
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <label className="block text-xs font-semibold text-slate-500">Cédula o RUC del Socio</label>
+                    <input
+                      type="text"
+                      placeholder="Ingrese número de identificación..."
+                      value={presencialCedula}
+                      onChange={(e) => setPresencialCedula(e.target.value)}
+                      disabled={buscarSocioLoading}
+                      className="w-full px-4 py-2.5 text-xs font-semibold text-slate-700 bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 focus:border-[#0054A6]"
+                    />
+                  </div>
+                  <Button
+                    onClick={async () => {
+                      if (!presencialCedula.trim()) {
+                        setBuscarSocioError('Por favor, ingrese una identificación.');
+                        return;
+                      }
+                      setBuscarSocioLoading(true);
+                      setBuscarSocioError(null);
+                      setPresencialSocio(null);
+                      try {
+                        const res = await api.get(`/socios/buscar?identificacion=${presencialCedula.trim()}`);
+                        const socio = res.data;
+                        if (!socio) {
+                          setBuscarSocioError('Error: Socio no encontrado en el sistema.');
+                        } else if (socio.estado !== 'ACTIVO') {
+                          setBuscarSocioError('Error: El socio existe pero no se encuentra en estado ACTIVO.');
+                        } else {
+                          setPresencialSocio(socio);
+                        }
+                      } catch (err: any) {
+                        console.error('Error buscando socio:', err);
+                        setBuscarSocioError(err.response?.data?.message || err.response?.data || 'Error al buscar el socio. Verifique que exista.');
+                      } finally {
+                        setBuscarSocioLoading(false);
+                      }
+                    }}
+                    disabled={buscarSocioLoading || !presencialCedula.trim()}
+                    className="bg-[#0054A6] hover:bg-[#004080] text-white font-bold rounded-2xl h-10.5 text-xs cursor-pointer shadow-sm flex items-center justify-center gap-2"
+                  >
+                    {buscarSocioLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin animate-none mr-1.5" />
+                        Buscando...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="h-4 w-4" />
+                        Buscar Socio
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {buscarSocioError && (
+                  <div className="p-3.5 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-xs font-medium animate-fade-in flex items-center gap-2">
+                    <AlertCircle className="h-4.5 w-4.5 shrink-0" />
+                    <span>{buscarSocioError}</span>
+                  </div>
+                )}
+
+                {/* Perfil del Socio Encontrado */}
+                {presencialSocio && (
+                  <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-3 animate-fade-in text-xs">
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-200/50">
+                      <span className="font-semibold text-slate-800 text-sm">{presencialSocio.nombresCompletos}</span>
+                      <span className="inline-flex items-center text-[9px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-100 bg-emerald-50 text-emerald-700 uppercase tracking-wider">
+                        Activo
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-650">
+                      <div>
+                        <span className="text-slate-400 font-medium block text-[10px] uppercase">Identificación:</span>
+                        <span className="font-mono font-bold">{presencialSocio.identificacion}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-medium block text-[10px] uppercase">Correo Electrónico:</span>
+                        <span className="font-bold">{presencialSocio.correo}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-medium block text-[10px] uppercase">Ingresos Mensuales:</span>
+                        <span className="font-bold text-slate-800">{formatCurrency(presencialSocio.ingresosMensuales)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-medium block text-[10px] uppercase">Gastos Mensuales:</span>
+                        <span className="font-bold text-slate-800">{formatCurrency(presencialSocio.gastosMensuales)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* PASO B: Simulador (Sólo si el socio fue validado con éxito) */}
+              {presencialSocio && (
+                <div className="space-y-4 border-t border-slate-100 pt-6 animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-blue-50 text-[#0054A6] flex items-center justify-center text-xs font-bold font-mono">
+                      B
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Simulación y Registro del Préstamo
+                    </h4>
+                  </div>
+
+                  <SimuladorCredito
+                    buttonLabel="Registrar Solicitud Presencial"
+                    successMessage="La solicitud presencial ha sido registrada directamente en estado EN ANÁLISIS."
+                    onApply={async (params) => {
+                      const response = await api.post('/creditos/solicitar?presencial=true', {
+                        socio: { id: presencialSocio.id },
+                        montoSolicitado: params.montoSolicitado,
+                        plazoMeses: params.plazoMeses,
+                        tasaInteresAnual: params.tasaInteresAnual,
+                        tasaMoraAnual: 5.00,
+                        tipoAmortizacion: params.tipoAmortizacion,
+                        garantiaDescripcion: `Garantía Quirografaria (Firma Personal). Registro presencial por Ventanilla. Destino: ${params.destinoFondo}`,
+                        usuarioOficialId: user?.detalles?.id
+                      });
+                      return response.data;
+                    }}
+                    onSuccessClose={() => {
+                      setMostrarPresencialModal(false);
+                      setPresencialSocio(null);
+                      setPresencialCedula('');
+                      fetchSolicitudes(); // Actualiza el tablero en caliente
+                    }}
+                  />
+                </div>
+              )}
+
+            </div>
+
+          </Card>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -2522,16 +2939,8 @@ const CardSolicitud: React.FC<CardSolicitudProps> = ({ cred, onClick, getElapsed
               <h4 className="text-xs font-black text-slate-700 truncate max-w-[110px] uppercase" title={cred.socio?.nombresCompletos}>
                 {cred.socio?.nombresCompletos}
               </h4>
-              <span className={`inline-flex items-center text-[8px] font-black px-1.5 py-0.5 rounded-md border uppercase tracking-wider ${
-                cred.estado === 'SOLICITADO'
-                  ? 'bg-amber-50 text-amber-600 border-amber-100'
-                  : cred.estado === 'EN_REVISION'
-                    ? 'bg-blue-50 text-blue-600 border-blue-100'
-                    : cred.estado === 'DESEMBOLSADO' || cred.estado === 'APROBADO'
-                      ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                      : 'bg-rose-50 text-rose-600 border-rose-100'
-              }`}>
-                {cred.estado === 'EN_REVISION' ? 'En Análisis' : cred.estado}
+              <span className={`inline-flex items-center text-[8px] font-black px-1.5 py-0.5 rounded-md border uppercase tracking-wider ${getEstadoCardStyles(cred.estado)}`}>
+                {getEstadoLabel(cred.estado)}
               </span>
             </div>
             <span className="text-[9px] font-bold text-slate-400 flex items-center gap-0.5 shrink-0 bg-slate-50 px-1.5 py-0.5 rounded-lg border border-slate-100/50">
