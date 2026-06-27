@@ -2612,8 +2612,8 @@ export const CreacionSocios: React.FC = () => {
 
       {/* Modal de Detalle, Portafolio y Mantenimiento KYC */}
       {isDetailModalOpen && selectedSocio && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-md p-4 overflow-y-auto no-print">
-          <div className="w-full md:w-[90vw] max-w-6xl bg-white shadow-2xl border border-slate-100 rounded-[2rem] p-6 relative animate-scale-up text-left max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 backdrop-blur-md p-4 overflow-y-auto no-print">
+          <div className="w-full md:w-[90vw] max-w-6xl bg-white shadow-2xl border border-slate-100 rounded-[2rem] p-6 relative animate-scale-up text-left max-h-[90vh] overflow-y-auto my-8">
             
             {/* Mensaje de Confirmación Sutil */}
             {showSuccessToast && (
