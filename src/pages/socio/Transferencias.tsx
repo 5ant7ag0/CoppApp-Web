@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Users, Search, Wallet, User, CheckCircle2, ArrowRight, AlertCircle, Info, Mail, FileText, Loader2, Download, X } from 'lucide-react';
+import { Send, Users, Search, Wallet, User, CheckCircle2, ArrowRight, AlertCircle, Info, Mail, FileText, Loader2, Download, X, Lock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import api from '../../services/api';
@@ -151,7 +151,12 @@ export const Transferencias: React.FC = () => {
         const activeAccounts = res.data.filter((acc: Account) => acc.estado === 'ACTIVA');
         setAccounts(activeAccounts);
         if (activeAccounts.length > 0) {
-          setSelectedAccountId(activeAccounts[0].id);
+          const vistaAccount = activeAccounts.find((acc: Account) => acc.tipo === 'AHORRO_VISTA');
+          if (vistaAccount) {
+            setSelectedAccountId(vistaAccount.id);
+          } else {
+            setSelectedAccountId(activeAccounts[0].id);
+          }
         }
       } catch (err: any) {
         console.error('Error fetching accounts:', err);
@@ -573,26 +578,47 @@ export const Transferencias: React.FC = () => {
                       <div className="fixed inset-0 z-10" onClick={() => setIsSelectOpen(false)} />
                       
                       <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-150 rounded-2xl shadow-xl z-20 overflow-hidden max-h-60 overflow-y-auto animate-scale-up">
-                        {accounts.map(acc => (
-                          <div
-                            key={acc.id}
-                            onClick={() => {
-                              setSelectedAccountId(acc.id);
-                              setIsSelectOpen(false);
-                              setPageError('');
-                            }}
-                            className={`px-4 py-3.5 hover:bg-slate-50 flex justify-between items-center cursor-pointer transition-all border-b border-slate-50 last:border-0 ${
-                              selectedAccountId === acc.id ? 'bg-blue-50/20' : ''
-                            }`}
-                          >
-                            <span className="text-sm text-slate-700 font-bold">
-                              {acc.tipo === 'AHORRO_VISTA' ? 'Ahorro a la Vista' : acc.tipo} - {acc.numeroCuenta}
-                            </span>
-                            <span className="text-sm font-black text-emerald-600">
-                              ${acc.saldo.toFixed(2)}
-                            </span>
-                          </div>
-                        ))}
+                        {accounts.map(acc => {
+                          const isAllowed = acc.tipo === 'AHORRO_VISTA';
+                          return (
+                            <div
+                              key={acc.id}
+                              onClick={() => {
+                                if (!isAllowed) return;
+                                setSelectedAccountId(acc.id);
+                                setIsSelectOpen(false);
+                                setPageError('');
+                              }}
+                              className={`px-4 py-3.5 flex justify-between items-center transition-all border-b border-slate-50 last:border-0 ${
+                                !isAllowed
+                                  ? 'bg-slate-50/50 text-slate-400 opacity-60 cursor-not-allowed select-none'
+                                  : selectedAccountId === acc.id
+                                    ? 'bg-blue-50/20 cursor-pointer'
+                                    : 'hover:bg-slate-50 cursor-pointer'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                {!isAllowed && (
+                                  <Lock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                )}
+                                <span className={`text-sm font-bold ${!isAllowed ? 'text-slate-400' : 'text-slate-700'}`}>
+                                  {acc.tipo === 'AHORRO_VISTA'
+                                    ? 'Ahorro a la Vista'
+                                    : acc.tipo === 'AHORRO_PROGRAMADO'
+                                      ? 'Ahorro Programado'
+                                      : acc.tipo === 'PLAZO_FIJO'
+                                        ? 'Plazo Fijo'
+                                        : acc.tipo === 'APORTACIONES'
+                                          ? 'Aportaciones'
+                                          : acc.tipo} - {acc.numeroCuenta}
+                                </span>
+                              </div>
+                              <span className={`text-sm font-black ${!isAllowed ? 'text-slate-400/80' : 'text-emerald-600'}`}>
+                                ${acc.saldo.toFixed(2)}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </>
                   )}
