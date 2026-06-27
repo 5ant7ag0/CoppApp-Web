@@ -3,6 +3,7 @@ import { Send, Users, Search, Wallet, User, CheckCircle2, ArrowRight, AlertCircl
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import api from '../../services/api';
+import { motion } from 'framer-motion';
 import { useTenant } from '../../context/TenantContext';
 import { useAuth } from '../../context/AuthContext';
 import { jsPDF } from 'jspdf';
@@ -601,39 +602,55 @@ export const Transferencias: React.FC = () => {
               {/* 2. TRANSACTION TYPE PILLS */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo de Transferencia</label>
-                <div className="grid grid-cols-2 p-1.5 bg-slate-100 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveTab('interna');
-                      setPageError('');
-                    }}
-                    className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      activeTab === 'interna'
-                        ? 'bg-white text-[#0054A6] shadow-sm'
-                        : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                  >
-                    Transferencia Interna
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveTab('otros');
-                      setPageError('');
-                    }}
-                    className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                      activeTab === 'otros'
-                        ? 'bg-white text-[#0054A6] shadow-sm'
-                        : 'text-slate-400 hover:text-slate-500 opacity-60'
-                    }`}
-                  >
-                    Otros Bancos
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-500 font-semibold tracking-wide">
-                      Próximamente
-                    </span>
-                  </button>
-                </div>
+                 <div className="grid grid-cols-2 p-1 bg-[#F1F3F6] border border-slate-100/50 rounded-full gap-1">
+                   <button
+                     type="button"
+                     onClick={() => {
+                       setActiveTab('interna');
+                       setPageError('');
+                     }}
+                     className="relative py-2.5 rounded-full text-xs font-bold transition-all cursor-pointer text-slate-500 hover:text-slate-805"
+                   >
+                     {activeTab === 'interna' && (
+                       <motion.div
+                         layoutId="activeTabTransferencia"
+                         className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                         transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                       />
+                     )}
+                     <span className={`relative z-10 transition-colors duration-300 ${
+                       activeTab === 'interna' ? 'text-white' : 'text-slate-500'
+                     }`}>
+                       Transferencia Interna
+                     </span>
+                   </button>
+                   <button
+                     type="button"
+                     onClick={() => {
+                       setActiveTab('otros');
+                       setPageError('');
+                     }}
+                     className="relative py-2.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 text-slate-500 hover:text-slate-805"
+                   >
+                     {activeTab === 'otros' && (
+                       <motion.div
+                         layoutId="activeTabTransferencia"
+                         className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                         transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                       />
+                     )}
+                     <span className={`relative z-10 flex items-center justify-center gap-1.5 transition-colors duration-300 ${
+                       activeTab === 'otros' ? 'text-white' : 'text-slate-500'
+                     }`}>
+                       Otros Bancos
+                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold tracking-wide transition-colors duration-300 ${
+                         activeTab === 'otros' ? 'bg-white/20 text-white' : 'bg-slate-200/60 text-slate-500'
+                       }`}>
+                         Próximamente
+                       </span>
+                     </span>
+                   </button>
+                 </div>
               </div>
 
               {/* 3. DESTINATION ACCOUNT */}

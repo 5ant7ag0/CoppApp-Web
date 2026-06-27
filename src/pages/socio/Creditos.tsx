@@ -12,8 +12,8 @@ import {
 } from 'lucide-react';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import api from '../../services/api';
+import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { SimuladorCredito } from '../../components/SimuladorCredito';
 
@@ -227,20 +227,47 @@ export const Creditos: React.FC = () => {
           <p className="text-xs text-slate-400 font-medium">Cargando información crediticia...</p>
         </div>
       ) : (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="w-full">
           {/* Pestañas Superiores */}
-          <TabsList className="bg-slate-100 max-w-md mb-6 rounded-2xl p-1.5 h-12">
-            <TabsTrigger value="activo" className="rounded-xl py-2 font-bold text-xs h-9">
-              Crédito Activo
-            </TabsTrigger>
-            <TabsTrigger value="simulador" className="rounded-xl py-2 font-bold text-xs h-9">
-              Simulador Financiero
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex bg-[#F1F3F6] p-1 border border-slate-100/50 rounded-full w-fit gap-1 mb-6">
+            <button
+              onClick={() => setActiveTab('activo')}
+              className="relative px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center justify-center text-slate-500 hover:text-slate-805"
+            >
+              {activeTab === 'activo' && (
+                <motion.div
+                  layoutId="activeTabCreditosSocio"
+                  className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <span className={`relative z-10 transition-colors duration-300 ${
+                activeTab === 'activo' ? 'text-white' : 'text-slate-500'
+              }`}>
+                Crédito Activo
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('simulador')}
+              className="relative px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center justify-center text-slate-500 hover:text-slate-805"
+            >
+              {activeTab === 'simulador' && (
+                <motion.div
+                  layoutId="activeTabCreditosSocio"
+                  className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <span className={`relative z-10 transition-colors duration-300 ${
+                activeTab === 'simulador' ? 'text-white' : 'text-slate-500'
+              }`}>
+                Simulador Financiero
+              </span>
+            </button>
+          </div>
 
           {/* CONTENIDO TABA 1: CRÉDITO ACTIVO */}
-          <TabsContent value="activo">
-            {(() => {
+          {activeTab === 'activo' && (() => {
               const solicitudes = creditsList.filter(c => 
                 c.estado !== 'DESEMBOLSADO' && 
                 c.estado !== 'VIGENTE' && 
@@ -555,32 +582,33 @@ export const Creditos: React.FC = () => {
                 );
               }
             })()}
-          </TabsContent>
 
           {/* CONTENIDO TABA 2: SIMULADOR FINANCIERO */}
-          <TabsContent value="simulador">
-            <SimuladorCredito
-              onApply={async (params) => {
-                if (!user || !user.detalles?.id) {
-                  throw new Error('Error: No se encontró la sesión del socio.');
-                }
-                const response = await api.post('/creditos/solicitar', {
-                  socio: { id: user.detalles.id },
-                  montoSolicitado: params.montoSolicitado,
-                  plazoMeses: params.plazoMeses,
-                  tasaInteresAnual: params.tasaInteresAnual,
-                  tasaMoraAnual: 5.00,
-                  tipoAmortizacion: params.tipoAmortizacion,
-                  garantiaDescripcion: `Garantía Quirografaria (Firma Personal). Destino: ${params.destinoFondo}`
-                });
-                return response.data;
-              }}
-              onSuccessClose={() => {
-                fetchActiveCredit(); // recargar créditos
-              }}
-            />
-          </TabsContent>
-        </Tabs>
+          {activeTab === 'simulador' && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+              <SimuladorCredito
+                onApply={async (params) => {
+                  if (!user || !user.detalles?.id) {
+                    throw new Error('Error: No se encontró la sesión del socio.');
+                  }
+                  const response = await api.post('/creditos/solicitar', {
+                    socio: { id: user.detalles.id },
+                    montoSolicitado: params.montoSolicitado,
+                    plazoMeses: params.plazoMeses,
+                    tasaInteresAnual: params.tasaInteresAnual,
+                    tasaMoraAnual: 5.00,
+                    tipoAmortizacion: params.tipoAmortizacion,
+                    garantiaDescripcion: `Garantía Quirografaria (Firma Personal). Destino: ${params.destinoFondo}`
+                  });
+                  return response.data;
+                }}
+                onSuccessClose={() => {
+                  fetchActiveCredit(); // recargar créditos
+                }}
+              />
+            </motion.div>
+          )}
+        </div>
       )}
 
       {/* Modal de Confirmación de Pago */}

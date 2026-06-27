@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api from '../../services/api';
+import { motion } from 'framer-motion';
 import { 
   TrendingUp, 
   Calculator, 
@@ -247,26 +248,40 @@ export const Inversiones: React.FC = () => {
       </Card>
 
       {/* Selector de Pestañas (Segmented Control) */}
-      <div className="flex p-1 bg-slate-100 rounded-2xl w-full sm:w-fit border border-slate-200/50 gap-1 select-none">
+      <div className="flex p-1 bg-[#F1F3F6] border border-slate-100/50 rounded-full w-full sm:w-fit gap-1 select-none">
         <button
           onClick={() => setActiveTab('mis-inversiones')}
-          className={`flex-1 sm:flex-initial px-6 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 cursor-pointer ${
-            activeTab === 'mis-inversiones'
-              ? 'bg-[#0054A6] text-white shadow-md shadow-blue-900/10'
-              : 'text-slate-500 hover:text-[#0054A6] hover:bg-white/60'
-          }`}
+          className="relative flex-1 sm:flex-initial px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer text-slate-505 hover:text-[#0054A6]"
         >
-          Mis Inversiones ({investmentAccounts.length})
+          {activeTab === 'mis-inversiones' && (
+            <motion.div
+              layoutId="activeTabInversionSocio"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 transition-colors duration-300 ${
+            activeTab === 'mis-inversiones' ? 'text-white' : 'text-slate-500'
+          }`}>
+            Mis Inversiones ({investmentAccounts.length})
+          </span>
         </button>
         <button
           onClick={() => setActiveTab('simular')}
-          className={`flex-1 sm:flex-initial px-6 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 cursor-pointer ${
-            activeTab === 'simular'
-              ? 'bg-[#0054A6] text-white shadow-md shadow-blue-900/10'
-              : 'text-slate-500 hover:text-[#0054A6] hover:bg-white/60'
-          }`}
+          className="relative flex-1 sm:flex-initial px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer text-slate-505 hover:text-[#0054A6]"
         >
-          Simular Inversión
+          {activeTab === 'simular' && (
+            <motion.div
+              layoutId="activeTabInversionSocio"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 transition-colors duration-300 ${
+            activeTab === 'simular' ? 'text-white' : 'text-slate-500'
+          }`}>
+            Simular Inversión
+          </span>
         </button>
       </div>
 
