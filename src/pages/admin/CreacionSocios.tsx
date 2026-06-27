@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { motion } from 'framer-motion';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { jsPDF } from 'jspdf';
@@ -1537,28 +1538,42 @@ export const CreacionSocios: React.FC = () => {
               Creación de Socios y Apertura de Cuentas
             </h2>
           </div>
-          <div className="flex items-center gap-1 bg-slate-100/70 border border-slate-200/50 p-1.5 rounded-2xl shadow-inner animate-fade-in">
+          <div className="flex items-center gap-1 bg-[#F1F3F6] p-1 rounded-full border border-slate-100/50 flex-row">
             <button
               onClick={() => setActiveTab('nuevo')}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'nuevo'
-                  ? 'bg-white text-[#0054A6] shadow-sm'
-                  : 'text-slate-500 hover:text-slate-750'
-              }`}
+              className="relative px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 text-slate-500 hover:text-slate-805"
             >
-              <Plus className="h-3.5 w-3.5" />
-              Nuevo Registro
+              {activeTab === 'nuevo' && (
+                <motion.div
+                  layoutId="activeTabSocios"
+                  className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <span className={`relative z-10 flex items-center gap-1.5 transition-colors duration-300 ${
+                activeTab === 'nuevo' ? 'text-white' : 'text-slate-500'
+              }`}>
+                <Plus className="h-3.5 w-3.5" />
+                Nuevo Registro
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('registrados')}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'registrados'
-                  ? 'bg-white text-[#0054A6] shadow-sm'
-                  : 'text-slate-500 hover:text-slate-750'
-              }`}
+              className="relative px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 text-slate-500 hover:text-slate-805"
             >
-              <Users className="h-3.5 w-3.5" />
-              Socios Registrados
+              {activeTab === 'registrados' && (
+                <motion.div
+                  layoutId="activeTabSocios"
+                  className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <span className={`relative z-10 flex items-center gap-1.5 transition-colors duration-300 ${
+                activeTab === 'registrados' ? 'text-white' : 'text-slate-500'
+              }`}>
+                <Users className="h-3.5 w-3.5" />
+                Socios Registrados
+              </span>
             </button>
           </div>
         </div>
