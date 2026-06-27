@@ -14,6 +14,7 @@ import { Transferencias } from './pages/socio/Transferencias';
 import { Creditos } from './pages/socio/Creditos';
 import { Perfil } from './pages/socio/Perfil';
 import { Movimientos } from './pages/socio/Movimientos';
+import { Inversiones } from './pages/socio/Inversiones';
 import { AprobacionCreditos } from './pages/admin/AprobacionCreditos';
 import { CreacionSocios } from './pages/admin/CreacionSocios';
 import { ContabilidadDashboard } from './pages/admin/ContabilidadDashboard';
@@ -49,6 +50,7 @@ const RootRouter: React.FC = () => {
           <Route path="/socio/dashboard" element={<Inicio />} />
           <Route path="/socio/movimientos" element={<Movimientos />} />
           <Route path="/socio/transferencias" element={<Transferencias />} />
+          <Route path="/socio/inversiones" element={<Inversiones />} />
           <Route path="/socio/creditos" element={<Creditos />} />
           <Route path="/socio/perfil" element={<Perfil />} />
         </Route>

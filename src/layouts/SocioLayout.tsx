@@ -1,11 +1,54 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Navigate, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, LogOut, Home, Send, CreditCard, User, Menu, History } from 'lucide-react';
+import { Loader2, LogOut, Home, Send, CreditCard, User, Menu, History, TrendingUp } from 'lucide-react';
+import api from '../services/api';
+import { useTenant } from '../context/TenantContext';
 
 export const SocioLayout: React.FC = () => {
   const { isAuthenticated, user, isLoading, logout } = useAuth();
-  const [mobileOpen, setMobileOpen] = React.useState(false);
+  const { activeTenant } = useTenant();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  const fetchLogo = async () => {
+    try {
+      const res = await api.get('/empresas/mi-perfil');
+      if (res.data?.logoUrl) {
+        const url = res.data.logoUrl.startsWith('http') 
+          ? res.data.logoUrl 
+          : `http://localhost:8080/api/v1${res.data.logoUrl}`;
+        setLogoUrl(url);
+      } else {
+        setLogoUrl(null);
+      }
+    } catch (err) {
+      console.error('Error fetching company logo in sidebar:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchLogo();
+      
+      const handleLogoUpdated = (e: Event) => {
+        const customEvent = e as CustomEvent;
+        if (customEvent.detail) {
+          const url = customEvent.detail.startsWith('http')
+            ? customEvent.detail
+            : `http://localhost:8080/api/v1${customEvent.detail}`;
+          setLogoUrl(url);
+        } else {
+          fetchLogo();
+        }
+      };
+
+      window.addEventListener('logo-updated', handleLogoUpdated);
+      return () => {
+        window.removeEventListener('logo-updated', handleLogoUpdated);
+      };
+    }
+  }, [isAuthenticated, activeTenant]);
 
   if (isLoading) {
     return (
@@ -26,6 +69,7 @@ export const SocioLayout: React.FC = () => {
     { to: '/socio/dashboard', label: 'Inicio', icon: Home },
     { to: '/socio/movimientos', label: 'Movimientos', icon: History },
     { to: '/socio/transferencias', label: 'Transferir', icon: Send },
+    { to: '/socio/inversiones', label: 'Inversiones', icon: TrendingUp },
     { to: '/socio/creditos', label: 'Créditos', icon: CreditCard },
     { to: '/socio/perfil', label: 'Perfil', icon: User },
   ];
@@ -42,11 +86,20 @@ export const SocioLayout: React.FC = () => {
       {/* Mobile Header */}
       <header className="md:hidden flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm z-40">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-xl bg-[#0054A6] flex items-center justify-center font-bold text-white shadow-md shadow-blue-600/20">
-            C
-          </div>
-          <span className="font-bold tracking-tight text-slate-800 text-sm">
-            CoopApp Digital
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt="Logo"
+              className="h-8 w-8 object-contain"
+              onError={() => setLogoUrl(null)}
+            />
+          ) : (
+            <div className="h-8 w-8 rounded-xl bg-[#0054A6] flex items-center justify-center font-bold text-white shadow-md shadow-blue-600/20">
+              {activeTenant?.name ? activeTenant.name.charAt(0).toUpperCase() : 'C'}
+            </div>
+          )}
+          <span className="font-bold tracking-tight text-slate-800 text-xs">
+            {activeTenant?.name || 'CoopApp'}
           </span>
         </div>
         <button 
@@ -64,16 +117,25 @@ export const SocioLayout: React.FC = () => {
         ${mobileOpen ? 'translate-x-0' : '-translate-x-[110%] md:translate-x-0'}
       `}>
         <div className="space-y-8">
-          {/* Logo */}
-          <div className="flex items-center gap-3 px-2">
-            <div className="h-10 w-10 rounded-2xl bg-[#0054A6] flex items-center justify-center font-black text-white text-lg shadow-lg shadow-blue-600/30">
-              C
-            </div>
-            <div className="flex flex-col">
-              <span className="font-bold tracking-tight text-slate-800 text-base leading-none">
-                CoopApp
+          {/* Brand Logo & Institution */}
+          <div className="flex flex-col items-center justify-center text-center gap-3 px-2">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Logo Institucional"
+                className="w-full max-h-24 object-contain select-none"
+                onError={() => setLogoUrl(null)}
+              />
+            ) : (
+              <div className="h-16 w-16 rounded-2xl bg-[#0054A6] flex items-center justify-center font-black text-white text-2xl shadow-lg shadow-blue-600/30 select-none">
+                {activeTenant?.name ? activeTenant.name.charAt(0).toUpperCase() : 'C'}
+              </div>
+            )}
+            <div className="flex flex-col items-center">
+              <span className="font-bold tracking-tight text-slate-800 text-xs leading-snug text-center max-w-full">
+                {activeTenant?.name || 'CoopApp'}
               </span>
-              <span className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-1">
+              <span className="text-[9px] text-slate-400 font-extrabold tracking-wider uppercase mt-1">
                 Portal Socios
               </span>
             </div>

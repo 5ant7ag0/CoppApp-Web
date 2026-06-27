@@ -4,11 +4,15 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { 
   TrendingUp, 
-  Calendar, 
   AlertCircle,
   X,
   CheckCircle2,
-  Download
+  Download,
+  Copy,
+  Wallet,
+  Coins,
+  Send,
+  CreditCard
 } from 'lucide-react';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -57,6 +61,8 @@ interface AmortizationCuota {
   estado: string;
 }
 
+
+
 export const Inicio: React.FC = () => {
   const { user } = useAuth();
   const { activeTenant } = useTenant();
@@ -66,11 +72,13 @@ export const Inicio: React.FC = () => {
   const [credits, setCredits] = useState<Credit[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]); // Últimas 5
   const [nextCuota, setNextCuota] = useState<AmortizationCuota | null>(null);
+  const [activeCreditCuotas, setActiveCreditCuotas] = useState<AmortizationCuota[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTxForReceipt, setSelectedTxForReceipt] = useState<Transaction | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [copiedText, setCopiedText] = useState<string | null>(null);
 
   const getFullAvatarUrl = (url: string | null) => {
     if (!url) return null;
@@ -140,11 +148,15 @@ export const Inicio: React.FC = () => {
       if (activeCredit) {
         const amortRes = await api.get(`/creditos/${activeCredit.id}/amortizacion`);
         const cuotas = amortRes.data as AmortizationCuota[];
+        setActiveCreditCuotas(cuotas);
         // Buscar la primera cuota pendiente o en mora
         const pending = cuotas.find(q => q.estado === 'PENDIENTE' || q.estado === 'EN_MORA');
         if (pending) {
           setNextCuota(pending);
         }
+      } else {
+        setActiveCreditCuotas([]);
+        setNextCuota(null);
       }
     } catch (err: any) {
       console.error('Error cargando posición consolidada:', err);
@@ -157,8 +169,6 @@ export const Inicio: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, []);
-
-
 
   const parseDescription = (desc: string) => {
     const ACCOUNT_NAMES: Record<string, string> = {
@@ -474,6 +484,32 @@ export const Inicio: React.FC = () => {
   const mainAccount = accounts.find(acc => acc.tipo === 'AHORRO_VISTA') || accounts[0];
   const activeCredit = credits.find(c => c.estado === 'DESEMBOLSADO');
 
+  // Filtrar cuentas: solo AHORRO_VISTA y APORTACIONES
+  const displayAccounts = accounts.filter(
+    acc => acc.tipo === 'AHORRO_VISTA' || acc.tipo === 'APORTACIONES'
+  );
+
+  // Calcular Saldo Total Disponible (suma de todas las cuentas AHORRO_VISTA activas)
+  const saldoTotalDisponible = accounts
+    .filter(acc => acc.tipo === 'AHORRO_VISTA' && acc.estado === 'ACTIVA')
+    .reduce((sum, acc) => sum + acc.saldo, 0);
+
+  // Calcular Saldo Deudor del crédito activo
+  const totalCapitalPagado = activeCreditCuotas.reduce((sum, q) => sum + (q.capitalPagado || 0), 0);
+  const saldoDeudor = activeCredit 
+    ? Math.max(0, (activeCredit.montoDesembolsado || activeCredit.montoSolicitado || 0) - totalCapitalPagado) 
+    : 0;
+
+  const getCreditHealth = (estado: string) => {
+    switch (estado) {
+      case 'EN_MORA':
+        return { label: 'En Mora', className: 'bg-rose-50 text-rose-700 border-rose-100' };
+      case 'DESEMBOLSADO':
+      default:
+        return { label: 'Al Día', className: 'bg-emerald-50 text-emerald-700 border-emerald-100' };
+    }
+  };
+
   return (
     <div className="space-y-6 md:space-y-8 animate-fade-in p-4 md:p-0">
       
@@ -507,111 +543,216 @@ export const Inicio: React.FC = () => {
         </div>
       )}
 
+      {/* Tarjeta de Resumen Ejecutivo: Saldo Total Disponible (Estética Apple/Stripe blanca con sombra suave) */}
+      <Card className="relative overflow-hidden rounded-[2rem] bg-white border border-slate-100 p-6 md:p-8 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.02)] flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Glow decoration sutil */}
+        <div className="absolute -right-10 -top-10 w-40 h-40 bg-slate-50 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
+          <div className="space-y-1">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block leading-none mb-1">
+              Saldo Total Disponible
+            </span>
+            <div className="text-3xl md:text-4xl font-extrabold tracking-tight leading-none text-slate-900 font-mono">
+              {formatCurrency(saldoTotalDisponible)}
+            </div>
+            <p className="text-slate-450 text-[11px] font-medium pt-1">
+              Consolidado de tus cuentas de ahorro a la vista activas
+            </p>
+          </div>
+          
+          <div className="h-12 w-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 self-start md:self-auto shadow-sm">
+            <Wallet className="h-6 w-6" />
+          </div>
+        </div>
+      </Card>
+
+      {/* Barra de Acciones Rápidas */}
+      <div className="grid grid-cols-3 gap-3 md:gap-4">
+        <Button
+          onClick={() => navigate('/socio/transferencias')}
+          className="flex flex-col md:flex-row items-center justify-center gap-2 h-16 md:h-12 bg-white hover:bg-slate-50 border border-slate-200 text-[#0054A6] font-bold rounded-2xl transition-all shadow-sm hover:shadow-md cursor-pointer text-xs"
+        >
+          <Send className="h-4 w-4 shrink-0 text-[#0054A6]" />
+          <span>Transferir</span>
+        </Button>
+        
+        <Button
+          onClick={() => navigate('/socio/inversiones')}
+          className="flex flex-col md:flex-row items-center justify-center gap-2 h-16 md:h-12 bg-white hover:bg-slate-50 border border-slate-200 text-emerald-650 font-bold rounded-2xl transition-all shadow-sm hover:shadow-md cursor-pointer text-xs"
+        >
+          <TrendingUp className="h-4 w-4 shrink-0 text-emerald-600" />
+          <span>Invertir</span>
+        </Button>
+
+        <Button
+          onClick={() => navigate('/socio/creditos')}
+          className="flex flex-col md:flex-row items-center justify-center gap-2 h-16 md:h-12 bg-white hover:bg-slate-50 border border-slate-200 text-amber-650 font-bold rounded-2xl transition-all shadow-sm hover:shadow-md cursor-pointer text-xs"
+        >
+          <CreditCard className="h-4 w-4 shrink-0 text-amber-500" />
+          <span>Pagar Crédito</span>
+        </Button>
+      </div>
+
       {/* Financial Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Card: Cuenta de Ahorro */}
-        {mainAccount ? (
-          <Card className="rounded-[2rem] border border-slate-100 bg-white p-6 md:p-8 shadow-[0_15px_40px_-10px_rgba(0,84,166,0.03)] flex flex-col justify-between min-h-[220px]">
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none">
-                  {mainAccount.tipo === 'AHORRO_VISTA' ? 'Ahorro a la Vista' : mainAccount.tipo}
-                </span>
-                <h3 className="text-sm font-bold text-slate-500">
-                  {mainAccount.numeroCuenta}
-                </h3>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 uppercase tracking-wider">
-                  {mainAccount.estado}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-8">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Saldo Disponible</span>
-              <span className="text-4xl md:text-5xl font-extrabold text-[#0054A6] tracking-tight">
-                {formatCurrency(mainAccount.saldo)}
-              </span>
-            </div>
-          </Card>
-        ) : (
-          <Card className="rounded-[2rem] border border-slate-100 bg-white p-8 shadow-sm flex flex-col items-center justify-center text-center text-slate-400 min-h-[220px]">
-            <AlertCircle className="h-8 w-8 mb-2" />
-            <p className="text-sm font-medium">No registras cuentas de ahorros activas.</p>
-          </Card>
-        )}
-
-        {/* Card: Crédito Activo */}
-        {activeCredit ? (
-          <Card className="rounded-[2rem] border border-slate-100 bg-white p-6 md:p-8 shadow-[0_15px_40px_-10px_rgba(0,84,166,0.03)] flex flex-col justify-between min-h-[220px]">
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none">
-                  Préstamo de Consumo
-                </span>
-                <h3 className="text-sm font-bold text-slate-500">
-                  {activeCredit.numeroCredito}
-                </h3>
-              </div>
-              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 uppercase tracking-wider">
-                {activeCredit.estado}
-              </span>
-            </div>
-
-            <div className="mt-6 flex items-end justify-between">
-              <div className="space-y-1">
-                {nextCuota ? (
-                  <>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block leading-none mb-1">
-                      Próxima Cuota (N° {nextCuota.numeroCuota})
+        {/* Column 1: Portafolio de Cuentas Financieras */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center mb-1">
+            <h2 className="text-xs font-black text-slate-455 uppercase tracking-widest block">Mis Cuentas</h2>
+            <span className="text-[10px] font-bold text-slate-400">{displayAccounts.length} producto{displayAccounts.length !== 1 ? 's' : ''}</span>
+          </div>
+          
+          <div className="space-y-4">
+            {displayAccounts.map((acc) => {
+              const borderLeftColor = 
+                acc.tipo === 'AHORRO_VISTA' ? 'border-l-[#0054A6]' :
+                acc.tipo === 'APORTACIONES' ? 'border-l-amber-500' : 'border-l-slate-350';
+              return (
+                <Card 
+                  key={acc.id} 
+                  className={`rounded-2xl border border-slate-100 border-l-4 ${borderLeftColor} bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex flex-col justify-between min-h-[135px] hover:shadow-md hover:border-slate-200/50 transition-all duration-300 group`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 leading-none mb-1">
+                        {acc.tipo === 'AHORRO_VISTA' && <Wallet className="h-3 w-3 text-[#0054A6]/75" />}
+                        {acc.tipo === 'APORTACIONES' && <Coins className="h-3 w-3 text-amber-600/75" />}
+                        {acc.tipo === 'AHORRO_VISTA' ? 'Ahorro a la Vista' : 
+                         acc.tipo === 'APORTACIONES' ? 'Aportaciones' : acc.tipo}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-slate-500">
+                        {/* Enmascaramiento de seguridad: muestra únicamente últimos 4 dígitos */}
+                        <span className="text-xs font-bold font-mono" title={acc.numeroCuenta}>
+                          **** {acc.numeroCuenta.slice(-4)}
+                        </span>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(acc.numeroCuenta);
+                            setCopiedText(acc.numeroCuenta);
+                            setTimeout(() => setCopiedText(null), 2000);
+                          }}
+                          className="p-1 rounded hover:bg-slate-50 hover:text-[#0054A6] text-slate-400 transition-colors cursor-pointer"
+                          title="Copiar número de cuenta completo"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </button>
+                        {copiedText === acc.numeroCuenta && (
+                          <span className="text-[9px] font-black text-emerald-600 ml-1 animate-fade-in">¡Copiado!</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
+                      acc.estado === 'ACTIVA' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-500 border border-slate-200'
+                    }`}>
+                      {acc.estado}
                     </span>
-                    <span className="text-3xl font-extrabold text-slate-800 tracking-tight leading-none">
-                      {formatCurrency(nextCuota.cuotaTotalProyectada)}
+                  </div>
+                  <div className="mt-4 flex justify-between items-end">
+                    <div>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Saldo Disponible</span>
+                      <span className="text-2xl font-black text-[#0054A6] tracking-tight font-mono">
+                        {formatCurrency(acc.saldo)}
+                      </span>
+                    </div>
+                    {acc.tasaInteresAnual > 0 && (
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                        {acc.tasaInteresAnual}% anual
+                      </span>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Column 2: Crédito Activo Reestructurado (Información Accionable) */}
+        <div className="space-y-4">
+          <div className="mb-1">
+            <h2 className="text-xs font-black text-slate-455 uppercase tracking-widest block">Mis Créditos</h2>
+          </div>
+          
+          {activeCredit ? (
+            <Card className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex flex-col justify-between min-h-[190px] hover:shadow-md hover:border-slate-200/50 transition-all duration-300">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block leading-none mb-1">
+                    Préstamo de Consumo
+                  </span>
+                  <h3 className="text-xs font-bold text-slate-500 font-mono">
+                    {activeCredit.numeroCredito}
+                  </h3>
+                </div>
+                {(() => {
+                  const health = getCreditHealth(activeCredit.estado);
+                  return (
+                    <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border ${health.className}`}>
+                      {health.label}
                     </span>
-                    <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-1 font-medium">
-                      <Calendar className="h-3.5 w-3.5" />
-                      Vence el {formatTxDate(nextCuota.fechaVencimiento).split(',')[0]}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Saldo Pendiente</span>
-                    <span className="text-3xl font-extrabold text-slate-800 tracking-tight">
-                      {formatCurrency(activeCredit.montoSolicitado)}
-                    </span>
-                  </>
-                )}
+                  );
+                })()}
               </div>
 
+              {/* Grid de Información Accionable */}
+              <div className="grid grid-cols-3 gap-2 border-t border-b border-slate-50 py-3 my-3 text-xs">
+                <div>
+                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Próximo Pago</span>
+                  <span className="font-extrabold text-slate-800 font-mono block">
+                    {nextCuota ? formatCurrency(nextCuota.cuotaTotalProyectada) : '$0.00'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Vencimiento</span>
+                  <span className="font-semibold text-slate-700 block">
+                    {nextCuota ? formatTxDate(nextCuota.fechaVencimiento).split(',')[0] : '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Saldo Deudor</span>
+                  <span className="font-extrabold text-[#0054A6] font-mono block">
+                    {formatCurrency(saldoDeudor)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Botones de Acción Rápidas */}
+              <div className="flex gap-2.5">
+                <Button
+                  onClick={() => navigate('/socio/creditos')}
+                  variant="outline"
+                  className="flex-1 border border-slate-200 text-slate-650 hover:bg-slate-50 font-bold rounded-xl h-9 transition-all cursor-pointer text-xs"
+                >
+                  Ver Detalle
+                </Button>
+                <Button
+                  onClick={() => navigate('/socio/creditos')}
+                  className="flex-1 bg-[#0054A6] hover:bg-[#004080] text-white font-bold rounded-xl h-9 transition-all cursor-pointer text-xs shadow-sm shadow-blue-500/10"
+                >
+                  Pagar Cuota
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <Card className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex flex-col justify-between min-h-[190px]">
+              <div className="flex flex-col items-center justify-center text-center flex-1 py-1">
+                <TrendingUp className="h-6 w-6 text-slate-350 mb-1.5" />
+                <h3 className="text-xs font-bold text-slate-700">Sin Créditos Activos</h3>
+                <p className="text-[10px] text-slate-400 max-w-[240px] mt-0.5 leading-relaxed">
+                  ¿Necesitas financiamiento? Simula un crédito y solicita tu préstamo de forma rápida.
+                </p>
+              </div>
               <Button
                 onClick={() => navigate('/socio/creditos')}
                 variant="outline"
-                className="border border-slate-200 text-[#0054A6] hover:bg-slate-50 font-bold rounded-2xl h-10 px-4 transition-all cursor-pointer text-xs"
+                className="border border-slate-200 text-[#0054A6] hover:bg-slate-50 font-bold rounded-xl h-9 w-full transition-all cursor-pointer text-xs mt-3"
               >
-                Ver Tabla
+                Simular Crédito
               </Button>
-            </div>
-          </Card>
-        ) : (
-          <Card className="rounded-[2rem] border border-slate-100 bg-white p-6 md:p-8 shadow-[0_15px_40px_-10px_rgba(0,84,166,0.03)] flex flex-col justify-between min-h-[220px]">
-            <div className="flex flex-col items-center justify-center text-center flex-1">
-              <TrendingUp className="h-8 w-8 text-slate-300 mb-2" />
-              <h3 className="text-sm font-bold text-slate-700">Sin Créditos Activos</h3>
-              <p className="text-xs text-slate-400 max-w-[240px] mt-1 leading-relaxed">
-                ¿Necesitas financiamiento? Simula un crédito y solicita un préstamo rápido.
-              </p>
-            </div>
-            <Button
-              onClick={() => navigate('/socio/creditos')}
-              variant="outline"
-              className="border border-slate-200 text-[#0054A6] hover:bg-slate-50 font-bold rounded-2xl h-10 w-full transition-all cursor-pointer text-xs"
-            >
-              Simular Crédito
-            </Button>
-          </Card>
-        )}
+            </Card>
+          )}
+        </div>
       </div>
 
       {/* Historial de Movimientos Recientes */}

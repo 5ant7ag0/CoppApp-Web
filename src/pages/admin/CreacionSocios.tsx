@@ -8,7 +8,9 @@ import {
   User, MapPin, Briefcase, DollarSign, FileText, 
   UploadCloud, CheckCircle2, AlertTriangle, Trash2, 
   Plus, ArrowRight, ArrowLeft, Check, Loader2, Users,
-  Mail, Phone, Calendar, Heart, Search, Printer, X, Pencil
+  Mail, Phone, Calendar, Heart, Search, Printer, X, Pencil, Eye,
+  CreditCard, ArrowRightLeft, Copy, Circle, AlertCircle, Download, Lock,
+  FolderOpen
 } from 'lucide-react';
 
 interface Beneficiario {
@@ -92,6 +94,8 @@ export const CreacionSocios: React.FC = () => {
   const [loadingCuentas, setLoadingCuentas] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [showSuccessToast, setShowSuccessToast] = useState<boolean>(false);
+  const [cargandoDocType, setCargandoDocType] = useState<'cedula-frontal' | 'cedula-posterior' | 'firma' | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; title: string } | null>(null);
 
   // Estados de edición de Socio (KYC)
   const [editDireccion, setEditDireccion] = useState<string>('');
@@ -102,7 +106,30 @@ export const CreacionSocios: React.FC = () => {
   const [editIngresosMensuales, setEditIngresosMensuales] = useState<string>('0');
   const [editGastosMensuales, setEditGastosMensuales] = useState<string>('0');
   const [editDeudasActuales, setEditDeudasActuales] = useState<string>('0');
+  const [editNombresCompletos, setEditNombresCompletos] = useState<string>('');
+  const [editEstadoCivil, setEditEstadoCivil] = useState<string>('SOLTERO');
+  const [editProfesion, setEditProfesion] = useState<string>('');
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+
+  // Estados para Navegación 360 y Módulo de Apertura de Cuentas / Créditos
+  const [activeDetailTab, setActiveDetailTab] = useState<'perfil' | 'cuentas' | 'creditos' | 'transacciones'>('perfil');
+  const [creditosSocio, setCreditosSocio] = useState<any[]>([]);
+  const [loadingCreditos, setLoadingCreditos] = useState<boolean>(false);
+  const [transaccionesSocio, setTransaccionesSocio] = useState<any[]>([]);
+  const [loadingTransacciones, setLoadingTransacciones] = useState<boolean>(false);
+  const [filtroCuentaTx, setFiltroCuentaTx] = useState<string>('TODAS');
+  const [isAperturaModalOpen, setIsAperturaModalOpen] = useState<boolean>(false);
+  const [productosAhorro, setProductosAhorro] = useState<any[]>([]);
+  const [selectedProductoId, setSelectedProductoId] = useState<number | ''>('');
+  const [montoInicialApertura, setMontoInicialApertura] = useState<string>('0');
+  const [fondearInmediatamente, setFondearInmediatamente] = useState<boolean>(false);
+  const [aperturaError, setAperturaError] = useState<string | null>(null);
+  const [cargandoApertura, setCargandoApertura] = useState<boolean>(false);
+  const [copiedCtaId, setCopiedCtaId] = useState<number | null>(null);
+  const [expandedCreditId, setExpandedCreditId] = useState<number | null>(null);
+  const [filtroTxBuscar, setFiltroTxBuscar] = useState<string>('');
+  const [filtroTxFechaDesde, setFiltroTxFechaDesde] = useState<string>('');
+  const [filtroTxFechaHasta, setFiltroTxFechaHasta] = useState<string>('');
 
   // Algoritmo de validación de Cédula Ecuatoriana (Módulo 10)
   const validarCedulaEcuatoriana = (ced: string): boolean => {
@@ -137,6 +164,7 @@ export const CreacionSocios: React.FC = () => {
       setCargoPep('');
     }
   }, [esPep]);
+
 
   // Validaciones en tiempo real para el Paso 1
   useEffect(() => {
@@ -574,6 +602,335 @@ export const CreacionSocios: React.FC = () => {
     doc.save(`ficha_kyc_${socio.identificacion}.pdf`);
   };
 
+  // Descarga la tabla de amortización en PDF usando jsPDF y autoTable
+  const descargarAmortizacionPdf = (cred: any, socio: any) => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const margin = 15;
+    const pageWidth = 210;
+    let currentY = 15;
+
+    // Header
+    doc.setFillColor(0, 84, 166);
+    doc.rect(margin, currentY, pageWidth - 2 * margin, 2, 'F');
+    currentY += 8;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(0, 84, 166);
+    doc.text("COOPERATIVA DE AHORRO Y CRÉDITO ITQ LTDA.", margin, currentY);
+
+    currentY += 5;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(26, 26, 26);
+    doc.text("TABLA DE AMORTIZACIÓN Y CRONOGRAMA DE PAGOS", margin, currentY);
+
+    currentY += 3;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+
+    // Socio and Credit details
+    currentY += 8;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(0, 84, 166);
+    doc.text("DETALLES DEL SOCIO Y CRÉDITO", margin, currentY);
+    currentY += 2;
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+
+    currentY += 6;
+    
+    // Rows of details helper
+    const drawRow = (l1: string, v1: string, l2: string, v2: string, y: number) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(l1 + ":", margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(26, 26, 26);
+      doc.text(v1, margin + 30, y);
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 116, 139);
+      doc.text(l2 + ":", 110, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(26, 26, 26);
+      doc.text(v2, 110 + 32, y);
+    };
+
+    drawRow("Socio", socio.nombresCompletos, "Identificación", socio.identificacion, currentY);
+    currentY += 5;
+    drawRow("Nº Crédito", cred.numeroCredito, "Fecha Solicitud", cred.fechaSolicitud ? new Date(cred.fechaSolicitud).toLocaleDateString('es-EC') : 'N/A', currentY);
+    currentY += 5;
+    drawRow("Monto Solicitado", `$${parseFloat(cred.montoSolicitado || 0).toFixed(2)}`, "Plazo", `${cred.plazoMeses} meses`, currentY);
+    currentY += 5;
+    const totalCapitalPagado = cred.cuotas ? cred.cuotas.reduce((sum: number, cuota: any) => sum + parseFloat(cuota.capitalPagado || 0), 0) : 0;
+    const saldoDeudor = cred.estado === 'DESEMBOLSADO' || cred.estado === 'EN_MORA'
+      ? Math.max(0, parseFloat(cred.montoDesembolsado || 0) - totalCapitalPagado)
+      : 0;
+    drawRow("Saldo Deudor", `$${saldoDeudor.toFixed(2)}`, "Tipo Amortización", cred.tipoAmortizacion || 'FRANCES', currentY);
+    currentY += 5;
+    drawRow("Tasa Interés", `${parseFloat(cred.tasaInteresAnual || 0).toFixed(2)}% Anual`, "Estado Crédito", cred.estado, currentY);
+
+    currentY += 8;
+
+    // Build amortization table body
+    let runningBalance = parseFloat(cred.montoDesembolsado || cred.montoSolicitado || 0);
+    const cuotasOrdenadas = cred.cuotas ? [...cred.cuotas].sort((a, b) => a.numeroCuota - b.numeroCuota).map((cuota) => {
+      runningBalance = runningBalance - parseFloat(cuota.capitalProyectado || 0);
+      return {
+        ...cuota,
+        saldoRestante: Math.max(0, runningBalance)
+      };
+    }) : [];
+
+    const tableBody = cuotasOrdenadas.map((cuota: any) => {
+      const totalCuota = parseFloat(cuota.cuotaTotalProyectada || (parseFloat(cuota.capitalProyectado || 0) + parseFloat(cuota.interesProyectado || 0)));
+      return [
+        `Cuota #${cuota.numeroCuota}`,
+        cuota.fechaVencimiento ? new Date(cuota.fechaVencimiento).toLocaleDateString('es-EC') : 'N/A',
+        `$${parseFloat(cuota.capitalProyectado || 0).toFixed(2)}`,
+        `$${parseFloat(cuota.interesProyectado || 0).toFixed(2)}`,
+        `$${totalCuota.toFixed(2)}`,
+        `$${cuota.saldoRestante.toFixed(2)}`,
+        cuota.estado
+      ];
+    });
+
+    autoTable(doc, {
+      startY: currentY,
+      margin: { left: margin, right: margin },
+      head: [['Cuota', 'Vencimiento', 'Capital', 'Interés', 'Total Cuota', 'Saldo Restante', 'Estado']],
+      body: tableBody,
+      theme: 'grid',
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+        valign: 'middle'
+      },
+      headStyles: {
+        fillColor: [0, 84, 166],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold'
+      },
+      didDrawPage: (data) => {
+        currentY = data.cursor ? data.cursor.y : currentY + 15;
+      }
+    });
+
+    // Signature line at bottom
+    currentY += 20;
+    if (currentY > 260) {
+      doc.addPage();
+      currentY = 30;
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text("Este documento es una copia digital de la tabla de amortización correspondiente al crédito indicado.", margin, currentY);
+
+    doc.save(`tabla_amortizacion_${cred.numeroCredito}.pdf`);
+  };
+
+  // Descarga el pagaré digital en PDF usando jsPDF
+  const descargarPagarePdf = (cred: any, socio: any) => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const margin = 20;
+    const pageWidth = 210;
+    let currentY = 20;
+
+    // Header
+    doc.setFillColor(0, 84, 166);
+    doc.rect(margin, currentY, pageWidth - 2 * margin, 2, 'F');
+    currentY += 10;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(0, 84, 166);
+    doc.text("COOPERATIVA DE AHORRO Y CRÉDITO ITQ LTDA.", margin, currentY);
+
+    currentY += 6;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(26, 26, 26);
+    doc.text(`PAGARÉ A LA ORDEN - OPERACIÓN Nº ${cred.numeroCredito}`, margin, currentY);
+
+    currentY += 4;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+
+    currentY += 10;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.setTextColor(26, 26, 26);
+    doc.text(`MONTO: $${parseFloat(cred.montoSolicitado || 0).toLocaleString('es-EC', { minimumFractionDigits: 2 })} USD`, margin, currentY);
+    
+    const fechaLetras = new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric' });
+    doc.text(`FECHA DE EMISIÓN: Quito, D.M., ${fechaLetras}`, 110, currentY);
+
+    currentY += 12;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
+    
+    const textoPagare = `Por el presente PAGARÉ A LA ORDEN, yo, ${socio.nombresCompletos}, portador de la identificación nº ${socio.identificacion}, en mi calidad de DEUDOR PRINCIPAL, me obligo a pagar incondicional e irrevocablemente a la orden de la COOPERATIVA DE AHORRO Y CRÉDITO ITQ LTDA., en sus oficinas de esta ciudad de Quito, la cantidad de $${parseFloat(cred.montoSolicitado || 0).toFixed(2)} USD (DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA), más los intereses generados a la tasa del ${parseFloat(cred.tasaInteresAnual || 0).toFixed(2)}% anual.\n\n` +
+      `Este valor será cancelado en el plazo de ${cred.plazoMeses} meses, mediante cuotas consecutivas mensuales de acuerdo con la tabla de amortización adjunta a este título valor.\n\n` +
+      `En caso de mora en el pago de una o más cuotas de capital o intereses, la cooperativa queda facultada para declarar vencida y exigible la totalidad de la obligación pendiente de pago y demandar por la vía coactiva o ejecutiva el saldo total deudor. El deudor acepta que el interés de mora sea cobrado a la tasa máxima permitida por la ley vigente al momento de la mora.\n\n` +
+      `Para todos los efectos legales que se deriven de este pagaré, el deudor renuncia a fuero y domicilio, y se somete expresamente a los jueces y tribunales de la ciudad de Quito. Expresamente se exime a la cooperativa del protesto y de la presentación para el pago de este pagaré.`;
+
+    // Split text to fit page
+    const textLines = doc.splitTextToSize(textoPagare, pageWidth - 2 * margin);
+    doc.text(textLines, margin, currentY);
+    
+    // Calculate new currentY based on number of text lines
+    currentY += textLines.length * 5 + 15;
+
+    if (currentY > 230) {
+      doc.addPage();
+      currentY = 30;
+    }
+
+    // Signature area
+    doc.setDrawColor(148, 163, 184);
+    doc.line(margin + 10, currentY, margin + 70, currentY);
+    doc.line(pageWidth - margin - 70, currentY, pageWidth - margin - 10, currentY);
+    
+    currentY += 5;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(26, 26, 26);
+    doc.text("DEUDOR PRINCIPAL", margin + 22, currentY);
+    doc.text("REPRESENTANTE LEGAL COOP ITQ", pageWidth - margin - 58, currentY);
+
+    currentY += 4;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Firma: ________________________`, margin + 15, currentY);
+    doc.text(`Firma: ________________________`, pageWidth - margin - 65, currentY);
+
+    currentY += 4;
+    doc.text(`Identificación: ${socio.identificacion}`, margin + 15, currentY);
+    doc.text(`Nombre: ${socio.nombresCompletos}`, margin + 15, currentY);
+
+    doc.save(`pagare_operacion_${cred.numeroCredito}.pdf`);
+  };
+
+  // Exporta el historial de transacciones filtradas a un PDF
+  const exportarTransaccionesPdf = (filtradas: any[], socio: any, cuentaSeleccionada: string) => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const margin = 15;
+    const pageWidth = 210;
+    let currentY = 15;
+
+    // Header
+    doc.setFillColor(0, 84, 166);
+    doc.rect(margin, currentY, pageWidth - 2 * margin, 2, 'F');
+    currentY += 8;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(0, 84, 166);
+    doc.text("COOPERATIVA DE AHORRO Y CRÉDITO ITQ LTDA.", margin, currentY);
+
+    currentY += 5;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(26, 26, 26);
+    doc.text("ESTADO DE CUENTA / HISTORIAL DE TRANSACCIONES", margin, currentY);
+
+    currentY += 3;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+
+    // Socio details
+    currentY += 8;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(0, 84, 166);
+    doc.text("INFORMACIÓN DEL SOCIO", margin, currentY);
+    currentY += 2;
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+
+    currentY += 6;
+    
+    // Draw rows of details helper
+    const drawRow = (l1: string, v1: string, l2: string, v2: string, y: number) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(l1 + ":", margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(26, 26, 26);
+      doc.text(v1, margin + 30, y);
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 116, 139);
+      doc.text(l2 + ":", 110, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(26, 26, 26);
+      doc.text(v2, 110 + 32, y);
+    };
+
+    drawRow("Socio", socio.nombresCompletos, "Identificación", socio.identificacion, currentY);
+    currentY += 5;
+    drawRow("Cuenta Filtrada", cuentaSeleccionada, "Fecha Generación", new Date().toLocaleString('es-EC'), currentY);
+    
+    currentY += 8;
+
+    // Table body
+    const tableBody = filtradas.map((tx: any) => {
+      const esCredito = tx.tipoTransaccion === 'CREDITO';
+      return [
+        tx.fechaContable ? new Date(tx.fechaContable).toLocaleString('es-EC') : 'N/A',
+        tx.numeroCuenta || 'N/A',
+        esCredito ? 'DEPÓSITO' : 'RETIRO',
+        `${esCredito ? '+' : '-'}$${parseFloat(tx.monto || 0).toFixed(2)}`,
+        `$${parseFloat(tx.saldoResultante || 0).toFixed(2)}`,
+        `${tx.descripcion || ''} (Ref: ${tx.referencia || ''})`
+      ];
+    });
+
+    autoTable(doc, {
+      startY: currentY,
+      margin: { left: margin, right: margin },
+      head: [['Fecha y Hora', 'Cuenta', 'Tipo', 'Monto', 'Saldo Resultante', 'Concepto / Referencia']],
+      body: tableBody,
+      theme: 'grid',
+      styles: {
+        fontSize: 7.5,
+        cellPadding: 2,
+        valign: 'middle'
+      },
+      headStyles: {
+        fillColor: [0, 84, 166],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold'
+      },
+      didDrawPage: (data) => {
+        currentY = data.cursor ? data.cursor.y : currentY + 15;
+      }
+    });
+
+    doc.save(`estado_cuenta_${socio.identificacion}.pdf`);
+  };
+
   // Imprimir KYC de socio nuevo (desde modal)
   const handleDownloadKycNuevo = () => {
     if (!socioCreadoInfo) return;
@@ -613,6 +970,43 @@ export const CreacionSocios: React.FC = () => {
     generarFichaKycPdf(tempSocio, tempAccounts, beneficiarios, cargoPep);
   };
 
+  const fetchTransaccionesSocio = async (cuentas: any[]) => {
+    setLoadingTransacciones(true);
+    setTransaccionesSocio([]);
+    setFiltroCuentaTx('TODAS');
+    if (!cuentas || cuentas.length === 0) {
+      setLoadingTransacciones(false);
+      return;
+    }
+    try {
+      const allTransactionsList: any[] = [];
+      for (const account of cuentas) {
+        try {
+          const txRes = await api.get(`/cuentas/${account.id}/transacciones`);
+          const txsWithAccount = txRes.data.map((tx: any) => ({
+            ...tx,
+            numeroCuenta: account.numeroCuenta,
+            tipoCuenta: account.tipo
+          }));
+          allTransactionsList.push(...txsWithAccount);
+        } catch (txErr) {
+          console.error(`Error al consultar transacciones para la cuenta ${account.id}:`, txErr);
+        }
+      }
+      // Ordenar por fechaContable desc
+      allTransactionsList.sort((a, b) => {
+        const dateA = a.fechaContable ? new Date(a.fechaContable).getTime() : 0;
+        const dateB = b.fechaContable ? new Date(b.fechaContable).getTime() : 0;
+        return dateB - dateA;
+      });
+      setTransaccionesSocio(allTransactionsList);
+    } catch (err) {
+      console.error('Error al consultar transacciones del socio:', err);
+    } finally {
+      setLoadingTransacciones(false);
+    }
+  };
+
   const handleVerDetalle = async (socio: any) => {
     setSelectedSocio(socio);
     setIsEditing(false);
@@ -629,16 +1023,38 @@ export const CreacionSocios: React.FC = () => {
     setEditIngresosMensuales(socio.ingresosMensuales.toString());
     setEditGastosMensuales(socio.gastosMensuales.toString());
     setEditDeudasActuales(socio.deudasActuales.toString());
+    setEditNombresCompletos(socio.nombresCompletos);
+    setEditEstadoCivil(socio.estadoCivil || 'SOLTERO');
+    setEditProfesion(socio.profesion || '');
     setEditErrors({});
+    setActiveDetailTab('perfil');
+    setCreditosSocio([]);
+    setLoadingCreditos(true);
+    setTransaccionesSocio([]);
+    setLoadingTransacciones(true);
 
+    let fetchedCuentas: any[] = [];
     try {
       const res = await api.get(`/cuentas/socio/${socio.id}`);
-      setCuentasSocio(res.data);
+      fetchedCuentas = res.data;
+      setCuentasSocio(fetchedCuentas);
     } catch (err) {
       console.error('Error al consultar cuentas del socio:', err);
     } finally {
       setLoadingCuentas(false);
     }
+
+    try {
+      const resCred = await api.get(`/creditos/socio/${socio.id}`);
+      setCreditosSocio(resCred.data);
+    } catch (err) {
+      console.error('Error al consultar créditos del socio:', err);
+    } finally {
+      setLoadingCreditos(false);
+    }
+
+    // Fetch transactions using the fetched accounts list
+    await fetchTransaccionesSocio(fetchedCuentas);
   };
 
   const handleGuardarCambios = async () => {
@@ -646,9 +1062,11 @@ export const CreacionSocios: React.FC = () => {
     
     // Validaciones en caliente para los campos editados
     const errs: Record<string, string> = {};
+    if (!editNombresCompletos.trim()) errs.nombresCompletos = 'Nombres completos son obligatorios';
     if (!editDireccion.trim()) errs.direccion = 'La dirección es obligatoria';
     if (!editTelefono || !/^09\d{8}$/.test(editTelefono)) errs.telefono = 'Celular ecuatoriano inválido';
     if (!editCorreo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editCorreo)) errs.correo = 'Correo electrónico inválido';
+    if (!editProfesion.trim()) errs.profesion = 'La profesión es obligatoria';
     
     if (editActividadEconomica !== 'ESTUDIANTE' && editActividadEconomica !== 'DESEMPLEADO' && !editLugarTrabajo.trim()) {
       errs.lugarTrabajo = 'El lugar de trabajo es obligatorio';
@@ -671,7 +1089,7 @@ export const CreacionSocios: React.FC = () => {
       const payload = {
         tipoIdentificacion: selectedSocio.tipoIdentificacion,
         identificacion: selectedSocio.identificacion,
-        nombresCompletos: selectedSocio.nombresCompletos,
+        nombresCompletos: editNombresCompletos.trim(),
         direccion: editDireccion.trim(),
         telefono: editTelefono,
         correo: editCorreo.trim(),
@@ -684,7 +1102,9 @@ export const CreacionSocios: React.FC = () => {
         fotoCedulaFrontalUrl: selectedSocio.fotoCedulaFrontalUrl,
         fotoCedulaPosteriorUrl: selectedSocio.fotoCedulaPosteriorUrl,
         esPep: selectedSocio.esPep,
-        estado: selectedSocio.estado
+        estado: selectedSocio.estado,
+        estadoCivil: editEstadoCivil,
+        profesion: editProfesion.trim()
       };
 
       const res = await api.put(`/socios/${selectedSocio.id}`, payload);
@@ -725,6 +1145,123 @@ export const CreacionSocios: React.FC = () => {
     } catch (err: any) {
       console.error('Error al consultar cuentas para reimpresión:', err);
       alert('No se pudieron recuperar las cuentas asociadas para generar la Ficha KYC.');
+    }
+  };
+
+  // Subir documentos KYC (Cédula Frontal, Posterior, Firma) de manera asíncrona
+  const handleUploadDocument = async (docType: 'cedula-frontal' | 'cedula-posterior' | 'firma', file: File) => {
+    if (!selectedSocio) return;
+    setCargandoDocType(docType);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const res = await api.post(`/socios/${selectedSocio.id}/${docType}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      const updatedSocio = { ...selectedSocio };
+      if (docType === 'cedula-frontal') {
+        updatedSocio.fotoCedulaFrontalUrl = res.data.fotoCedulaFrontalUrl;
+      } else if (docType === 'cedula-posterior') {
+        updatedSocio.fotoCedulaPosteriorUrl = res.data.fotoCedulaPosteriorUrl;
+      } else if (docType === 'firma') {
+        updatedSocio.firmaUrl = res.data.firmaUrl;
+      }
+      
+      setSelectedSocio(updatedSocio);
+      setSociosList((prev) => 
+        prev.map((s) => (s.id === selectedSocio.id ? updatedSocio : s))
+      );
+      
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 3000);
+    } catch (err: any) {
+      console.error('Error al subir documento KYC:', err);
+      alert('Error al subir el documento: ' + (err.response?.data || err.message));
+    } finally {
+      setCargandoDocType(null);
+    }
+  };
+
+  const handleAbrirAperturaModal = async () => {
+    setAperturaError(null);
+    setMontoInicialApertura('0');
+    setSelectedProductoId('');
+    setFondearInmediatamente(false);
+    try {
+      const res = await api.get('/productos-ahorro/activos');
+      setProductosAhorro(res.data);
+      setIsAperturaModalOpen(true);
+    } catch (err: any) {
+      console.error('Error al cargar productos de ahorro activos:', err);
+      setProductosAhorro([]);
+      setIsAperturaModalOpen(true);
+    }
+  };
+
+  const handleAperturarCuentaSubmit = async () => {
+    if (!selectedSocio || !selectedProductoId) {
+      setAperturaError('Debe seleccionar un producto de ahorro.');
+      return;
+    }
+
+    let monto = 0;
+    if (fondearInmediatamente) {
+      monto = parseFloat(montoInicialApertura);
+      if (isNaN(monto) || monto <= 0) {
+        setAperturaError('El monto inicial de fondeo debe ser mayor a cero.');
+        return;
+      }
+
+      const prodSeleccionado = productosAhorro.find((p) => p.id === Number(selectedProductoId));
+      if (prodSeleccionado && monto < parseFloat(prodSeleccionado.montoMinimoApertura)) {
+        setAperturaError(`El monto mínimo de apertura para este producto es $${parseFloat(prodSeleccionado.montoMinimoApertura).toFixed(2)}`);
+        return;
+      }
+
+      const cuentaVista = cuentasSocio.find(c => c.tipo === 'AHORRO_VISTA' && c.estado === 'ACTIVA');
+      if (!cuentaVista) {
+        setAperturaError('El socio no posee una cuenta de ahorros a la vista activa para realizar el fondeo.');
+        return;
+      }
+      if (parseFloat(cuentaVista.saldo) < monto) {
+        setAperturaError(`Saldo insuficiente en la cuenta de ahorros a la vista ($${parseFloat(cuentaVista.saldo).toFixed(2)}).`);
+        return;
+      }
+    }
+
+    setCargandoApertura(true);
+    setAperturaError(null);
+    try {
+      const payload = {
+        socioId: selectedSocio.id,
+        productoAhorroId: Number(selectedProductoId),
+        montoInicial: monto,
+        medioFondeo: 'TRANSFERENCIA'
+      };
+      const res = await api.post('/cuentas/aperturar', payload);
+      const nuevaCta = res.data;
+      
+      // Si se hizo un fondeo por transferencia, recargar el portafolio completo del socio para refrescar saldos
+      if (monto > 0) {
+        const resCuentas = await api.get(`/cuentas/socio/${selectedSocio.id}`);
+        setCuentasSocio(resCuentas.data);
+      } else {
+        setCuentasSocio((prev) => [...prev, { ...nuevaCta, saldo: 0 }]); // Asegurar formato de saldo para mostrar
+      }
+      
+      setIsAperturaModalOpen(false);
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 3000);
+    } catch (err: any) {
+      console.error('Error al aperturar cuenta:', err);
+      const errMsg = err.response?.data || 'Error interno al aperturar cuenta. Verifique el saldo de la cuenta de origen.';
+      setAperturaError(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg));
+    } finally {
+      setCargandoApertura(false);
     }
   };
 
@@ -905,8 +1442,84 @@ export const CreacionSocios: React.FC = () => {
     editLugarTrabajo.trim() !== (selectedSocio.lugarTrabajo || '').trim() ||
     (parseFloat(editIngresosMensuales) || 0) !== (parseFloat(selectedSocio.ingresosMensuales) || 0) ||
     (parseFloat(editGastosMensuales) || 0) !== (parseFloat(selectedSocio.gastosMensuales) || 0) ||
-    (parseFloat(editDeudasActuales) || 0) !== (parseFloat(selectedSocio.deudasActuales) || 0)
+    (parseFloat(editDeudasActuales) || 0) !== (parseFloat(selectedSocio.deudasActuales) || 0) ||
+    editNombresCompletos.trim() !== (selectedSocio.nombresCompletos || '').trim() ||
+    editEstadoCivil !== (selectedSocio.estadoCivil || 'SOLTERO') ||
+    editProfesion.trim() !== (selectedSocio.profesion || '').trim()
   );
+
+  // Helper to map credit state to a semantic badge
+  const getEstadoCreditoBadge = (estado: string) => {
+    switch (estado) {
+      case 'DESEMBOLSADO':
+        return {
+          label: 'AL DÍA',
+          classes: 'text-emerald-700 bg-emerald-50 border border-emerald-100'
+        };
+      case 'EN_MORA':
+        return {
+          label: 'EN MORA',
+          classes: 'text-rose-700 bg-rose-50 border border-rose-100 font-bold'
+        };
+      case 'CANCELADO':
+        return {
+          label: 'LIQUIDADO',
+          classes: 'text-slate-500 bg-slate-50 border border-slate-200'
+        };
+      case 'SOLICITADO':
+        return {
+          label: 'SOLICITADO',
+          classes: 'text-amber-700 bg-amber-50 border border-amber-100'
+        };
+      case 'EN_REVISION':
+        return {
+          label: 'EN REVISIÓN',
+          classes: 'text-blue-700 bg-blue-50 border border-blue-100'
+        };
+      case 'APROBADO':
+        return {
+          label: 'APROBADO',
+          classes: 'text-cyan-700 bg-cyan-50 border border-cyan-100'
+        };
+      case 'RECHAZADO':
+        return {
+          label: 'RECHAZADO',
+          classes: 'text-slate-500 bg-slate-100 border border-slate-200'
+        };
+      default:
+        return {
+          label: estado,
+          classes: 'text-slate-700 bg-slate-50 border border-slate-200'
+        };
+    }
+  };
+
+  // Helper to get next due cuota's details
+  const obtenerProximoVencimiento = (cred: any) => {
+    if (!cred.cuotas || cred.cuotas.length === 0) return { fecha: 'N/A', monto: 0 };
+    
+    // Sort cuotas by numeroCuota
+    const cuotasOrdenadas = [...cred.cuotas].sort((a, b) => a.numeroCuota - b.numeroCuota);
+    
+    // Find first unpaid cuota (PENDIENTE or EN_MORA)
+    const proxima = cuotasOrdenadas.find((c: any) => c.estado === 'PENDIENTE' || c.estado === 'EN_MORA');
+    
+    if (!proxima) {
+      return { fecha: 'N/A', monto: 0 };
+    }
+    
+    // Remaining amount for this cuota: projected + mora - paid
+    const totalProyectado = parseFloat(proxima.cuotaTotalProyectada || (parseFloat(proxima.capitalProyectado || 0) + parseFloat(proxima.interesProyectado || 0)));
+    const totalMora = parseFloat(proxima.montoMoraAcumulado || 0);
+    const totalPagado = parseFloat(proxima.capitalPagado || 0) + parseFloat(proxima.interesPagado || 0) + parseFloat(proxima.montoMoraPagado || 0);
+    
+    const montoPendiente = Math.max(0, (totalProyectado + totalMora) - totalPagado);
+    
+    return {
+      fecha: proxima.fechaVencimiento ? new Date(proxima.fechaVencimiento).toLocaleDateString('es-EC') : 'N/A',
+      monto: montoPendiente
+    };
+  };
 
   return (
     <div className="w-full py-4 select-none animate-fade-in text-left">
@@ -1978,7 +2591,7 @@ export const CreacionSocios: React.FC = () => {
       {/* Modal de Detalle, Portafolio y Mantenimiento KYC */}
       {isDetailModalOpen && selectedSocio && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-md p-4 overflow-y-auto no-print">
-          <div className="w-full max-w-4xl bg-white shadow-2xl border border-slate-100 rounded-[2rem] p-6 relative animate-scale-up text-left max-h-[90vh] overflow-y-auto">
+          <div className="w-full md:w-[90vw] max-w-6xl bg-white shadow-2xl border border-slate-100 rounded-[2rem] p-6 relative animate-scale-up text-left max-h-[90vh] overflow-y-auto">
             
             {/* Mensaje de Confirmación Sutil */}
             {showSuccessToast && (
@@ -1996,51 +2609,76 @@ export const CreacionSocios: React.FC = () => {
               <X className="h-5 w-5" />
             </button>
 
+            {/* Texto de Cabecera Centrado y Sutil */}
+            <div className="text-center w-full mb-3 select-none">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
+                Mantenimiento y Portafolio del Socio
+              </span>
+            </div>
+
             {/* Cabecera del Modal */}
             <div className="border-b border-slate-100 pb-4 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pr-10">
-              <div>
-                <span className="text-[9px] font-black text-[#0054A6] bg-blue-50 border border-blue-100/30 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                  Mantenimiento y Portafolio del Socio
-                </span>
-                <h3 className="text-lg font-black text-slate-800 tracking-tight mt-1.5 uppercase">
-                  {selectedSocio.nombresCompletos}
-                </h3>
-                <p className="text-xs text-slate-400 font-semibold mt-0.5">
-                  Identificación: <span className="font-bold font-mono">{selectedSocio.identificacion}</span>
-                </p>
+              <div className="flex items-center gap-4">
+                {/* Foto de Perfil del Socio (Avatar) */}
+                <div className="h-16 w-16 rounded-full border border-slate-100 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                  {selectedSocio.fotoPerfilUrl ? (
+                    <img 
+                      src={`http://localhost:8080/api/v1${selectedSocio.fotoPerfilUrl}`} 
+                      alt="Foto de Perfil" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-[#0054A6]/10 text-[#0054A6] flex items-center justify-center font-black text-xl">
+                      {selectedSocio.nombresCompletos ? selectedSocio.nombresCompletos.charAt(0).toUpperCase() : 'S'}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-black text-slate-800 tracking-tight uppercase leading-none">
+                    {selectedSocio.nombresCompletos}
+                  </h3>
+                  <span className="text-xs text-slate-400 font-bold font-mono mt-1.5 block">
+                    {selectedSocio.identificacion}
+                  </span>
+                </div>
               </div>
 
               {/* Botonera de Acciones en Cabecera */}
               <div className="flex items-center gap-2">
-                {!isEditing ? (
-                  <Button
-                    onClick={() => setIsEditing(true)}
-                    variant="outline"
-                    className="border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl h-8.5 px-3 transition-all flex items-center gap-1 cursor-pointer text-xs"
-                  >
-                    <Pencil className="h-3 w-3 text-[#0054A6]" />
-                    Editar Datos
-                  </Button>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => setIsEditing(false)}
-                      variant="outline"
-                      className="border-slate-200 hover:bg-slate-50 text-slate-600 font-bold rounded-xl h-8.5 px-3 transition-all text-xs cursor-pointer"
-                    >
-                      Cancelar
-                    </Button>
-                    {tieneCambios && (
+                {activeDetailTab === 'perfil' && (
+                  <>
+                    {!isEditing ? (
                       <Button
-                        onClick={handleGuardarCambios}
-                        disabled={cargando}
-                        className="bg-[#0054A6] hover:bg-[#004080] text-white font-bold rounded-xl h-8.5 px-3.5 transition-all flex items-center gap-1.5 text-xs cursor-pointer disabled:opacity-50"
+                        onClick={() => setIsEditing(true)}
+                        variant="outline"
+                        className="border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl h-8.5 px-3 transition-all flex items-center gap-1 cursor-pointer text-xs"
                       >
-                        {cargando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                        Guardar Cambios
+                        <Pencil className="h-3 w-3 text-[#0054A6]" />
+                        Editar Datos
                       </Button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => setIsEditing(false)}
+                          variant="outline"
+                          className="border-slate-200 hover:bg-slate-50 text-slate-600 font-bold rounded-xl h-8.5 px-3 transition-all text-xs cursor-pointer"
+                        >
+                          Cancelar
+                        </Button>
+                        {tieneCambios && (
+                          <Button
+                            onClick={handleGuardarCambios}
+                            disabled={cargando}
+                            className="bg-[#0054A6] hover:bg-[#004080] text-white font-bold rounded-xl h-8.5 px-3.5 transition-all flex items-center gap-1.5 text-xs cursor-pointer disabled:opacity-50"
+                          >
+                            {cargando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                            Guardar Cambios
+                          </Button>
+                        )}
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
                 <Button
                   onClick={() => handleReimprimirKyc(selectedSocio)}
@@ -2052,11 +2690,57 @@ export const CreacionSocios: React.FC = () => {
               </div>
             </div>
 
-            {/* Cuerpo del Modal: Datos del Socio a la Izquierda, Cuentas del Socio a la Derecha */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-              
-              {/* Columna Izquierda: Ficha de Información */}
-              <div className="md:col-span-7 space-y-4">
+              {/* Selector de Pestañas Principal */}
+              <div className="flex bg-[#F1F5F9] p-1 border border-slate-200/40 shadow-sm rounded-full w-fit gap-1 mb-6 no-print font-sans">
+                <button
+                  onClick={() => setActiveDetailTab('perfil')}
+                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all duration-250 flex items-center gap-2 cursor-pointer ${
+                    activeDetailTab === 'perfil'
+                      ? 'bg-[#0054A6] text-white shadow-sm shadow-blue-900/10'
+                      : 'text-slate-500 hover:text-[#0054A6] hover:bg-white/60'
+                  }`}
+                >
+                  <User className="h-3.5 w-3.5" />
+                  Perfil General
+                </button>
+                <button
+                  onClick={() => setActiveDetailTab('cuentas')}
+                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all duration-250 flex items-center gap-2 cursor-pointer ${
+                    activeDetailTab === 'cuentas'
+                      ? 'bg-[#0054A6] text-white shadow-sm shadow-blue-900/10'
+                      : 'text-slate-500 hover:text-[#0054A6] hover:bg-white/60'
+                  }`}
+                >
+                  <DollarSign className="h-3.5 w-3.5" />
+                  Cuentas Financieras
+                </button>
+                <button
+                  onClick={() => setActiveDetailTab('creditos')}
+                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all duration-250 flex items-center gap-2 cursor-pointer ${
+                    activeDetailTab === 'creditos'
+                      ? 'bg-[#0054A6] text-white shadow-sm shadow-blue-900/10'
+                      : 'text-slate-500 hover:text-[#0054A6] hover:bg-white/60'
+                  }`}
+                >
+                  <CreditCard className="h-3.5 w-3.5" />
+                  Créditos
+                </button>
+                <button
+                  onClick={() => setActiveDetailTab('transacciones')}
+                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all duration-250 flex items-center gap-2 cursor-pointer ${
+                    activeDetailTab === 'transacciones'
+                      ? 'bg-[#0054A6] text-white shadow-sm shadow-blue-900/10'
+                      : 'text-slate-500 hover:text-[#0054A6] hover:bg-white/60'
+                  }`}
+                >
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                  Transacciones
+                </button>
+              </div>
+
+            {/* Contenido de la Pestaña Perfil */}
+            {activeDetailTab === 'perfil' && (
+              <div className="space-y-6 animate-fade-in text-left">
                 
                 {/* Alerta PEP */}
                 {selectedSocio.esPep && (
@@ -2071,251 +2755,577 @@ export const CreacionSocios: React.FC = () => {
                   </div>
                 )}
 
-                {/* Formulario/Vista de Contacto */}
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1">
-                    Datos de Identificación y Contacto
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                  
+                  {/* Bloque 1: Datos de Identidad */}
+                  <div className="md:col-span-4 space-y-4 bg-slate-50/30 p-4 border border-slate-100 rounded-2xl">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1 flex items-center gap-1.5">
+                      <User className="h-3.5 w-3.5 text-slate-400" />
+                      Datos de Identidad
+                    </h4>
+                    
+                    <div className="space-y-3.5">
+                      {/* Cédula / Identificación */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Identificación (Cédula/RUC)</label>
+                        {isEditing ? (
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={selectedSocio.identificacion}
+                              readOnly={true}
+                              disabled={true}
+                              className="w-full border border-slate-200 rounded-lg text-xs h-8 pl-2.5 pr-8 bg-slate-100 text-slate-500 font-bold select-none cursor-not-allowed outline-none font-mono"
+                            />
+                            <Lock className="absolute right-2.5 top-2 h-4 w-4 text-slate-400" />
+                          </div>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700 font-mono block">{selectedSocio.identificacion}</span>
+                        )}
+                      </div>
+
+                      {/* Nombres Completos */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Nombres Completos</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editNombresCompletos}
+                            onChange={(e) => setEditNombresCompletos(e.target.value)}
+                            className={`w-full border rounded-lg text-xs h-8 px-2.5 bg-slate-50/20 font-bold outline-none uppercase ${
+                              editErrors.nombresCompletos ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
+                            }`}
+                          />
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700 block uppercase">{selectedSocio.nombresCompletos}</span>
+                        )}
+                        {editErrors.nombresCompletos && <span className="text-[9px] text-rose-500 font-bold block">{editErrors.nombresCompletos}</span>}
+                      </div>
+
+                      {/* Estado Civil */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Estado Civil</label>
+                        {isEditing ? (
+                          <select
+                            value={editEstadoCivil}
+                            onChange={(e) => setEditEstadoCivil(e.target.value)}
+                            className="w-full border border-slate-200 text-slate-700 font-bold rounded-lg text-xs h-8 px-1.5 bg-white outline-none"
+                          >
+                            <option value="SOLTERO">Soltero/a</option>
+                            <option value="CASADO">Casado/a</option>
+                            <option value="DIVORCIADO">Divorciado/a</option>
+                            <option value="VIUDO">Viudo/a</option>
+                            <option value="UNION_DE_HECHO">Unión de Hecho</option>
+                          </select>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700 block uppercase">{selectedSocio.estadoCivil || 'SOLTERO'}</span>
+                        )}
+                      </div>
+
+                      {/* Estado del Socio */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Estado del Socio</label>
+                        {isEditing ? (
+                          <select
+                            value={selectedSocio.estado}
+                            disabled={true}
+                            className="w-full border border-slate-200 text-slate-400 font-bold rounded-lg text-xs h-8 px-1.5 bg-slate-100 cursor-not-allowed outline-none"
+                          >
+                            <option value="PENDIENTE_APROBACION">PENDIENTE</option>
+                            <option value="ACTIVO">ACTIVO</option>
+                            <option value="INACTIVO">INACTIVO</option>
+                          </select>
+                        ) : (
+                          <span className={`inline-flex px-2 py-0.5 text-[9px] font-black rounded-md ${
+                            selectedSocio.estado === 'ACTIVO' 
+                              ? 'text-emerald-700 bg-emerald-50 border border-emerald-100'
+                              : selectedSocio.estado === 'PENDIENTE_APROBACION'
+                              ? 'text-amber-700 bg-amber-50 border border-amber-100'
+                              : 'text-rose-700 bg-rose-50 border border-rose-100'
+                          }`}>
+                            {selectedSocio.estado === 'PENDIENTE_APROBACION' ? 'PENDIENTE' : selectedSocio.estado}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bloque 2: Datos de Contacto */}
+                  <div className="md:col-span-4 space-y-4 bg-slate-50/30 p-4 border border-slate-100 rounded-2xl">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1 flex items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5 text-slate-400" />
+                      Datos de Contacto
+                    </h4>
+                    
+                    <div className="space-y-3.5">
+                      {/* Celular */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Teléfono Celular</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editTelefono}
+                            onChange={(e) => setEditTelefono(e.target.value.replace(/\D/g, '').substring(0, 10))}
+                            className={`w-full border rounded-lg text-xs h-8 px-2.5 bg-slate-50/20 font-bold outline-none font-mono ${
+                              editErrors.telefono ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
+                            }`}
+                          />
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700 font-mono block">{selectedSocio.telefono}</span>
+                        )}
+                        {editErrors.telefono && <span className="text-[9px] text-rose-500 font-bold block">{editErrors.telefono}</span>}
+                      </div>
+
+                      {/* Correo */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Correo Electrónico</label>
+                        {isEditing ? (
+                          <input
+                            type="email"
+                            value={editCorreo}
+                            onChange={(e) => setEditCorreo(e.target.value)}
+                            className={`w-full border rounded-lg text-xs h-8 px-2.5 bg-slate-50/20 font-bold outline-none ${
+                              editErrors.correo ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
+                            }`}
+                          />
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700 truncate block" title={selectedSocio.correo}>{selectedSocio.correo}</span>
+                        )}
+                        {editErrors.correo && <span className="text-[9px] text-rose-500 font-bold block">{editErrors.correo}</span>}
+                      </div>
+
+                      {/* Dirección */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Dirección Domiciliaria</label>
+                        {isEditing ? (
+                          <textarea
+                            value={editDireccion}
+                            onChange={(e) => setEditDireccion(e.target.value)}
+                            rows={4}
+                            className={`w-full border rounded-lg text-xs p-2 bg-slate-50/20 font-bold outline-none resize-none ${
+                              editErrors.direccion ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
+                            }`}
+                          />
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700 block leading-normal">{selectedSocio.direccion}</span>
+                        )}
+                        {editErrors.direccion && <span className="text-[9px] text-rose-500 font-bold block">{editErrors.direccion}</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bloque 3: Perfil Socioeconómico */}
+                  <div className="md:col-span-4 space-y-4 bg-slate-50/30 p-4 border border-slate-100 rounded-2xl">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1 flex items-center gap-1.5">
+                      <Briefcase className="h-3.5 w-3.5 text-slate-400" />
+                      Perfil Socioeconómico
+                    </h4>
+                    
+                    <div className="space-y-3.5">
+                      {/* Profesión */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Profesión / Oficio</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editProfesion}
+                            onChange={(e) => setEditProfesion(e.target.value)}
+                            className={`w-full border rounded-lg text-xs h-8 px-2.5 bg-slate-50/20 font-bold outline-none ${
+                              editErrors.profesion ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
+                            }`}
+                          />
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700 block">{selectedSocio.profesion || 'No especificada'}</span>
+                        )}
+                        {editErrors.profesion && <span className="text-[9px] text-rose-500 font-bold block">{editErrors.profesion}</span>}
+                      </div>
+
+                      {/* Actividad Económica */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Actividad Económica</label>
+                        {isEditing ? (
+                          <select
+                            value={editActividadEconomica}
+                            onChange={(e) => {
+                              setEditActividadEconomica(e.target.value);
+                              if (e.target.value === 'ESTUDIANTE' || e.target.value === 'DESEMPLEADO') {
+                                setEditLugarTrabajo('Ninguno');
+                              } else if (editLugarTrabajo === 'Ninguno') {
+                                setEditLugarTrabajo('');
+                              }
+                            }}
+                            className="w-full border border-slate-200 text-slate-700 font-bold rounded-lg text-xs h-8 px-1.5 bg-white outline-none"
+                          >
+                            <option value="EMPLEADO_PRIVADO">Empleado Privado</option>
+                            <option value="EMPLEADO_PUBLICO">Empleado Público</option>
+                            <option value="INDEPENDIENTE">Comerciante / Independiente</option>
+                            <option value="PROFESIONAL_LIBERAL">Profesional Liberal</option>
+                            <option value="JUBILADO">Jubilado</option>
+                            <option value="ESTUDIANTE">Estudiante</option>
+                            <option value="DESEMPLEADO">Sin Empleo</option>
+                          </select>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700 block uppercase">{selectedSocio.actividadEconomica.replace(/_/g, ' ')}</span>
+                        )}
+                      </div>
+
+                      {/* Lugar de Trabajo */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Empresa / Lugar Trabajo</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editLugarTrabajo}
+                            onChange={(e) => setEditLugarTrabajo(e.target.value)}
+                            disabled={editActividadEconomica === 'ESTUDIANTE' || editActividadEconomica === 'DESEMPLEADO'}
+                            className={`w-full border rounded-lg text-xs h-8 px-2 bg-slate-50/20 font-bold outline-none disabled:bg-slate-100 ${
+                              editErrors.lugarTrabajo ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
+                            }`}
+                          />
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700 block">{selectedSocio.lugarTrabajo || 'Independiente / N/A'}</span>
+                        )}
+                        {editErrors.lugarTrabajo && <span className="text-[9px] text-rose-500 font-bold block">{editErrors.lugarTrabajo}</span>}
+                      </div>
+
+                      {/* Ingresos Mensuales */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Ingresos Mensuales</label>
+                        {isEditing ? (
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1.5 text-xs font-bold text-slate-400 font-mono">$</span>
+                            <input
+                              type="number"
+                              value={editIngresosMensuales}
+                              onChange={(e) => setEditIngresosMensuales(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+                              }}
+                              className={`w-full border rounded-lg text-xs h-8 pl-6 pr-2.5 bg-slate-50/20 font-bold outline-none font-mono ${
+                                editErrors.ingresos ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
+                              }`}
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700 font-mono block">
+                            ${parseFloat(selectedSocio.ingresosMensuales).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Gastos Mensuales */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Gastos Mensuales</label>
+                        {isEditing ? (
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1.5 text-xs font-bold text-slate-400 font-mono">$</span>
+                            <input
+                              type="number"
+                              value={editGastosMensuales}
+                              onChange={(e) => setEditGastosMensuales(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+                              }}
+                              className={`w-full border rounded-lg text-xs h-8 pl-6 pr-2.5 bg-slate-50/20 font-bold outline-none font-mono ${
+                                editErrors.gastos ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
+                              }`}
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700 font-mono block">
+                            ${parseFloat(selectedSocio.gastosMensuales).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Deudas Actuales */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Deudas Financieras</label>
+                        {isEditing ? (
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1.5 text-xs font-bold text-slate-400 font-mono">$</span>
+                            <input
+                              type="number"
+                              value={editDeudasActuales}
+                              onChange={(e) => setEditDeudasActuales(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+                              }}
+                              className={`w-full border rounded-lg text-xs h-8 pl-6 pr-2.5 bg-slate-50/20 font-bold outline-none font-mono ${
+                                editErrors.deudas ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
+                              }`}
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-700 font-mono block">
+                            ${parseFloat(selectedSocio.deudasActuales).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Capacidad de Pago Reactiva */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Capacidad de Pago</label>
+                        <span className={`text-xs font-extrabold font-mono block ${
+                          (isEditing 
+                            ? (parseFloat(editIngresosMensuales)||0) - (parseFloat(editGastosMensuales)||0) - (parseFloat(editDeudasActuales)||0) 
+                            : selectedSocio.capacidadPago !== undefined 
+                            ? parseFloat(selectedSocio.capacidadPago) 
+                            : (parseFloat(selectedSocio.ingresosMensuales) - parseFloat(selectedSocio.gastosMensuales) - parseFloat(selectedSocio.deudasActuales))
+                          ) >= 0
+                            ? 'text-[#0054A6]'
+                            : 'text-rose-600'
+                        }`}>
+                          ${(isEditing 
+                            ? (parseFloat(editIngresosMensuales)||0) - (parseFloat(editGastosMensuales)||0) - (parseFloat(editDeudasActuales)||0) 
+                            : selectedSocio.capacidadPago !== undefined 
+                            ? parseFloat(selectedSocio.capacidadPago) 
+                            : (parseFloat(selectedSocio.ingresosMensuales) - parseFloat(selectedSocio.gastosMensuales) - parseFloat(selectedSocio.deudasActuales))
+                          ).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Expediente Digital (KYC) */}
+                <div className="border-t border-slate-100 pt-6 mt-6">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mb-4">
+                    <FolderOpen className="h-3.5 w-3.5 text-slate-400" />
+                    Expediente Digital (Documentos KYC)
                   </h4>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    
-                    {/* Celular */}
-                    <div className="space-y-1">
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Teléfono Celular</label>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editTelefono}
-                          onChange={(e) => setEditTelefono(e.target.value.replace(/\D/g, '').substring(0, 10))}
-                          className={`w-full border rounded-lg text-xs h-8 px-2.5 bg-slate-50/20 font-bold outline-none ${
-                            editErrors.telefono ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
-                          }`}
-                        />
-                      ) : (
-                        <span className="text-xs font-bold text-slate-700 font-mono">{selectedSocio.telefono}</span>
-                      )}
-                      {editErrors.telefono && <span className="text-[9px] text-rose-500 font-bold block">{editErrors.telefono}</span>}
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Cédula Anverso */}
+                    {(() => {
+                      const path = selectedSocio.fotoCedulaFrontalUrl;
+                      const docUrl = path ? `http://localhost:8080/api/v1${path}` : '';
+                      const isLoading = cargandoDocType === 'cedula-frontal';
+                      return (
+                        <div className="bg-white border border-slate-100 rounded-2xl flex flex-col h-56 shadow-sm relative overflow-hidden group hover:border-[#0054A6]/20 transition-all duration-300">
+                          {isLoading && (
+                            <div className="absolute inset-0 bg-white/70 backdrop-blur-xs flex flex-col items-center justify-center gap-2 z-30">
+                              <Loader2 className="h-5 w-5 animate-spin text-[#0054A6]" />
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Subiendo...</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center p-3 pb-2 border-b border-slate-100 bg-slate-50/30">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide">Cédula Anverso</span>
+                            <span className={`h-2 w-2 rounded-full ${docUrl ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                          </div>
+                          <div className="flex-1 w-full overflow-hidden flex items-center justify-center bg-slate-50/20 relative">
+                            {docUrl ? (
+                              <>
+                                <img 
+                                  src={docUrl} 
+                                  alt="Cédula Anverso" 
+                                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
+                                  onClick={() => setLightboxImage({ url: docUrl, title: "Cédula Anverso" })}
+                                />
+                                <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-xs p-1 rounded-lg border border-slate-150 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-250 z-20">
+                                  <button
+                                    onClick={() => setLightboxImage({ url: docUrl, title: "Cédula Anverso" })}
+                                    className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center"
+                                    title="Visualizar"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                  </button>
+                                  <label className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center relative">
+                                    <input 
+                                      type="file" 
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleUploadDocument('cedula-frontal', file);
+                                      }}
+                                    />
+                                    <UploadCloud className="h-3.5 w-3.5" />
+                                  </label>
+                                </div>
+                              </>
+                            ) : (
+                              <label className="flex flex-col items-center gap-1.5 text-slate-400 hover:text-[#0054A6] cursor-pointer transition-colors p-4 w-full h-full justify-center select-none">
+                                <input 
+                                  type="file" 
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleUploadDocument('cedula-frontal', file);
+                                  }}
+                                />
+                                <UploadCloud className="h-6 w-6 text-slate-350 group-hover:scale-110 transition-transform duration-200" />
+                                <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Subir Documento</span>
+                              </label>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
-                    {/* Correo */}
-                    <div className="space-y-1">
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Correo Electrónico</label>
-                      {isEditing ? (
-                        <input
-                          type="email"
-                          value={editCorreo}
-                          onChange={(e) => setEditCorreo(e.target.value)}
-                          className={`w-full border rounded-lg text-xs h-8 px-2.5 bg-slate-50/20 font-bold outline-none ${
-                            editErrors.correo ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
-                          }`}
-                        />
-                      ) : (
-                        <span className="text-xs font-bold text-slate-700 truncate block" title={selectedSocio.correo}>{selectedSocio.correo}</span>
-                      )}
-                      {editErrors.correo && <span className="text-[9px] text-rose-500 font-bold block">{editErrors.correo}</span>}
-                    </div>
+                    {/* Cédula Reverso */}
+                    {(() => {
+                      const path = selectedSocio.fotoCedulaPosteriorUrl;
+                      const docUrl = path ? `http://localhost:8080/api/v1${path}` : '';
+                      const isLoading = cargandoDocType === 'cedula-posterior';
+                      return (
+                        <div className="bg-white border border-slate-100 rounded-2xl flex flex-col h-56 shadow-sm relative overflow-hidden group hover:border-[#0054A6]/20 transition-all duration-300">
+                          {isLoading && (
+                            <div className="absolute inset-0 bg-white/70 backdrop-blur-xs flex flex-col items-center justify-center gap-2 z-30">
+                              <Loader2 className="h-5 w-5 animate-spin text-[#0054A6]" />
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Subiendo...</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center p-3 pb-2 border-b border-slate-100 bg-slate-50/30">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide">Cédula Reverso</span>
+                            <span className={`h-2 w-2 rounded-full ${docUrl ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                          </div>
+                          <div className="flex-1 w-full overflow-hidden flex items-center justify-center bg-slate-50/20 relative">
+                            {docUrl ? (
+                              <>
+                                <img 
+                                  src={docUrl} 
+                                  alt="Cédula Reverso" 
+                                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
+                                  onClick={() => setLightboxImage({ url: docUrl, title: "Cédula Reverso" })}
+                                />
+                                <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-xs p-1 rounded-lg border border-slate-150 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-250 z-20">
+                                  <button
+                                    onClick={() => setLightboxImage({ url: docUrl, title: "Cédula Reverso" })}
+                                    className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center"
+                                    title="Visualizar"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                  </button>
+                                  <label className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center relative">
+                                    <input 
+                                      type="file" 
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleUploadDocument('cedula-posterior', file);
+                                      }}
+                                    />
+                                    <UploadCloud className="h-3.5 w-3.5" />
+                                  </label>
+                                </div>
+                              </>
+                            ) : (
+                              <label className="flex flex-col items-center gap-1.5 text-slate-400 hover:text-[#0054A6] cursor-pointer transition-colors p-4 w-full h-full justify-center select-none">
+                                <input 
+                                  type="file" 
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleUploadDocument('cedula-posterior', file);
+                                  }}
+                                />
+                                <UploadCloud className="h-6 w-6 text-slate-350 group-hover:scale-110 transition-transform duration-200" />
+                                <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Subir Documento</span>
+                              </label>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
-                    {/* Dirección */}
-                    <div className="sm:col-span-2 space-y-1">
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Dirección Domiciliaria</label>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editDireccion}
-                          onChange={(e) => setEditDireccion(e.target.value)}
-                          className={`w-full border rounded-lg text-xs h-8 px-2.5 bg-slate-50/20 font-bold outline-none ${
-                            editErrors.direccion ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
-                          }`}
-                        />
-                      ) : (
-                        <span className="text-xs font-bold text-slate-700 block leading-tight">{selectedSocio.direccion}</span>
-                      )}
-                      {editErrors.direccion && <span className="text-[9px] text-rose-500 font-bold block">{editErrors.direccion}</span>}
-                    </div>
-
-                    {/* Estado del Socio */}
-                    <div className="sm:col-span-2 space-y-1">
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Estado del Socio</label>
-                      {isEditing ? (
-                        <select
-                          value={selectedSocio.estado}
-                          disabled={true}
-                          className="w-full border border-slate-200 text-slate-400 font-bold rounded-lg text-xs h-8 px-1.5 bg-slate-100 cursor-not-allowed outline-none"
-                        >
-                          <option value="PENDIENTE_APROBACION">PENDIENTE</option>
-                          <option value="ACTIVO">ACTIVO</option>
-                          <option value="INACTIVO">INACTIVO</option>
-                        </select>
-                      ) : (
-                        <span className={`inline-flex px-2 py-0.5 text-[9px] font-black rounded-md ${
-                          selectedSocio.estado === 'ACTIVO' 
-                            ? 'text-emerald-700 bg-emerald-50 border border-emerald-100'
-                            : selectedSocio.estado === 'PENDIENTE_APROBACION'
-                            ? 'text-amber-700 bg-amber-50 border border-amber-100'
-                            : 'text-rose-700 bg-rose-50 border border-rose-100'
-                        }`}>
-                          {selectedSocio.estado === 'PENDIENTE_APROBACION' ? 'PENDIENTE' : selectedSocio.estado}
-                        </span>
-                      )}
-                    </div>
-
+                    {/* Firma Registrada */}
+                    {(() => {
+                      const path = selectedSocio.firmaUrl;
+                      const docUrl = path ? `http://localhost:8080/api/v1${path}` : '';
+                      const isLoading = cargandoDocType === 'firma';
+                      return (
+                        <div className="bg-white border border-slate-100 rounded-2xl flex flex-col h-56 shadow-sm relative overflow-hidden group hover:border-[#0054A6]/20 transition-all duration-300">
+                          {isLoading && (
+                            <div className="absolute inset-0 bg-white/70 backdrop-blur-xs flex flex-col items-center justify-center gap-2 z-30">
+                              <Loader2 className="h-5 w-5 animate-spin text-[#0054A6]" />
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Subiendo...</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center p-3 pb-2 border-b border-slate-100 bg-slate-50/30">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide">Firma Registrada</span>
+                            <span className={`h-2 w-2 rounded-full ${docUrl ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                          </div>
+                          <div className="flex-1 w-full overflow-hidden flex items-center justify-center bg-slate-50/20 relative">
+                            {docUrl ? (
+                              <>
+                                <img 
+                                  src={docUrl} 
+                                  alt="Firma Registrada" 
+                                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
+                                  onClick={() => setLightboxImage({ url: docUrl, title: "Firma Registrada" })}
+                                />
+                                <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-xs p-1 rounded-lg border border-slate-150 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-250 z-20">
+                                  <button
+                                    onClick={() => setLightboxImage({ url: docUrl, title: "Firma Registrada" })}
+                                    className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center"
+                                    title="Visualizar"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                  </button>
+                                  <label className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center relative">
+                                    <input 
+                                      type="file" 
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleUploadDocument('firma', file);
+                                      }}
+                                    />
+                                    <UploadCloud className="h-3.5 w-3.5" />
+                                  </label>
+                                </div>
+                              </>
+                            ) : (
+                              <label className="flex flex-col items-center gap-1.5 text-slate-400 hover:text-[#0054A6] cursor-pointer transition-colors p-4 w-full h-full justify-center select-none">
+                                <input 
+                                  type="file" 
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleUploadDocument('firma', file);
+                                  }}
+                                />
+                                <UploadCloud className="h-6 w-6 text-slate-350 group-hover:scale-110 transition-transform duration-200" />
+                                <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Subir Documento</span>
+                              </label>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
-
-                {/* Formulario/Vista Socioeconómica */}
-                <div className="space-y-3 pt-2">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1">
-                    Información Financiera y Capacidad de Pago
-                  </h4>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    
-                    {/* Actividad Económica */}
-                    <div className="space-y-1">
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Actividad Económica</label>
-                      {isEditing ? (
-                        <select
-                          value={editActividadEconomica}
-                          onChange={(e) => {
-                            setEditActividadEconomica(e.target.value);
-                            if (e.target.value === 'ESTUDIANTE' || e.target.value === 'DESEMPLEADO') {
-                              setEditLugarTrabajo('Ninguno');
-                            } else if (editLugarTrabajo === 'Ninguno') {
-                              setEditLugarTrabajo('');
-                            }
-                          }}
-                          className="w-full border border-slate-200 text-slate-700 font-bold rounded-lg text-xs h-8 px-1.5 bg-white"
-                        >
-                          <option value="EMPLEADO_PRIVADO">Empleado Privado</option>
-                          <option value="EMPLEADO_PUBLICO">Empleado Público</option>
-                          <option value="INDEPENDIENTE">Comerciante / Independiente</option>
-                          <option value="PROFESIONAL_LIBERAL">Profesional Liberal</option>
-                          <option value="JUBILADO">Jubilado</option>
-                          <option value="ESTUDIANTE">Estudiante</option>
-                          <option value="DESEMPLEADO">Sin Empleo</option>
-                        </select>
-                      ) : (
-                        <span className="text-xs font-bold text-slate-700 block">{selectedSocio.actividadEconomica.replace(/_/g, ' ')}</span>
-                      )}
-                    </div>
-
-                    {/* Lugar de Trabajo */}
-                    <div className="space-y-1">
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Lugar de Trabajo / Empresa</label>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editLugarTrabajo}
-                          onChange={(e) => setEditLugarTrabajo(e.target.value)}
-                          disabled={editActividadEconomica === 'ESTUDIANTE' || editActividadEconomica === 'DESEMPLEADO'}
-                          className={`w-full border rounded-lg text-xs h-8 px-2 bg-slate-50/20 font-bold outline-none disabled:bg-slate-100 ${
-                            editErrors.lugarTrabajo ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
-                          }`}
-                        />
-                      ) : (
-                        <span className="text-xs font-bold text-slate-700 block">{selectedSocio.lugarTrabajo || 'Independiente / N/A'}</span>
-                      )}
-                      {editErrors.lugarTrabajo && <span className="text-[9px] text-rose-500 font-bold block">{editErrors.lugarTrabajo}</span>}
-                    </div>
-
-                    {/* Ingresos Mensuales */}
-                    <div className="space-y-1">
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Ingresos Declarados ($)</label>
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          value={editIngresosMensuales}
-                          onChange={(e) => setEditIngresosMensuales(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
-                          }}
-                          className={`w-full border rounded-lg text-xs h-8 px-2.5 bg-slate-50/20 font-bold outline-none font-mono ${
-                            editErrors.ingresos ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
-                          }`}
-                        />
-                      ) : (
-                        <span className="text-xs font-bold text-slate-700 font-mono block">
-                          ${parseFloat(selectedSocio.ingresosMensuales).toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Gastos Mensuales */}
-                    <div className="space-y-1">
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Gastos Declarados ($)</label>
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          value={editGastosMensuales}
-                          onChange={(e) => setEditGastosMensuales(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
-                          }}
-                          className={`w-full border rounded-lg text-xs h-8 px-2.5 bg-slate-50/20 font-bold outline-none font-mono ${
-                            editErrors.gastos ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
-                          }`}
-                        />
-                      ) : (
-                        <span className="text-xs font-bold text-slate-700 font-mono block">
-                          ${parseFloat(selectedSocio.gastosMensuales).toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Deudas Actuales */}
-                    <div className="space-y-1">
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Deudas Financieras ($)</label>
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          value={editDeudasActuales}
-                          onChange={(e) => setEditDeudasActuales(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
-                          }}
-                          className={`w-full border rounded-lg text-xs h-8 px-2.5 bg-slate-50/20 font-bold outline-none font-mono ${
-                            editErrors.deudas ? 'border-rose-300 focus:border-rose-500' : 'border-slate-200 focus:border-[#0054A6]'
-                          }`}
-                        />
-                      ) : (
-                        <span className="text-xs font-bold text-slate-700 font-mono block">
-                          ${parseFloat(selectedSocio.deudasActuales).toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Capacidad de Pago Reactiva */}
-                    <div className="space-y-1">
-                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Capacidad de Pago</label>
-                      <span className={`text-xs font-extrabold font-mono block ${
-                        (isEditing 
-                          ? (parseFloat(editIngresosMensuales)||0) - (parseFloat(editGastosMensuales)||0) - (parseFloat(editDeudasActuales)||0) 
-                          : selectedSocio.capacidadPago !== undefined 
-                          ? parseFloat(selectedSocio.capacidadPago) 
-                          : (parseFloat(selectedSocio.ingresosMensuales) - parseFloat(selectedSocio.gastosMensuales) - parseFloat(selectedSocio.deudasActuales))
-                        ) >= 0
-                          ? 'text-[#0054A6]'
-                          : 'text-rose-600'
-                      }`}>
-                        ${(isEditing 
-                          ? (parseFloat(editIngresosMensuales)||0) - (parseFloat(editGastosMensuales)||0) - (parseFloat(editDeudasActuales)||0) 
-                          : selectedSocio.capacidadPago !== undefined 
-                          ? parseFloat(selectedSocio.capacidadPago) 
-                          : (parseFloat(selectedSocio.ingresosMensuales) - parseFloat(selectedSocio.gastosMensuales) - parseFloat(selectedSocio.deudasActuales))
-                        ).toFixed(2)}
-                      </span>
-                    </div>
-
-                  </div>
-                </div>
-
               </div>
+            )}
 
-              {/* Columna Derecha: Portafolio Financiero */}
-              <div className="md:col-span-5 space-y-4">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1">
-                  Portafolio de Cuentas Cooperativas
-                </h4>
+            {/* Contenido de la Pestaña Cuentas */}
+            {activeDetailTab === 'cuentas' && (
+              <div className="space-y-6 animate-fade-in text-left">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <div>
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Portafolio de Cuentas Financieras
+                    </h4>
+                    <p className="text-[9.5px] font-bold text-slate-400 mt-0.5">
+                      Cuentas de ahorro a la vista y aportaciones sociales del socio
+                    </p>
+                  </div>
+                  {/* Botón premium de Apertura */}
+                  <Button
+                    onClick={handleAbrirAperturaModal}
+                    className="bg-[#0054A6] hover:bg-[#004080] text-white font-bold rounded-xl h-8.5 px-3.5 transition-all flex items-center gap-1.5 text-xs cursor-pointer shadow-sm shadow-blue-500/10"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Aperturar Nueva Cuenta
+                  </Button>
+                </div>
 
                 {loadingCuentas ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-400">
@@ -2323,23 +3333,50 @@ export const CreacionSocios: React.FC = () => {
                     <span className="text-[10px] font-bold">Consultando cuentas asociadas...</span>
                   </div>
                 ) : cuentasSocio.length === 0 ? (
-                  <div className="text-center py-10 bg-slate-50 border border-slate-100 rounded-2xl">
-                    <span className="text-[10px] font-bold text-slate-400">Socio sin cuentas activas registradas.</span>
+                  <div className="text-center py-12 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <span className="text-[10px] font-bold text-slate-400">El socio no posee cuentas activas registradas.</span>
                   </div>
                 ) : (
-                  <div className="space-y-4 font-sans text-left">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {cuentasSocio.map((cta) => {
                       const isVista = cta.tipo === 'AHORRO_VISTA';
+                      const isProgramado = cta.tipo === 'AHORRO_PROGRAMADO';
+                      const isAportaciones = cta.tipo === 'APORTACIONES';
+                      
+                      // 5. Borde sutil izquierdo basado en el tipo de producto
+                      const borderLeftColor = isVista 
+                        ? 'border-l-4 border-l-[#00E5FF]' 
+                        : isProgramado
+                        ? 'border-l-4 border-l-[#00E676]'
+                        : isAportaciones
+                        ? 'border-l-4 border-l-slate-400'
+                        : 'border-l-4 border-l-amber-400';
+
                       const bgGradient = isVista 
-                        ? 'bg-gradient-to-br from-[#0054A6] to-blue-800 text-white shadow-lg shadow-blue-500/10' 
-                        : 'bg-gradient-to-br from-slate-700 to-slate-800 text-slate-100';
+                        ? 'bg-gradient-to-br from-[#0054A6] to-blue-800 text-white shadow-md' 
+                        : isProgramado
+                        ? 'bg-gradient-to-br from-emerald-600 to-teal-800 text-white shadow-md shadow-emerald-500/10'
+                        : isAportaciones
+                        ? 'bg-gradient-to-br from-slate-700 to-slate-800 text-slate-100'
+                        : 'bg-gradient-to-br from-amber-600 to-yellow-800 text-white shadow-md shadow-amber-500/10';
+
+                      const accountLabel = cta.productoAhorro?.nombre || 
+                        (isVista ? 'Ahorro a la Vista' : isAportaciones ? 'Aportaciones' : cta.tipo.replace(/_/g, ' '));
+
+                      // 1. Badge Dinámico con colores semánticos basados en el estado real
+                      const getStatusBadgeStyle = () => {
+                        const st = (cta.estado || 'ACTIVA').toUpperCase();
+                        if (st === 'ACTIVA') return 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30';
+                        if (st === 'BLOQUEADA') return 'bg-rose-500/30 text-rose-300 border-rose-400/30';
+                        return 'bg-amber-500/20 text-amber-300 border-amber-400/30';
+                      };
 
                       return (
                         <div 
                           key={cta.id} 
-                          className={`rounded-2xl p-4 shadow-md flex flex-col justify-between h-32 relative overflow-hidden transition-all duration-300 hover:scale-[1.02] ${bgGradient}`}
+                          className={`rounded-2xl p-5 shadow-sm flex flex-col justify-between h-44 relative overflow-hidden transition-all duration-300 hover:scale-[1.02] ${bgGradient} ${borderLeftColor}`}
                         >
-                          {/* Marca de agua / decoración */}
+                          {/* Marca de agua */}
                           <div className="absolute right-0 bottom-0 translate-x-1/4 translate-y-1/4 opacity-10 pointer-events-none">
                             <Users className="h-28 w-28" />
                           </div>
@@ -2347,31 +3384,73 @@ export const CreacionSocios: React.FC = () => {
                           <div className="flex justify-between items-start z-10">
                             <div>
                               <span className="text-[9px] font-black tracking-widest uppercase opacity-75">
-                                {isVista ? 'Ahorro a la Vista' : 'Certificado de Aportaciones'}
+                                {accountLabel}
                               </span>
-                              <h5 className="text-xs font-bold font-mono tracking-wider mt-1 opacity-90">
+                              
+                              {/* 4. Clipboard Copy icon next to the account number */}
+                              <h5 className="text-xs font-bold font-mono tracking-wider mt-1 opacity-90 flex items-center gap-1.5">
                                 {cta.numeroCuenta.replace(/(\d{4})/g, '$1 ').trim()}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(cta.numeroCuenta);
+                                    setCopiedCtaId(cta.id);
+                                    setTimeout(() => setCopiedCtaId(null), 1500);
+                                  }}
+                                  className="p-1 rounded hover:bg-white/15 text-white/60 hover:text-white transition-all cursor-pointer relative"
+                                  title="Copiar número de cuenta"
+                                >
+                                  {copiedCtaId === cta.id ? (
+                                    <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[8px] font-black px-1.5 py-0.5 bg-emerald-500 text-white rounded shadow animate-fade-in whitespace-nowrap">
+                                      ¡Copiado!
+                                    </span>
+                                  ) : (
+                                    <Copy className="h-3 w-3" />
+                                  )}
+                                </button>
                               </h5>
+
+                              <div className="mt-1 flex items-center gap-1.5">
+                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded tracking-wide ${
+                                  isAportaciones 
+                                    ? 'bg-slate-650 text-slate-200 border border-slate-500'
+                                    : 'bg-white/15 text-white border border-white/10' 
+                                }`}>
+                                  Tasa: {parseFloat(cta.tasaInteresAnual || 0).toFixed(2)}% Anual
+                                </span>
+                              </div>
                             </div>
-                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
-                              isVista
-                                ? 'bg-white/20 text-white border border-white/10'
-                                : parseFloat(cta.saldo) > 0
-                                ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/20'
-                                : 'bg-amber-500/25 text-amber-300 border border-amber-500/20'
-                            }`}>
-                              {isVista ? 'ACTIVA' : parseFloat(cta.saldo) > 0 ? 'ACTIVA' : 'PENDIENTE_PAGO'}
+                            
+                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wide border ${getStatusBadgeStyle()}`}>
+                              {cta.estado || 'ACTIVA'}
                             </span>
                           </div>
 
-                          <div className="flex justify-between items-end z-10">
-                            <div>
-                              <span className="text-[8px] font-medium opacity-60 uppercase block">Saldo Disponible</span>
-                              <span className="text-base font-black font-mono">
-                                ${parseFloat(cta.saldo).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
+                          {/* 2. Desglose de Saldos */}
+                          <div className="flex justify-between items-end z-10 mt-2">
+                            <div className="flex gap-4">
+                              <div>
+                                <span className="text-[7.5px] font-medium opacity-65 uppercase block">Saldo Disponible</span>
+                                <span className="text-sm font-black font-mono leading-none block mt-0.5">
+                                  ${parseFloat(cta.saldo).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                              <div className="border-l border-white/20 h-6 my-auto"></div>
+                              <div>
+                                <span className="text-[7.5px] font-medium opacity-65 uppercase block">Saldo Contable</span>
+                                <span className="text-sm font-bold font-mono opacity-80 leading-none block mt-0.5">
+                                  ${parseFloat(cta.saldo).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
                             </div>
-                            <span className="text-[9px] font-black opacity-40 uppercase tracking-widest">COOP ITQ</span>
+                          </div>
+
+                          {/* 3. Información de Antigüedad (Fecha de Creación) */}
+                          <div className="z-10 flex justify-between items-center border-t border-white/10 pt-1.5 mt-1">
+                            <span className="text-[8px] font-medium opacity-50 uppercase">COOP ITQ</span>
+                            <span className="text-[8px] font-medium opacity-50">
+                              Apertura: {cta.createdAt ? new Date(cta.createdAt).toLocaleDateString('es-EC') : 'N/A'}
+                            </span>
                           </div>
 
                         </div>
@@ -2380,9 +3459,633 @@ export const CreacionSocios: React.FC = () => {
                   </div>
                 )}
               </div>
+            )}
 
+            {/* Contenido de la Pestaña Créditos */}
+            {activeDetailTab === 'creditos' && (
+              <div className="space-y-4 animate-fade-in text-left">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1">
+                  Créditos Solicitados y Desembolsados
+                </h4>
+                {loadingCreditos ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-400">
+                    <Loader2 className="h-6 w-6 animate-spin text-[#0054A6]" />
+                    <span className="text-[10px] font-bold">Cargando información de créditos...</span>
+                  </div>
+                ) : creditosSocio.length === 0 ? (
+                  <div className="text-center py-10 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <span className="text-[10px] font-bold text-slate-400">El socio no registra solicitudes de crédito.</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto border border-slate-100 rounded-2xl">
+                    <table className="w-full text-left border-collapse table-fixed">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100">
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[15%]">Nº Crédito</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[13%]">Fecha Solicitud</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[12%]">Monto</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[14%]">Saldo Deudor</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[21%]">Próximo Vencimiento</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[15%]">Estado</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[10%] text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {creditosSocio.map((cred) => {
+                          const totalCapitalPagado = cred.cuotas ? cred.cuotas.reduce((sum: number, cuota: any) => sum + parseFloat(cuota.capitalPagado || 0), 0) : 0;
+                          const saldoDeudor = cred.estado === 'DESEMBOLSADO' || cred.estado === 'EN_MORA'
+                            ? Math.max(0, parseFloat(cred.montoDesembolsado || 0) - totalCapitalPagado)
+                            : 0;
+
+                          const prox = obtenerProximoVencimiento(cred);
+                          const badge = getEstadoCreditoBadge(cred.estado);
+                          const isExpanded = expandedCreditId === cred.id;
+
+                          let runningBalance = parseFloat(cred.montoDesembolsado || cred.montoSolicitado || 0);
+                          const cuotasOrdenadas = cred.cuotas ? [...cred.cuotas].sort((a, b) => a.numeroCuota - b.numeroCuota).map((cuota) => {
+                            runningBalance = runningBalance - parseFloat(cuota.capitalProyectado || 0);
+                            return {
+                              ...cuota,
+                              saldoRestante: Math.max(0, runningBalance)
+                            };
+                          }) : [];
+
+                          return (
+                            <React.Fragment key={cred.id}>
+                              <tr 
+                                onClick={() => setExpandedCreditId(isExpanded ? null : cred.id)}
+                                className={`hover:bg-slate-50/70 active:bg-slate-100/50 transition-all duration-200 cursor-pointer border-b border-slate-100/60 ${isExpanded ? 'bg-[#0054A6]/[0.02]' : ''}`}
+                              >
+                                <td className="px-4 py-3.5 text-xs font-bold text-[#0054A6] font-mono truncate">
+                                  {cred.numeroCredito}
+                                </td>
+                                <td className="px-4 py-3.5 text-xs font-semibold text-slate-500 font-mono">
+                                  {cred.fechaSolicitud ? new Date(cred.fechaSolicitud).toLocaleDateString('es-EC') : 'N/A'}
+                                </td>
+                                <td className="px-4 py-3.5 text-xs font-bold text-slate-700 font-mono">
+                                  ${parseFloat(cred.montoSolicitado || 0).toFixed(2)}
+                                </td>
+                                <td className="px-4 py-3.5 text-xs font-bold text-slate-700 font-mono">
+                                  ${saldoDeudor.toFixed(2)}
+                                </td>
+                                <td className="px-4 py-3.5 text-xs font-semibold text-slate-650 font-mono">
+                                  {prox.fecha !== 'N/A' ? (
+                                    <div className="flex flex-col">
+                                      <span className="text-slate-700 font-bold">${prox.monto.toFixed(2)}</span>
+                                      <span className="text-[10px] text-slate-400 font-medium">Vence: {prox.fecha}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 font-medium">—</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3.5 text-xs">
+                                  <span className={`px-2 py-0.5 text-[9px] font-black rounded-md ${badge.classes}`}>
+                                    {badge.label}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3.5 text-xs relative" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center justify-end gap-2">
+                                    {/* Botón Imprimir Tabla de Amortización */}
+                                    <div className="relative group">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          descargarAmortizacionPdf(cred, selectedSocio);
+                                        }}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-[#0054A6] hover:bg-[#0054A6]/5 transition-all focus:outline-none cursor-pointer flex items-center justify-center"
+                                      >
+                                        <Printer className="h-4 w-4" />
+                                      </button>
+                                      <span className="pointer-events-none absolute -top-8 right-0 bg-slate-800 text-white text-[9px] font-bold py-1 px-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-md z-[60]">
+                                        Imprimir Amortización
+                                      </span>
+                                    </div>
+
+                                    {/* Botón Ver Pagaré */}
+                                    <div className="relative group">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          descargarPagarePdf(cred, selectedSocio);
+                                        }}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-[#0054A6] hover:bg-[#0054A6]/5 transition-all focus:outline-none cursor-pointer flex items-center justify-center"
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </button>
+                                      <span className="pointer-events-none absolute -top-8 right-0 bg-slate-800 text-white text-[9px] font-bold py-1 px-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-md z-[60]">
+                                        Ver Pagaré
+                                      </span>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+
+                              {isExpanded && (
+                                <tr className="bg-slate-50/30">
+                                  <td colSpan={7} className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                    <div className="bg-white border border-slate-100/80 rounded-2xl p-4 shadow-sm animate-fade-in">
+                                      <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-50">
+                                        <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                          Detalle de Amortización — Sistema: {cred.tipoAmortizacion}
+                                        </h5>
+                                        <span className="text-[10px] text-slate-400 font-semibold font-mono">
+                                          Plazo: {cred.plazoMeses} Meses | Tasa: {parseFloat(cred.tasaInteresAnual || 0).toFixed(2)}%
+                                        </span>
+                                      </div>
+
+                                      {!cred.cuotas || cred.cuotas.length === 0 ? (
+                                        <div className="text-center py-4">
+                                          <span className="text-xs text-slate-400 font-medium">No se registra cronograma de pagos para este crédito.</span>
+                                        </div>
+                                      ) : (
+                                        <div className="overflow-hidden border border-slate-100 rounded-xl">
+                                          <table className="w-full text-left border-collapse table-fixed">
+                                            <thead>
+                                              <tr className="bg-slate-50/60 border-b border-slate-100">
+                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[10%]">Cuota</th>
+                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%]">Vencimiento</th>
+                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%]">Capital</th>
+                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%]">Interés</th>
+                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%]">Total</th>
+                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%]">Saldo Restante</th>
+                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[20%] text-center">Estado</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100/60 text-xs">
+                                              {cuotasOrdenadas.map((cuota: any) => {
+                                                const totalCuota = parseFloat(cuota.cuotaTotalProyectada || (parseFloat(cuota.capitalProyectado || 0) + parseFloat(cuota.interesProyectado || 0)));
+                                                
+                                                return (
+                                                  <tr key={cuota.id} className="hover:bg-slate-50/30 transition-colors">
+                                                    <td className="px-3 py-2 font-bold text-slate-600 font-mono">
+                                                      #{cuota.numeroCuota}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-slate-500 font-mono">
+                                                      {cuota.fechaVencimiento ? new Date(cuota.fechaVencimiento).toLocaleDateString('es-EC') : 'N/A'}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-slate-600 font-mono">
+                                                      ${parseFloat(cuota.capitalProyectado || 0).toFixed(2)}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-slate-500 font-mono">
+                                                      ${parseFloat(cuota.interesProyectado || 0).toFixed(2)}
+                                                    </td>
+                                                    <td className="px-3 py-2 font-bold text-slate-700 font-mono">
+                                                      ${totalCuota.toFixed(2)}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-slate-500 font-mono">
+                                                      ${cuota.saldoRestante.toFixed(2)}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-center">
+                                                      <div className="flex items-center justify-center">
+                                                        {cuota.estado === 'PAGADA' ? (
+                                                          <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-md">
+                                                            <Check className="h-3 w-3 text-emerald-600 stroke-[3]" /> PAGADA
+                                                          </span>
+                                                        ) : cuota.estado === 'PENDIENTE' ? (
+                                                          <span className="inline-flex items-center gap-1 text-[9px] font-black text-slate-500 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-md">
+                                                            <Circle className="h-2 w-2 text-slate-400 fill-slate-200" /> PENDIENTE
+                                                          </span>
+                                                        ) : (
+                                                          <span className="inline-flex items-center gap-1 text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded-md">
+                                                            <AlertCircle className="h-3 w-3 text-rose-600" /> ATRASADA
+                                                          </span>
+                                                        )}
+                                                      </div>
+                                                    </td>
+                                                  </tr>
+                                                );
+                                              })}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Contenido de la Pestaña Transacciones */}
+            {activeDetailTab === 'transacciones' && (
+              <div className="space-y-4 animate-fade-in text-left">
+                {(() => {
+                  const filtradas = transaccionesSocio.filter(tx => {
+                    // Account filter
+                    if (filtroCuentaTx !== 'TODAS' && tx.numeroCuenta !== filtroCuentaTx) {
+                      return false;
+                    }
+                    // Text search filter
+                    if (filtroTxBuscar) {
+                      const query = filtroTxBuscar.toLowerCase();
+                      const descMatches = tx.descripcion ? tx.descripcion.toLowerCase().includes(query) : false;
+                      const refMatches = tx.referencia ? tx.referencia.toLowerCase().includes(query) : false;
+                      if (!descMatches && !refMatches) return false;
+                    }
+                    // Date range filter
+                    if (tx.fechaContable) {
+                      const txDate = new Date(tx.fechaContable);
+                      if (filtroTxFechaDesde) {
+                        const fromDate = new Date(filtroTxFechaDesde + 'T00:00:00');
+                        if (txDate < fromDate) return false;
+                      }
+                      if (filtroTxFechaHasta) {
+                        const toDate = new Date(filtroTxFechaHasta + 'T23:59:59');
+                        if (txDate > toDate) return false;
+                      }
+                    } else if (filtroTxFechaDesde || filtroTxFechaHasta) {
+                      return false;
+                    }
+                    return true;
+                  });
+
+                  return (
+                    <>
+                      <div className="flex flex-col gap-4 border-b border-slate-100 pb-3.5">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            Movimientos y Transacciones Ledger
+                          </h4>
+                          
+                          {/* Botón Exportar PDF (Estado de Cuenta) */}
+                          {transaccionesSocio.length > 0 && (
+                            <Button
+                              onClick={() => {
+                                console.log("Exportando estado de cuenta en PDF...");
+                                exportarTransaccionesPdf(filtradas, selectedSocio, filtroCuentaTx);
+                              }}
+                              className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold rounded-xl h-8.5 px-3 transition-all flex items-center gap-1.5 cursor-pointer text-xs shadow-sm font-sans shrink-0 self-end sm:self-auto"
+                            >
+                              <Download className="h-3.5 w-3.5 text-[#0054A6]" />
+                              Exportar PDF
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* Fila de Filtros Avanzados */}
+                        {transaccionesSocio.length > 0 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                            {/* Filtro por Cuenta */}
+                            <div className="sm:col-span-3 space-y-1">
+                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Cuenta Financiera</label>
+                              <select
+                                value={filtroCuentaTx}
+                                onChange={(e) => setFiltroCuentaTx(e.target.value)}
+                                className="w-full border border-slate-200 text-xs font-bold rounded-lg px-2.5 h-8.5 bg-white text-slate-700 outline-none focus:border-[#0054A6] cursor-pointer"
+                              >
+                                <option value="TODAS">Todas las Cuentas</option>
+                                {cuentasSocio.map((cta) => (
+                                  <option key={cta.id} value={cta.numeroCuenta}>
+                                    {cta.numeroCuenta} ({cta.tipo === 'AHORRO_VISTA' ? 'Ahorros' : 'Aportes'})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Buscador de Texto */}
+                            <div className="sm:col-span-3 space-y-1">
+                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Buscar Concepto / Ref</label>
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  placeholder="Buscar..."
+                                  value={filtroTxBuscar}
+                                  onChange={(e) => setFiltroTxBuscar(e.target.value)}
+                                  className="w-full border border-slate-200 text-xs font-bold rounded-lg pl-8 pr-2.5 h-8.5 bg-white text-slate-700 outline-none focus:border-[#0054A6]"
+                                />
+                                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                              </div>
+                            </div>
+
+                            {/* Fecha Desde */}
+                            <div className="sm:col-span-3 space-y-1">
+                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Fecha Desde</label>
+                              <input
+                                type="date"
+                                value={filtroTxFechaDesde}
+                                onChange={(e) => setFiltroTxFechaDesde(e.target.value)}
+                                className="w-full border border-slate-200 text-xs font-bold rounded-lg px-2.5 h-8.5 bg-white text-slate-700 outline-none focus:border-[#0054A6] font-mono"
+                              />
+                            </div>
+
+                            {/* Fecha Hasta */}
+                            <div className="sm:col-span-3 space-y-1">
+                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Fecha Hasta</label>
+                              <input
+                                type="date"
+                                value={filtroTxFechaHasta}
+                                onChange={(e) => setFiltroTxFechaHasta(e.target.value)}
+                                className="w-full border border-slate-200 text-xs font-bold rounded-lg px-2.5 h-8.5 bg-white text-slate-700 outline-none focus:border-[#0054A6] font-mono"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Botón de limpiar filtros si hay alguno activo */}
+                        {(filtroTxBuscar || filtroTxFechaDesde || filtroTxFechaHasta || filtroCuentaTx !== 'TODAS') && (
+                          <div className="flex justify-end mt-1">
+                            <button
+                              onClick={() => {
+                                setFiltroTxBuscar('');
+                                setFiltroTxFechaDesde('');
+                                setFiltroTxFechaHasta('');
+                                setFiltroCuentaTx('TODAS');
+                              }}
+                              className="text-[9px] font-extrabold text-[#0054A6] hover:underline uppercase tracking-wider cursor-pointer"
+                            >
+                              Limpiar Filtros
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {loadingTransacciones ? (
+                        <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-400">
+                          <Loader2 className="h-6 w-6 animate-spin text-[#0054A6]" />
+                          <span className="text-[10px] font-bold">Cargando transacciones...</span>
+                        </div>
+                      ) : transaccionesSocio.length === 0 ? (
+                        <div className="text-center py-10 bg-slate-50 border border-slate-100 rounded-2xl">
+                          <span className="text-[10px] font-bold text-slate-400">No se registran transacciones para este socio.</span>
+                        </div>
+                      ) : filtradas.length === 0 ? (
+                        <div className="text-center py-10 bg-slate-50 border border-slate-100 rounded-2xl">
+                          <span className="text-[10px] font-bold text-slate-400">No hay transacciones que coincidan con los filtros aplicados.</span>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto border border-slate-100 rounded-2xl">
+                          <table className="w-full text-left border-collapse table-fixed">
+                            <thead>
+                              <tr className="bg-slate-50 border-b border-slate-100">
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[18%]">Fecha y Hora</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[18%]">Cuenta</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[12%]">Tipo</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[12%]">Monto</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[12%]">Saldo</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[28%]">Concepto</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {filtradas.map((tx) => {
+                                const esCredito = tx.tipoTransaccion === 'CREDITO';
+                                return (
+                                  <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <td className="px-4 py-3 text-xs font-semibold text-slate-500 font-mono">
+                                      {tx.fechaContable ? new Date(tx.fechaContable).toLocaleString('es-EC') : 'N/A'}
+                                    </td>
+                                    <td className="px-4 py-3 text-xs font-bold text-slate-700 font-mono">
+                                      <span className="block">{tx.numeroCuenta}</span>
+                                      <span className="text-[9px] font-medium text-slate-400 uppercase">
+                                        {tx.tipoCuenta === 'AHORRO_VISTA' ? 'Ahorros' : 'Aportes'}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-xs">
+                                      <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-black rounded ${
+                                        esCredito 
+                                          ? 'text-emerald-700 bg-emerald-50 border border-emerald-100'
+                                          : 'text-rose-700 bg-rose-50 border border-rose-100'
+                                      }`}>
+                                        {esCredito ? 'DEPÓSITO' : 'RETIRO'}
+                                      </span>
+                                    </td>
+                                    <td className={`px-4 py-3 text-xs font-black font-mono ${
+                                      esCredito ? 'text-emerald-600' : 'text-rose-600'
+                                    }`}>
+                                      {esCredito ? '+' : '-'}${parseFloat(tx.monto).toFixed(2)}
+                                    </td>
+                                    <td className="px-4 py-3 text-xs font-bold text-slate-700 font-mono">
+                                      ${parseFloat(tx.saldoResultante).toFixed(2)}
+                                    </td>
+                                    <td className="px-4 py-3 text-xs text-slate-500 truncate" title={tx.descripcion}>
+                                      <span className="block font-semibold text-slate-700 truncate">{tx.descripcion}</span>
+                                      <span className="block text-[9px] font-mono text-slate-400 truncate">Ref: {tx.referencia}</span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Apertura de Cuenta */}
+      {isAperturaModalOpen && (
+        <div id="modal-apertura-cuenta" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-md p-4 overflow-y-auto animate-fade-in no-print">
+          <div className="w-full max-w-lg bg-white shadow-2xl border border-slate-100 rounded-[2rem] p-6 relative animate-scale-up text-left">
+            {/* Botón de Cerrar */}
+            <button 
+              id="btn-cerrar-apertura"
+              onClick={() => setIsAperturaModalOpen(false)}
+              className="absolute right-5 top-5 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="mx-auto h-12 w-12 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center mb-4">
+              <Plus className="h-6 w-6 text-[#0054A6]" />
             </div>
 
+            <h3 className="text-base font-black text-slate-800 tracking-tight text-center">
+              Aperturar Nueva Cuenta de Ahorro
+            </h3>
+            <p className="text-[10px] text-slate-450 mt-1 font-semibold text-center uppercase tracking-wider">
+              Socio: {selectedSocio?.nombresCompletos}
+            </p>
+
+            <div className="mt-5 space-y-4">
+              {/* Selector de Producto */}
+              <div>
+                <label id="lbl-producto" htmlFor="select-producto" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+                  Producto de Ahorro
+                </label>
+                <select
+                  id="select-producto"
+                  value={selectedProductoId}
+                  onChange={(e) => {
+                    setSelectedProductoId(e.target.value ? Number(e.target.value) : '');
+                    setAperturaError(null);
+                  }}
+                  className="w-full h-11 border border-slate-200 rounded-xl bg-slate-50/50 px-3.5 text-xs font-bold text-slate-700 focus:ring-4 focus:ring-[#0054A6]/10 focus:border-[#0054A6] outline-none transition-all cursor-pointer"
+                >
+                  <option value="">Seleccione un producto...</option>
+                  {productosAhorro.map((prod) => (
+                    <option key={prod.id} value={prod.id}>
+                      {prod.nombre} (Mín. ${parseFloat(prod.montoMinimoApertura).toFixed(2)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Toggle de Fondeo Inmediato */}
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100 transition-all duration-300">
+                <div className="space-y-0.5">
+                  <span className="block text-[10.5px] font-extrabold text-slate-700 leading-tight">
+                    Fondear inmediatamente por transferencia
+                  </span>
+                  <span className="block text-[9px] text-slate-400 font-semibold leading-normal">
+                    Debita el monto inicial desde la cuenta de Ahorro a la Vista del socio
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    id="toggle-fondear-inmediatamente"
+                    type="checkbox"
+                    checked={fondearInmediatamente}
+                    onChange={(e) => {
+                      setFondearInmediatamente(e.target.checked);
+                      setAperturaError(null);
+                      if (!e.target.checked) {
+                        setMontoInicialApertura('0');
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-350 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#0054A6]"></div>
+                </label>
+              </div>
+
+              {/* Sección Condicional de Fondeo */}
+              {fondearInmediatamente && (
+                <div className="space-y-3.5 border border-blue-100 bg-blue-50/20 p-4 rounded-2xl animate-fade-in">
+                  {/* Información de Cuenta Origen */}
+                  {(() => {
+                    const cuentaVista = cuentasSocio.find(c => c.tipo === 'AHORRO_VISTA' && c.estado === 'ACTIVA');
+                    if (!cuentaVista) {
+                      return (
+                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex gap-2 items-center">
+                          <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 font-bold" />
+                          <p className="text-[9.5px] text-amber-800 font-bold leading-normal">
+                            El socio no dispone de una cuenta de ahorros a la vista activa para realizar el débito. Debe aperturar una primero o desactivar el fondeo inmediato.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="flex justify-between items-center bg-white/70 border border-blue-50 p-2.5 rounded-xl text-[10px] font-bold text-slate-600 shadow-sm">
+                        <div>
+                          <span className="block text-[8px] text-slate-400 uppercase tracking-widest font-black">Cuenta de Origen</span>
+                          <span className="font-mono text-slate-700">{cuentaVista.numeroCuenta}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="block text-[8px] text-slate-400 uppercase tracking-widest font-black">Saldo Disponible</span>
+                          <span className="text-[#0054A6] font-mono">${parseFloat(cuentaVista.saldo).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Input de Monto */}
+                  <div>
+                    <label id="lbl-monto" htmlFor="input-monto" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+                      Monto de Apertura ($)
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <DollarSign className="h-3.5 w-3.5 text-slate-400" />
+                      </div>
+                      <input
+                        id="input-monto"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={montoInicialApertura}
+                        onChange={(e) => {
+                          setMontoInicialApertura(e.target.value);
+                          setAperturaError(null);
+                        }}
+                        className="w-full h-11 border border-slate-200 rounded-xl bg-white pl-8 pr-3.5 text-xs font-bold text-slate-700 font-mono focus:ring-4 focus:ring-[#0054A6]/10 focus:border-[#0054A6] outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Mensaje de Error */}
+              {aperturaError && (
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex gap-2 items-start animate-fade-in">
+                  <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-rose-700 font-bold leading-normal">
+                    {aperturaError}
+                  </p>
+                </div>
+              )}
+
+              {/* Botones de Acción */}
+              <div className="flex gap-3 pt-2">
+                <Button
+                  id="btn-cancelar-apertura"
+                  onClick={() => setIsAperturaModalOpen(false)}
+                  variant="outline"
+                  className="flex-1 border-slate-200 text-slate-500 hover:bg-slate-50 font-bold rounded-xl h-11 transition-all cursor-pointer text-xs"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  id="btn-confirmar-apertura"
+                  onClick={handleAperturarCuentaSubmit}
+                  disabled={cargandoApertura}
+                  className="flex-1 bg-[#0054A6] hover:bg-[#004080] text-white font-bold rounded-xl h-11 transition-all cursor-pointer flex items-center justify-center gap-1.5 text-xs shadow-sm shadow-blue-500/10 disabled:opacity-50"
+                >
+                  {cargandoApertura ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    'Procesar Apertura'
+                  )}
+                </Button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox / Visor de Documentos */}
+      {lightboxImage && (
+        <div 
+          onClick={() => setLightboxImage(null)}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in no-print"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-4xl max-h-[85vh] bg-white rounded-3xl p-3 shadow-2xl border border-slate-100/20 overflow-hidden flex flex-col items-center"
+          >
+            <button 
+              onClick={() => setLightboxImage(null)}
+              className="absolute right-4 top-4 p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 rounded-full transition-all cursor-pointer z-10 animate-fade-in"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="text-slate-700 font-extrabold text-[10px] uppercase tracking-wider mb-2 pt-2 px-4 select-none">
+              {lightboxImage.title}
+            </div>
+            <div className="overflow-auto max-h-[75vh] w-full flex justify-center items-center bg-slate-50 rounded-2xl p-4">
+              <img 
+                src={lightboxImage.url} 
+                alt={lightboxImage.title} 
+                className="max-w-full max-h-[65vh] object-contain rounded-xl shadow-md border border-slate-200/50"
+              />
+            </div>
           </div>
         </div>
       )}

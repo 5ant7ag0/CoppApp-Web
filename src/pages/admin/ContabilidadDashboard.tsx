@@ -15,7 +15,11 @@ import {
   Plus,
   Coins,
   Eye,
-  EyeOff
+  EyeOff,
+  BookOpen,
+  TrendingUp,
+  Scale,
+  Lock
 } from 'lucide-react';
 import api from '../../services/api';
 import { jsPDF } from 'jspdf';
@@ -98,7 +102,7 @@ const filterVisibleAccounts = (accounts: any[] | undefined | null, virtualCode?:
 };
 
 export const ContabilidadDashboard: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const activeSection = (searchParams.get('section') || 'PLAN').toUpperCase();
 
 
@@ -1411,6 +1415,87 @@ export const ContabilidadDashboard: React.FC = () => {
 
   return (
     <div className="animate-fade-in relative w-full space-y-6">
+      
+      {/* Tabs Navigation (Navbar Contabilidad) */}
+      <div className="flex bg-slate-200/60 p-1.5 rounded-[1.5rem] border border-slate-100 overflow-x-auto scrollbar-none gap-1">
+        <button
+          type="button"
+          onClick={() => setSearchParams({ section: 'plan' })}
+          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
+            activeSection === 'PLAN'
+              ? 'bg-white text-[#0054A6] shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Folder className="h-4 w-4" />
+          <span>Plan de Cuentas</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSearchParams({ section: 'diario' })}
+          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
+            activeSection === 'DIARIO'
+              ? 'bg-white text-[#0054A6] shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <BookOpen className="h-4 w-4" />
+          <span>Libro Diario</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSearchParams({ section: 'mayor' })}
+          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
+            activeSection === 'MAYOR'
+              ? 'bg-white text-[#0054A6] shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <FileText className="h-4 w-4" />
+          <span>Libro Mayor</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSearchParams({ section: 'resultados' })}
+          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
+            activeSection === 'RESULTADOS'
+              ? 'bg-white text-[#0054A6] shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <TrendingUp className="h-4 w-4" />
+          <span>Estado de Resultados</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSearchParams({ section: 'balance' })}
+          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
+            activeSection === 'BALANCE'
+              ? 'bg-white text-[#0054A6] shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Scale className="h-4 w-4" />
+          <span>Balance General</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSearchParams({ section: 'cierres' })}
+          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
+            activeSection === 'CIERRES'
+              ? 'bg-white text-[#0054A6] shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Lock className="h-4 w-4" />
+          <span>Cierres Fiscales</span>
+        </button>
+      </div>
 
       {/* SECCIÓN 1: PLAN DE CUENTAS */}
       {activeSection === 'PLAN' && (

@@ -1,29 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, Navigate, Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Outlet, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import api from '../services/api';
 import { 
   Loader2, 
   LogOut, 
-  Coins, 
   Users, 
   CreditCard, 
-  Calculator, 
   Settings,
-  Folder,
-  BookOpen,
-  TrendingUp,
-  Scale,
-  Lock,
-  FileText
+  Briefcase,
+  Monitor
 } from 'lucide-react';
 
 export const AdminLayout: React.FC = () => {
   const { isAuthenticated, user, isLoading, logout } = useAuth();
   const { activeTenant } = useTenant();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
 
   const isCajero = user?.rol === 'CAJERO';
   const activePath = location.pathname;
@@ -107,6 +100,49 @@ export const AdminLayout: React.FC = () => {
     };
   }, [isAuthenticated, isCajero]);
 
+  // Logo institucional dinámico
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  const fetchLogo = async () => {
+    try {
+      const res = await api.get('/empresas/mi-perfil');
+      if (res.data?.logoUrl) {
+        const url = res.data.logoUrl.startsWith('http') 
+          ? res.data.logoUrl 
+          : `http://localhost:8080/api/v1${res.data.logoUrl}`;
+        setLogoUrl(url);
+      } else {
+        setLogoUrl(null);
+      }
+    } catch (err) {
+      console.error('Error fetching company logo in sidebar:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchLogo();
+      
+      const handleLogoUpdated = (e: Event) => {
+        const customEvent = e as CustomEvent;
+        if (customEvent.detail) {
+          const url = customEvent.detail.startsWith('http')
+            ? customEvent.detail
+            : `http://localhost:8080/api/v1${customEvent.detail}`;
+          setLogoUrl(url);
+        } else {
+          fetchLogo();
+        }
+      };
+
+      window.addEventListener('logo-updated', handleLogoUpdated);
+      return () => {
+        window.removeEventListener('logo-updated', handleLogoUpdated);
+      };
+    }
+  }, [isAuthenticated, activeTenant]);
+
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-900 text-white">
@@ -124,7 +160,6 @@ export const AdminLayout: React.FC = () => {
     : 'U';
 
   const isContabilidadRoute = activePath.startsWith('/admin/contabilidad');
-  const contabilidadSeccionActiva = searchParams.get('section') || 'plan';
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col md:flex-row font-sans p-4 md:p-6 gap-6 relative select-none">
@@ -134,164 +169,96 @@ export const AdminLayout: React.FC = () => {
         <div className="space-y-8 flex flex-col flex-1 min-h-0">
           
           {/* Brand Logo & Institution */}
-          <div className="flex items-center gap-3 px-2">
-            <div className="h-10 w-10 rounded-2xl bg-[#0054A6] flex items-center justify-center font-black text-white text-lg shadow-lg shadow-blue-600/30 select-none">
-              {activeTenant?.name ? activeTenant.name.charAt(0).toUpperCase() : 'C'}
-            </div>
-            <div className="flex flex-col">
-              <span className="font-bold tracking-tight text-slate-800 text-base leading-none truncate max-w-[140px]">
-                {activeTenant?.name || 'CoopApp'}
-              </span>
-              <span className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-1">
-                {isContabilidadRoute ? 'Portal Contable' : 'Portal Operaciones'}
-              </span>
-            </div>
+          <div className="flex flex-col items-center justify-center text-center gap-3 px-2">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Logo Institucional"
+                className="w-full max-h-24 object-contain select-none"
+                onError={() => setLogoUrl(null)}
+              />
+            ) : (
+              <div className="h-16 w-16 rounded-2xl bg-[#0054A6] flex items-center justify-center font-black text-white text-2xl shadow-lg shadow-blue-600/30 select-none">
+                {activeTenant?.name ? activeTenant.name.charAt(0).toUpperCase() : 'C'}
+              </div>
+            )}
+            <span className="font-bold tracking-tight text-slate-800 text-xs leading-snug text-center max-w-full">
+              {activeTenant?.name || 'CoopApp'}
+            </span>
           </div>
 
           <nav className="flex flex-col gap-1.5 flex-1 overflow-y-auto scrollbar-none pr-1">
-            {isContabilidadRoute ? (
-              /* MENÚ EXCLUSIVO DE CONTABILIDAD (Mismo estilo que SocioLayout) */
+            {/* GRUPO 1: BALCÓN DE SERVICIOS */}
+            <span className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 mt-2 select-none">
+              Balcón de Servicios
+            </span>
+            <Link
+              to="/admin/socios"
+              className={
+                activePath === '/admin/socios'
+                  ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
+                  : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
+              }
+            >
+              <Users className="h-5 w-5 shrink-0" />
+              <span>Socios</span>
+            </Link>
+            <Link
+              to="/admin/creditos"
+              className={
+                activePath === '/admin/creditos'
+                  ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
+                  : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
+              }
+            >
+              <CreditCard className="h-5 w-5 shrink-0" />
+              <span>Créditos</span>
+            </Link>
+            <Link
+              to="/admin/dashboard"
+              className={
+                activePath === '/admin/dashboard'
+                  ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
+                  : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
+              }
+            >
+              <Monitor className="h-5 w-5 shrink-0" />
+              <span>Ventanilla</span>
+            </Link>
+
+            {/* GRUPO 2: FINANZAS Y CONTROL */}
+            <span className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 mt-6 select-none">
+              Finanzas y Control
+            </span>
+            <Link
+              to="/admin/contabilidad"
+              className={
+                isContabilidadRoute
+                  ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
+                  : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
+              }
+            >
+              <Briefcase className="h-5 w-5 shrink-0" />
+              <span>Contabilidad</span>
+            </Link>
+
+            {/* GRUPO 3: SISTEMA */}
+            {(user?.rol === 'ADMINISTRADOR' || user?.rol === 'GERENTE_GENERAL') && (
               <>
-                <Link
-                  to="/admin/contabilidad?section=plan"
-                  className={
-                    contabilidadSeccionActiva === 'plan'
-                      ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                      : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-                  }
-                >
-                  <Folder className="h-5 w-5 shrink-0" />
-                  <span>Plan de Cuentas</span>
-                </Link>
-                <Link
-                  to="/admin/contabilidad?section=diario"
-                  className={
-                    contabilidadSeccionActiva === 'diario'
-                      ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                      : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-                  }
-                >
-                  <BookOpen className="h-5 w-5 shrink-0" />
-                  <span>Libro Diario</span>
-                </Link>
-                <Link
-                  to="/admin/contabilidad?section=mayor"
-                  className={
-                    contabilidadSeccionActiva === 'mayor'
-                      ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                      : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-                  }
-                >
-                  <FileText className="h-5 w-5 shrink-0" />
-                  <span>Libro Mayor</span>
-                </Link>
-                <Link
-                  to="/admin/contabilidad?section=resultados"
-                  className={
-                    contabilidadSeccionActiva === 'resultados'
-                      ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                      : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-                  }
-                >
-                  <TrendingUp className="h-5 w-5 shrink-0" />
-                  <span>Estado Resultados</span>
-                </Link>
-                <Link
-                  to="/admin/contabilidad?section=balance"
-                  className={
-                    contabilidadSeccionActiva === 'balance'
-                      ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                      : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-                  }
-                >
-                  <Scale className="h-5 w-5 shrink-0" />
-                  <span>Balance General</span>
-                </Link>
-                <Link
-                  to="/admin/contabilidad?section=cierres"
-                  className={
-                    contabilidadSeccionActiva === 'cierres'
-                      ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                      : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-                  }
-                >
-                  <Lock className="h-5 w-5 shrink-0" />
-                  <span>Cierres Fiscales</span>
-                </Link>
-              </>
-            ) : (
-              /* MENÚ DE OTROS ROLES (OPERACIONES / CONTABILIDAD / SISTEMA) */
-              <>
-                <span className="px-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1 mt-2 select-none">
-                  Operaciones
+                <span className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 mt-6 select-none">
+                  Sistema
                 </span>
                 <Link
-                  to="/admin/dashboard"
+                  to="/admin/parametrizacion"
                   className={
-                    activePath === '/admin/dashboard'
+                    activePath === '/admin/parametrizacion'
                       ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
                       : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
                   }
                 >
-                  <Coins className="h-5 w-5 shrink-0" />
-                  <span>Ventanilla (Caja)</span>
+                  <Settings className="h-5 w-5 shrink-0" />
+                  <span>Parametrización</span>
                 </Link>
-                <Link
-                  to="/admin/socios"
-                  className={
-                    activePath === '/admin/socios'
-                      ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                      : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-                  }
-                >
-                  <Users className="h-5 w-5 shrink-0" />
-                  <span>Socios</span>
-                </Link>
-                <Link
-                  to="/admin/creditos"
-                  className={
-                    activePath === '/admin/creditos'
-                      ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                      : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-                  }
-                >
-                  <CreditCard className="h-5 w-5 shrink-0" />
-                  <span>Créditos</span>
-                </Link>
-
-                <span className="px-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1 mt-4 select-none">
-                  Contabilidad
-                </span>
-                <Link
-                  to="/admin/contabilidad?section=plan"
-                  className={
-                    activePath.startsWith('/admin/contabilidad')
-                      ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                      : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-                  }
-                >
-                  <Calculator className="h-5 w-5 shrink-0" />
-                  <span>Módulo Contable</span>
-                </Link>
-
-                {(user?.rol === 'ADMINISTRADOR' || user?.rol === 'GERENTE_GENERAL') && (
-                  <>
-                    <span className="px-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1 mt-4 select-none">
-                      Sistema
-                    </span>
-                    <Link
-                      to="/admin/parametrizacion"
-                      className={
-                        activePath === '/admin/parametrizacion'
-                          ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                          : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-                      }
-                    >
-                      <Settings className="h-5 w-5 shrink-0" />
-                      <span>Parametrización</span>
-                    </Link>
-                  </>
-                )}
               </>
             )}
           </nav>
