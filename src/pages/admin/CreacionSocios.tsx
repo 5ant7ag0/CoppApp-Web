@@ -2340,7 +2340,7 @@ export const CreacionSocios: React.FC = () => {
               </div>
 
               {/* Filtros de estado como botones pill */}
-              <div className="flex items-center gap-1 bg-slate-100/70 border border-slate-200/50 p-1.5 rounded-2xl shrink-0 w-full md:w-auto h-11 shadow-inner">
+              <div className="flex items-center gap-1 bg-[#F1F3F6] p-1 rounded-full border border-slate-100/50 shrink-0 w-full md:w-auto h-11">
                 {[
                   { value: 'TODOS', label: 'Todos' },
                   { value: 'PENDIENTE', label: 'Pendientes' },
@@ -2352,13 +2352,20 @@ export const CreacionSocios: React.FC = () => {
                     <button
                       key={item.value}
                       onClick={() => setEstadoFilter(item.value)}
-                      className={`flex-1 md:flex-initial h-full px-4 rounded-xl text-[10px] font-black transition-all cursor-pointer uppercase tracking-wider ${
-                        isActive
-                          ? 'bg-[#0054A6] text-white shadow-sm'
-                          : 'text-slate-500 hover:text-slate-750'
-                      }`}
+                      className="relative flex-1 md:flex-initial h-full px-4 rounded-full text-[10px] font-black transition-all cursor-pointer uppercase tracking-wider text-slate-500 hover:text-slate-805"
                     >
-                      {item.label}
+                      {isActive && (
+                        <motion.div
+                          layoutId="activeFilterSocio"
+                          className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                        />
+                      )}
+                      <span className={`relative z-10 transition-colors duration-300 ${
+                        isActive ? 'text-white' : 'text-slate-500'
+                      }`}>
+                        {item.label}
+                      </span>
                     </button>
                   );
                 })}
@@ -2706,50 +2713,78 @@ export const CreacionSocios: React.FC = () => {
             </div>
 
               {/* Selector de Pestañas Principal */}
-              <div className="flex bg-[#F1F5F9] p-1 border border-slate-200/40 shadow-sm rounded-full w-fit gap-1 mb-6 no-print font-sans">
+              <div className="flex bg-[#F1F3F6] p-1 border border-slate-100/50 shadow-sm rounded-full w-fit gap-1 mb-6 no-print font-sans">
                 <button
                   onClick={() => setActiveDetailTab('perfil')}
-                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all duration-250 flex items-center gap-2 cursor-pointer ${
-                    activeDetailTab === 'perfil'
-                      ? 'bg-[#0054A6] text-white shadow-sm shadow-blue-900/10'
-                      : 'text-slate-500 hover:text-[#0054A6] hover:bg-white/60'
-                  }`}
+                  className="relative px-5 py-2 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-2 cursor-pointer text-slate-500 hover:text-slate-805"
                 >
-                  <User className="h-3.5 w-3.5" />
-                  Perfil General
+                  {activeDetailTab === 'perfil' && (
+                    <motion.div
+                      layoutId="activeTabDetailSocio"
+                      className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+                    activeDetailTab === 'perfil' ? 'text-white' : 'text-slate-500'
+                  }`}>
+                    <User className="h-3.5 w-3.5" />
+                    Perfil General
+                  </span>
                 </button>
                 <button
                   onClick={() => setActiveDetailTab('cuentas')}
-                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all duration-250 flex items-center gap-2 cursor-pointer ${
-                    activeDetailTab === 'cuentas'
-                      ? 'bg-[#0054A6] text-white shadow-sm shadow-blue-900/10'
-                      : 'text-slate-500 hover:text-[#0054A6] hover:bg-white/60'
-                  }`}
+                  className="relative px-5 py-2 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-2 cursor-pointer text-slate-500 hover:text-slate-805"
                 >
-                  <DollarSign className="h-3.5 w-3.5" />
-                  Cuentas Financieras
+                  {activeDetailTab === 'cuentas' && (
+                    <motion.div
+                      layoutId="activeTabDetailSocio"
+                      className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+                    activeDetailTab === 'cuentas' ? 'text-white' : 'text-slate-500'
+                  }`}>
+                    <DollarSign className="h-3.5 w-3.5" />
+                    Cuentas Financieras
+                  </span>
                 </button>
                 <button
                   onClick={() => setActiveDetailTab('creditos')}
-                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all duration-250 flex items-center gap-2 cursor-pointer ${
-                    activeDetailTab === 'creditos'
-                      ? 'bg-[#0054A6] text-white shadow-sm shadow-blue-900/10'
-                      : 'text-slate-500 hover:text-[#0054A6] hover:bg-white/60'
-                  }`}
+                  className="relative px-5 py-2 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-2 cursor-pointer text-slate-500 hover:text-slate-805"
                 >
-                  <CreditCard className="h-3.5 w-3.5" />
-                  Créditos
+                  {activeDetailTab === 'creditos' && (
+                    <motion.div
+                      layoutId="activeTabDetailSocio"
+                      className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+                    activeDetailTab === 'creditos' ? 'text-white' : 'text-slate-500'
+                  }`}>
+                    <CreditCard className="h-3.5 w-3.5" />
+                    Créditos
+                  </span>
                 </button>
                 <button
                   onClick={() => setActiveDetailTab('transacciones')}
-                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all duration-250 flex items-center gap-2 cursor-pointer ${
-                    activeDetailTab === 'transacciones'
-                      ? 'bg-[#0054A6] text-white shadow-sm shadow-blue-900/10'
-                      : 'text-slate-500 hover:text-[#0054A6] hover:bg-white/60'
-                  }`}
+                  className="relative px-5 py-2 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-2 cursor-pointer text-slate-500 hover:text-slate-805"
                 >
-                  <ArrowRightLeft className="h-3.5 w-3.5" />
-                  Transacciones
+                  {activeDetailTab === 'transacciones' && (
+                    <motion.div
+                      layoutId="activeTabDetailSocio"
+                      className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+                    activeDetailTab === 'transacciones' ? 'text-white' : 'text-slate-500'
+                  }`}>
+                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                    Transacciones
+                  </span>
                 </button>
               </div>
 
