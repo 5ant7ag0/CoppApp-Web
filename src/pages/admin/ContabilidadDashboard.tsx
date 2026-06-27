@@ -1417,14 +1417,14 @@ export const ContabilidadDashboard: React.FC = () => {
     <div className="animate-fade-in relative w-full space-y-6">
       
       {/* Tabs Navigation (Navbar Contabilidad) */}
-      <div className="flex bg-slate-200/60 p-1.5 rounded-[1.5rem] border border-slate-100 overflow-x-auto scrollbar-none gap-1">
+      <div className="flex bg-[#F1F3F6] p-1 rounded-full border border-slate-100/50 overflow-x-auto scrollbar-none gap-1">
         <button
           type="button"
           onClick={() => setSearchParams({ section: 'plan' })}
-          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
+          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
             activeSection === 'PLAN'
-              ? 'bg-white text-[#0054A6] shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
           }`}
         >
           <Folder className="h-4 w-4" />
@@ -1434,10 +1434,10 @@ export const ContabilidadDashboard: React.FC = () => {
         <button
           type="button"
           onClick={() => setSearchParams({ section: 'diario' })}
-          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
+          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
             activeSection === 'DIARIO'
-              ? 'bg-white text-[#0054A6] shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
           }`}
         >
           <BookOpen className="h-4 w-4" />
@@ -1447,10 +1447,10 @@ export const ContabilidadDashboard: React.FC = () => {
         <button
           type="button"
           onClick={() => setSearchParams({ section: 'mayor' })}
-          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
+          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
             activeSection === 'MAYOR'
-              ? 'bg-white text-[#0054A6] shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
           }`}
         >
           <FileText className="h-4 w-4" />
@@ -1460,10 +1460,10 @@ export const ContabilidadDashboard: React.FC = () => {
         <button
           type="button"
           onClick={() => setSearchParams({ section: 'resultados' })}
-          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
+          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
             activeSection === 'RESULTADOS'
-              ? 'bg-white text-[#0054A6] shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
           }`}
         >
           <TrendingUp className="h-4 w-4" />
@@ -1473,10 +1473,10 @@ export const ContabilidadDashboard: React.FC = () => {
         <button
           type="button"
           onClick={() => setSearchParams({ section: 'balance' })}
-          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
+          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
             activeSection === 'BALANCE'
-              ? 'bg-white text-[#0054A6] shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
           }`}
         >
           <Scale className="h-4 w-4" />
@@ -1486,10 +1486,10 @@ export const ContabilidadDashboard: React.FC = () => {
         <button
           type="button"
           onClick={() => setSearchParams({ section: 'cierres' })}
-          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
+          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
             activeSection === 'CIERRES'
-              ? 'bg-white text-[#0054A6] shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
           }`}
         >
           <Lock className="h-4 w-4" />

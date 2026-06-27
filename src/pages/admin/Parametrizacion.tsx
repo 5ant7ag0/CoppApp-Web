@@ -884,13 +884,13 @@ export const Parametrizacion: React.FC = () => {
 
 
       {/* Tabs Navigation */}
-      <div className="flex bg-slate-200/60 p-1.5 rounded-[1.5rem] border border-slate-100 overflow-x-auto scrollbar-none gap-1">
+      <div className="flex bg-[#F1F3F6] p-1 rounded-full border border-slate-100/50 overflow-x-auto scrollbar-none gap-1">
         <button
           onClick={() => setActiveTab('institucional')}
-          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer ${
+          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
             activeTab === 'institucional'
-              ? 'bg-white text-[#0054A6] shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
           }`}
         >
           <Building2 className="h-4 w-4" />
@@ -899,10 +899,10 @@ export const Parametrizacion: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('financiero')}
-          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer ${
+          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
             activeTab === 'financiero'
-              ? 'bg-white text-[#0054A6] shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
           }`}
         >
           <DollarSign className="h-4 w-4" />
@@ -911,10 +911,10 @@ export const Parametrizacion: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('contabilidad')}
-          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer ${
+          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
             activeTab === 'contabilidad'
-              ? 'bg-white text-[#0054A6] shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
           }`}
         >
           <Link2 className="h-4 w-4" />
@@ -923,10 +923,10 @@ export const Parametrizacion: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('auditoria')}
-          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer ${
+          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
             activeTab === 'auditoria'
-              ? 'bg-white text-[#0054A6] shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
           }`}
         >
           <History className="h-4 w-4" />
@@ -935,10 +935,10 @@ export const Parametrizacion: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('ahorro_productos')}
-          className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 cursor-pointer ${
+          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
             activeTab === 'ahorro_productos'
-              ? 'bg-white text-[#0054A6] shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
           }`}
         >
           <TrendingUp className="h-4 w-4" />
