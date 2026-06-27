@@ -16,6 +16,7 @@ import {
   Clock
 } from 'lucide-react';
 import api from '../../services/api';
+import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import { Card } from '../../components/ui/card';
@@ -1378,47 +1379,64 @@ export const CajaVentanilla: React.FC = () => {
           <Card className="rounded-[2.2rem] border border-slate-100 bg-white shadow-[0_15px_40px_-10px_rgba(0,84,166,0.02)] overflow-hidden">
             
             {/* Tabs Control */}
-            <div className="flex border-b border-slate-100 bg-slate-50/50">
+            <div className="flex bg-[#F1F3F6] p-1 border border-slate-100/50 rounded-full gap-1 shadow-sm mx-6 mt-6">
               <button
                 type="button"
+                disabled={!isAhorroVista}
                 onClick={() => {
                   if (!isAhorroVista) return;
                   setActiveTab('DEPOSITO');
                   setTxError(null);
                 }}
                 title={!isAhorroVista ? 'Transacción no permitida para este tipo de cuenta' : ''}
-                className={`flex-1 py-3 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 transition-all cursor-pointer border-b-2 ${
-                  !isAhorroVista 
-                    ? 'opacity-40 cursor-not-allowed border-transparent text-slate-400' 
-                    : activeTab === 'DEPOSITO' 
-                      ? 'border-[#0054A6] text-[#0054A6] bg-white' 
-                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                className={`relative flex-1 py-2 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 rounded-full ${
+                  !isAhorroVista ? 'opacity-40 cursor-not-allowed text-slate-400' : 'cursor-pointer text-slate-500 hover:text-slate-805'
                 }`}
               >
-                <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
-                Depósito
+                {isAhorroVista && activeTab === 'DEPOSITO' && (
+                  <motion.div
+                    layoutId="activeTabVentanilla"
+                    className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className={`relative z-10 flex items-center gap-1 transition-colors duration-300 ${
+                  isAhorroVista && activeTab === 'DEPOSITO' ? 'text-white' : 'text-slate-500'
+                }`}>
+                  <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
+                  Depósito
+                </span>
               </button>
               <button
                 type="button"
+                disabled={!isAhorroVista}
                 onClick={() => {
                   if (!isAhorroVista) return;
                   setActiveTab('RETIRO');
                   setTxError(null);
                 }}
                 title={!isAhorroVista ? 'Transacción no permitida para este tipo de cuenta' : ''}
-                className={`flex-1 py-3 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 transition-all cursor-pointer border-b-2 ${
-                  !isAhorroVista 
-                    ? 'opacity-40 cursor-not-allowed border-transparent text-slate-400' 
-                    : activeTab === 'RETIRO' 
-                      ? 'border-[#0054A6] text-[#0054A6] bg-white' 
-                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                className={`relative flex-1 py-2 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 rounded-full ${
+                  !isAhorroVista ? 'opacity-40 cursor-not-allowed text-slate-400' : 'cursor-pointer text-slate-500 hover:text-slate-805'
                 }`}
               >
-                <ArrowUpRight className="h-4 w-4 text-rose-500" />
-                Retiro
+                {isAhorroVista && activeTab === 'RETIRO' && (
+                  <motion.div
+                    layoutId="activeTabVentanilla"
+                    className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className={`relative z-10 flex items-center gap-1 transition-colors duration-300 ${
+                  isAhorroVista && activeTab === 'RETIRO' ? 'text-white' : 'text-slate-500'
+                }`}>
+                  <ArrowUpRight className="h-4 w-4 text-rose-500" />
+                  Retiro
+                </span>
               </button>
               <button
                 type="button"
+                disabled={!isAhorroVista}
                 onClick={() => {
                   if (!isAhorroVista) return;
                   setActiveTab('PAGO_CREDITO');
@@ -1434,19 +1452,27 @@ export const CajaVentanilla: React.FC = () => {
                   }
                 }}
                 title={!isAhorroVista ? 'Transacción no permitida para este tipo de cuenta' : ''}
-                className={`flex-1 py-3 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 transition-all cursor-pointer border-b-2 ${
-                  !isAhorroVista 
-                    ? 'opacity-40 cursor-not-allowed border-transparent text-slate-400' 
-                    : activeTab === 'PAGO_CREDITO' 
-                      ? 'border-[#0054A6] text-[#0054A6] bg-white' 
-                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                className={`relative flex-1 py-2 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 rounded-full ${
+                  !isAhorroVista ? 'opacity-40 cursor-not-allowed text-slate-400' : 'cursor-pointer text-slate-500 hover:text-slate-805'
                 }`}
               >
-                <FileText className="h-4 w-4 text-blue-500" />
-                Crédito
+                {isAhorroVista && activeTab === 'PAGO_CREDITO' && (
+                  <motion.div
+                    layoutId="activeTabVentanilla"
+                    className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className={`relative z-10 flex items-center gap-1 transition-colors duration-300 ${
+                  isAhorroVista && activeTab === 'PAGO_CREDITO' ? 'text-white' : 'text-slate-500'
+                }`}>
+                  <FileText className="h-4 w-4 text-blue-500" />
+                  Crédito
+                </span>
               </button>
               <button
                 type="button"
+                disabled={!isAportaciones}
                 onClick={() => {
                   if (!isAportaciones) return;
                   setActiveTab('APORTACIONES');
@@ -1454,16 +1480,23 @@ export const CajaVentanilla: React.FC = () => {
                   setMontoTx('');
                 }}
                 title={!isAportaciones ? 'Transacción no permitida para este tipo de cuenta' : ''}
-                className={`flex-1 py-3 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 transition-all cursor-pointer border-b-2 ${
-                  !isAportaciones 
-                    ? 'opacity-40 cursor-not-allowed border-transparent text-slate-400' 
-                    : activeTab === 'APORTACIONES' 
-                      ? 'border-[#0054A6] text-[#0054A6] bg-white' 
-                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                className={`relative flex-1 py-2 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 rounded-full ${
+                  !isAportaciones ? 'opacity-40 cursor-not-allowed text-slate-400' : 'cursor-pointer text-slate-500 hover:text-slate-805'
                 }`}
               >
-                <Coins className="h-4 w-4 text-amber-500" />
-                Aportaciones
+                {isAportaciones && activeTab === 'APORTACIONES' && (
+                  <motion.div
+                    layoutId="activeTabVentanilla"
+                    className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className={`relative z-10 flex items-center gap-1 transition-colors duration-300 ${
+                  isAportaciones && activeTab === 'APORTACIONES' ? 'text-white' : 'text-slate-500'
+                }`}>
+                  <Coins className="h-4 w-4 text-amber-500" />
+                  Aportaciones
+                </span>
               </button>
             </div>
 
