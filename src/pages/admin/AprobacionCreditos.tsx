@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { motion } from 'framer-motion';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { useAuth } from '../../context/AuthContext';
@@ -1238,28 +1239,42 @@ export const AprobacionCreditos: React.FC = () => {
             )}
 
             {/* Toggle de Vista (Tablero / Lista) */}
-            <div className="bg-slate-100/80 p-0.5 rounded-2xl border border-slate-200/50 flex gap-0.5 shadow-inner">
+            <div className="flex bg-[#F1F3F6] p-1 border border-slate-100/50 rounded-full gap-1 shadow-sm">
               <button
                 onClick={() => setViewMode('kanban')}
-                className={`w-40 h-8.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  viewMode === 'kanban'
-                    ? 'bg-[#0054A6] text-white shadow-sm'
-                    : 'text-slate-500 hover:text-[#0054A6] hover:bg-blue-50/50'
-                }`}
+                className="relative w-32 h-8.5 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-slate-500 hover:text-slate-805"
               >
-                <LayoutGrid className="h-3.5 w-3.5" />
-                Tablero
+                {viewMode === 'kanban' && (
+                  <motion.div
+                    layoutId="activeViewMode"
+                    className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className={`relative z-10 flex items-center gap-1.5 transition-colors duration-300 ${
+                  viewMode === 'kanban' ? 'text-white' : 'text-slate-500'
+                }`}>
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  Tablero
+                </span>
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`w-40 h-8.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  viewMode === 'list'
-                    ? 'bg-[#0054A6] text-white shadow-sm'
-                    : 'text-slate-500 hover:text-[#0054A6] hover:bg-blue-50/50'
-                }`}
+                className="relative w-32 h-8.5 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-slate-500 hover:text-slate-805"
               >
-                <List className="h-3.5 w-3.5" />
-                Lista
+                {viewMode === 'list' && (
+                  <motion.div
+                    layoutId="activeViewMode"
+                    className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className={`relative z-10 flex items-center gap-1.5 transition-colors duration-300 ${
+                  viewMode === 'list' ? 'text-white' : 'text-slate-500'
+                }`}>
+                  <List className="h-3.5 w-3.5" />
+                  Lista
+                </span>
               </button>
             </div>
 
