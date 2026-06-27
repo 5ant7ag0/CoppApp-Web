@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { motion } from 'framer-motion';
 import { ECUADOR_GEODATA } from '../../utils/ecuadorGeodata';
 import { SearchableCombobox } from '../../components/SearchableCombobox';
 import { 
@@ -887,62 +888,97 @@ export const Parametrizacion: React.FC = () => {
       <div className="flex bg-[#F1F3F6] p-1 rounded-full border border-slate-100/50 overflow-x-auto scrollbar-none gap-1">
         <button
           onClick={() => setActiveTab('institucional')}
-          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
-            activeTab === 'institucional'
-              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
-          }`}
+          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer text-slate-500 hover:text-slate-805"
         >
-          <Building2 className="h-4 w-4" />
-          <span>Institucional</span>
+          {activeTab === 'institucional' && (
+            <motion.div
+              layoutId="activeTabParametrizacion"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+            activeTab === 'institucional' ? 'text-white' : 'text-slate-500'
+          }`}>
+            <Building2 className="h-4 w-4" />
+            <span>Institucional</span>
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab('financiero')}
-          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
-            activeTab === 'financiero'
-              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
-          }`}
+          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer text-slate-500 hover:text-slate-805"
         >
-          <DollarSign className="h-4 w-4" />
-          <span>Reglas Financieras</span>
+          {activeTab === 'financiero' && (
+            <motion.div
+              layoutId="activeTabParametrizacion"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+            activeTab === 'financiero' ? 'text-white' : 'text-slate-500'
+          }`}>
+            <DollarSign className="h-4 w-4" />
+            <span>Reglas Financieras</span>
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab('contabilidad')}
-          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
-            activeTab === 'contabilidad'
-              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
-          }`}
+          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer text-slate-500 hover:text-slate-850"
         >
-          <Link2 className="h-4 w-4" />
-          <span>Enlaces Contables</span>
+          {activeTab === 'contabilidad' && (
+            <motion.div
+              layoutId="activeTabParametrizacion"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+            activeTab === 'contabilidad' ? 'text-white' : 'text-slate-500'
+          }`}>
+            <Link2 className="h-4 w-4" />
+            <span>Enlaces Contables</span>
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab('auditoria')}
-          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
-            activeTab === 'auditoria'
-              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
-          }`}
+          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer text-slate-500 hover:text-slate-850"
         >
-          <History className="h-4 w-4" />
-          <span>Pista de Auditoría (SEPS)</span>
+          {activeTab === 'auditoria' && (
+            <motion.div
+              layoutId="activeTabParametrizacion"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+            activeTab === 'auditoria' ? 'text-white' : 'text-slate-500'
+          }`}>
+            <History className="h-4 w-4" />
+            <span>Pista de Auditoría (SEPS)</span>
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab('ahorro_productos')}
-          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer ${
-            activeTab === 'ahorro_productos'
-              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
-          }`}
+          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer text-slate-500 hover:text-slate-850"
         >
-          <TrendingUp className="h-4 w-4" />
-          <span>Productos de Ahorro</span>
+          {activeTab === 'ahorro_productos' && (
+            <motion.div
+              layoutId="activeTabParametrizacion"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+            activeTab === 'ahorro_productos' ? 'text-white' : 'text-slate-500'
+          }`}>
+            <TrendingUp className="h-4 w-4" />
+            <span>Productos de Ahorro</span>
+          </span>
         </button>
       </div>
 

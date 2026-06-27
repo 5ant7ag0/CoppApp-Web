@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { 
   FileText, 
   ChevronDown, 
@@ -1421,79 +1422,121 @@ export const ContabilidadDashboard: React.FC = () => {
         <button
           type="button"
           onClick={() => setSearchParams({ section: 'plan' })}
-          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
-            activeSection === 'PLAN'
-              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
-          }`}
+          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 text-slate-500 hover:text-slate-805"
         >
-          <Folder className="h-4 w-4" />
-          <span>Plan de Cuentas</span>
+          {activeSection === 'PLAN' && (
+            <motion.div
+              layoutId="activeTabContabilidad"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+            activeSection === 'PLAN' ? 'text-white' : 'text-slate-500'
+          }`}>
+            <Folder className="h-4 w-4" />
+            <span>Plan de Cuentas</span>
+          </span>
         </button>
 
         <button
           type="button"
           onClick={() => setSearchParams({ section: 'diario' })}
-          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
-            activeSection === 'DIARIO'
-              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
-          }`}
+          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 text-slate-500 hover:text-slate-805"
         >
-          <BookOpen className="h-4 w-4" />
-          <span>Libro Diario</span>
+          {activeSection === 'DIARIO' && (
+            <motion.div
+              layoutId="activeTabContabilidad"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+            activeSection === 'DIARIO' ? 'text-white' : 'text-slate-500'
+          }`}>
+            <BookOpen className="h-4 w-4" />
+            <span>Libro Diario</span>
+          </span>
         </button>
 
         <button
           type="button"
           onClick={() => setSearchParams({ section: 'mayor' })}
-          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
-            activeSection === 'MAYOR'
-              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
-          }`}
+          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 text-slate-500 hover:text-slate-805"
         >
-          <FileText className="h-4 w-4" />
-          <span>Libro Mayor</span>
+          {activeSection === 'MAYOR' && (
+            <motion.div
+              layoutId="activeTabContabilidad"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+            activeSection === 'MAYOR' ? 'text-white' : 'text-slate-500'
+          }`}>
+            <FileText className="h-4 w-4" />
+            <span>Libro Mayor</span>
+          </span>
         </button>
 
         <button
           type="button"
           onClick={() => setSearchParams({ section: 'resultados' })}
-          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
-            activeSection === 'RESULTADOS'
-              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
-          }`}
+          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 text-slate-500 hover:text-slate-805"
         >
-          <TrendingUp className="h-4 w-4" />
-          <span>Estado de Resultados</span>
+          {activeSection === 'RESULTADOS' && (
+            <motion.div
+              layoutId="activeTabContabilidad"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+            activeSection === 'RESULTADOS' ? 'text-white' : 'text-slate-500'
+          }`}>
+            <TrendingUp className="h-4 w-4" />
+            <span>Estado de Resultados</span>
+          </span>
         </button>
 
         <button
           type="button"
           onClick={() => setSearchParams({ section: 'balance' })}
-          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
-            activeSection === 'BALANCE'
-              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
-          }`}
+          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 text-slate-500 hover:text-slate-805"
         >
-          <Scale className="h-4 w-4" />
-          <span>Balance General</span>
+          {activeSection === 'BALANCE' && (
+            <motion.div
+              layoutId="activeTabContabilidad"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+            activeSection === 'BALANCE' ? 'text-white' : 'text-slate-500'
+          }`}>
+            <Scale className="h-4 w-4" />
+            <span>Balance General</span>
+          </span>
         </button>
 
         <button
           type="button"
           onClick={() => setSearchParams({ section: 'cierres' })}
-          className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 ${
-            activeSection === 'CIERRES'
-              ? 'bg-[#0054A6] text-white shadow-[0_4px_12px_rgba(0,84,166,0.15)]'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
-          }`}
+          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 text-slate-500 hover:text-slate-805"
         >
-          <Lock className="h-4 w-4" />
-          <span>Cierres Fiscales</span>
+          {activeSection === 'CIERRES' && (
+            <motion.div
+              layoutId="activeTabContabilidad"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+            activeSection === 'CIERRES' ? 'text-white' : 'text-slate-500'
+          }`}>
+            <Lock className="h-4 w-4" />
+            <span>Cierres Fiscales</span>
+          </span>
         </button>
       </div>
 
