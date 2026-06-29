@@ -691,8 +691,7 @@ export const AprobacionCreditos: React.FC = () => {
 
   // Manejar click en tarjeta
   const handleSelectCardClick = async (credito: Credito) => {
-    setVerPagareCredito(credito);
-    setActiveModalTab('pagare');
+    setCreditoSeleccionado(credito);
     setDisburseError(null);
     
     if (credito.estado === 'SOLICITADO') {
