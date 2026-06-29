@@ -19,10 +19,33 @@ import { AprobacionCreditos } from './pages/admin/AprobacionCreditos';
 import { CreacionSocios } from './pages/admin/CreacionSocios';
 import { ContabilidadDashboard } from './pages/admin/ContabilidadDashboard';
 import { Parametrizacion } from './pages/admin/Parametrizacion';
+import { GestionEquipo } from './pages/admin/GestionEquipo';
+import { ForzarCambioPassword } from './pages/auth/ForzarCambioPassword';
 import { Loader2 } from 'lucide-react';
 
+interface ProtectedAdminRouteProps {
+  allowedRoles: string[];
+  children: React.ReactNode;
+}
+
+const ProtectedAdminRoute: React.FC<ProtectedAdminRouteProps> = ({ allowedRoles, children }) => {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (!allowedRoles.includes(user.rol)) {
+    // Redirect to their default module based on role
+    if (user.rol === 'CAJERO') return <Navigate to="/admin/dashboard" replace />;
+    if (user.rol === 'OFICIAL_DE_CREDITO') return <Navigate to="/admin/creditos" replace />;
+    if (user.rol === 'CONTADOR') return <Navigate to="/admin/contabilidad" replace />;
+    if (user.rol === 'GERENTE_GENERAL' || user.rol === 'SUPER_ADMIN_SAAS' || user.rol === 'ADMINISTRADOR') {
+      return <Navigate to="/admin/creditos" replace />;
+    }
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+};
+
 const RootRouter: React.FC = () => {
-  const { isInitializing } = useAuth();
+  const { isInitializing, isAuthenticated, user } = useAuth();
 
   if (isInitializing) {
     return (
@@ -45,6 +68,18 @@ const RootRouter: React.FC = () => {
           <Route path="/establecer-password" element={<EstablecerPassword />} />
         </Route>
 
+        {/* Ruta de cambio obligatorio de contraseña */}
+        <Route 
+          path="/forzar-cambio-password" 
+          element={
+            isAuthenticated && user && user.rol !== 'SOCIO' && user.detalles?.cambiarPasswordProximoInicio ? (
+              <ForzarCambioPassword />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+
         {/* Rutas Protegidas del Socio */}
         <Route element={<SocioLayout />}>
           <Route path="/socio/dashboard" element={<Inicio />} />
@@ -57,11 +92,54 @@ const RootRouter: React.FC = () => {
 
         {/* Rutas Protegidas de Administración */}
         <Route element={<AdminLayout />}>
-          <Route path="/admin/dashboard" element={<DashboardScreen />} />
-          <Route path="/admin/creditos" element={<AprobacionCreditos />} />
-          <Route path="/admin/socios" element={<CreacionSocios />} />
-          <Route path="/admin/contabilidad" element={<ContabilidadDashboard />} />
-          <Route path="/admin/parametrizacion" element={<Parametrizacion />} />
+          <Route 
+            path="/admin/dashboard" 
+            element={
+              <ProtectedAdminRoute allowedRoles={['CAJERO']}>
+                <DashboardScreen />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin/creditos" 
+            element={
+              <ProtectedAdminRoute allowedRoles={['OFICIAL_DE_CREDITO', 'CONTADOR', 'GERENTE_GENERAL', 'SUPER_ADMIN_SAAS', 'ADMINISTRADOR']}>
+                <AprobacionCreditos />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin/socios" 
+            element={
+              <ProtectedAdminRoute allowedRoles={['OFICIAL_DE_CREDITO', 'CONTADOR', 'GERENTE_GENERAL', 'SUPER_ADMIN_SAAS', 'ADMINISTRADOR']}>
+                <CreacionSocios />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin/contabilidad" 
+            element={
+              <ProtectedAdminRoute allowedRoles={['CONTADOR', 'GERENTE_GENERAL', 'SUPER_ADMIN_SAAS', 'ADMINISTRADOR']}>
+                <ContabilidadDashboard />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin/parametrizacion" 
+            element={
+              <ProtectedAdminRoute allowedRoles={['GERENTE_GENERAL', 'SUPER_ADMIN_SAAS', 'ADMINISTRADOR']}>
+                <Parametrizacion />
+              </ProtectedAdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin/gestion-equipo" 
+            element={
+              <ProtectedAdminRoute allowedRoles={['GERENTE_GENERAL', 'SUPER_ADMIN_SAAS', 'ADMINISTRADOR']}>
+                <GestionEquipo />
+              </ProtectedAdminRoute>
+            } 
+          />
         </Route>
 
         {/* Redirecciones Generales */}

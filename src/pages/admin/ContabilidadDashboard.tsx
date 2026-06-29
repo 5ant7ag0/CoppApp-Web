@@ -23,6 +23,7 @@ import {
   Lock
 } from 'lucide-react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Card } from '../../components/ui/card';
@@ -104,7 +105,10 @@ const filterVisibleAccounts = (accounts: any[] | undefined | null, virtualCode?:
 
 export const ContabilidadDashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeSection = (searchParams.get('section') || 'PLAN').toUpperCase();
+  const { user } = useAuth();
+  const isLectura = user?.rol === 'GERENTE_GENERAL' || user?.rol === 'SUPER_ADMIN_SAAS';
+  const rawSection = (searchParams.get('section') || 'PLAN').toUpperCase();
+  const activeSection = (isLectura && rawSection === 'CIERRES') ? 'PLAN' : rawSection;
 
 
   // Cierres Fiscales state
@@ -1353,40 +1357,42 @@ export const ContabilidadDashboard: React.FC = () => {
 
           <div className="flex items-center gap-2">
             {/* Hover Actions Group */}
-            <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity duration-150 mr-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setParentAccountForNewSub(node);
-                  setShowAddSubcuentaModal(true);
-                }}
-                title="Agregar Subcuenta"
-                className="p-1 hover:bg-slate-100 border border-slate-200/50 rounded-lg text-slate-500 hover:text-[#0054A6] transition-colors cursor-pointer"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleToggleEstadoCuenta(node);
-                }}
-                disabled={deactivatingId === node.id}
-                title={node.estado === 'ACTIVO' ? 'Desactivar Cuenta' : 'Activar Cuenta'}
-                className={`p-1 border border-slate-200/50 rounded-lg transition-colors cursor-pointer ${
-                  node.estado === 'ACTIVO'
-                    ? 'hover:bg-rose-50 text-rose-500 hover:text-rose-700'
-                    : 'hover:bg-emerald-50 text-emerald-500 hover:text-emerald-700'
-                }`}
-              >
-                {deactivatingId === node.id ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : node.estado === 'ACTIVO' ? (
-                  <EyeOff className="h-3.5 w-3.5" />
-                ) : (
-                  <Eye className="h-3.5 w-3.5" />
-                )}
-              </button>
-            </div>
+            {!isLectura && (
+              <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity duration-150 mr-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setParentAccountForNewSub(node);
+                    setShowAddSubcuentaModal(true);
+                  }}
+                  title="Agregar Subcuenta"
+                  className="p-1 hover:bg-slate-100 border border-slate-200/50 rounded-lg text-slate-500 hover:text-[#0054A6] transition-colors cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleEstadoCuenta(node);
+                  }}
+                  disabled={deactivatingId === node.id}
+                  title={node.estado === 'ACTIVO' ? 'Desactivar Cuenta' : 'Activar Cuenta'}
+                  className={`p-1 border border-slate-200/50 rounded-lg transition-colors cursor-pointer ${
+                    node.estado === 'ACTIVO'
+                      ? 'hover:bg-rose-50 text-rose-500 hover:text-rose-700'
+                      : 'hover:bg-emerald-50 text-emerald-500 hover:text-emerald-700'
+                  }`}
+                >
+                  {deactivatingId === node.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : node.estado === 'ACTIVO' ? (
+                    <EyeOff className="h-3.5 w-3.5" />
+                  ) : (
+                    <Eye className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
+            )}
 
             {isInactive && (
               <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md border border-rose-100 bg-rose-50 text-rose-700 tracking-wider uppercase shrink-0">
@@ -1519,25 +1525,27 @@ export const ContabilidadDashboard: React.FC = () => {
           </span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setSearchParams({ section: 'cierres' })}
-          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 text-slate-500 hover:text-slate-805"
-        >
-          {activeSection === 'CIERRES' && (
-            <motion.div
-              layoutId="activeTabContabilidad"
-              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
-              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-            />
-          )}
-          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
-            activeSection === 'CIERRES' ? 'text-white' : 'text-slate-500'
-          }`}>
-            <Lock className="h-4 w-4" />
-            <span>Cierres Fiscales</span>
-          </span>
-        </button>
+        {!isLectura && (
+          <button
+            type="button"
+            onClick={() => setSearchParams({ section: 'cierres' })}
+            className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer shrink-0 text-slate-500 hover:text-slate-805"
+          >
+            {activeSection === 'CIERRES' && (
+              <motion.div
+                layoutId="activeTabContabilidad"
+                className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+              />
+            )}
+            <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+              activeSection === 'CIERRES' ? 'text-white' : 'text-slate-500'
+            }`}>
+              <Lock className="h-4 w-4" />
+              <span>Cierres Fiscales</span>
+            </span>
+          </button>
+        )}
       </div>
 
       {/* SECCIÓN 1: PLAN DE CUENTAS */}

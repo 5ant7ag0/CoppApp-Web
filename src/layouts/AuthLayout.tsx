@@ -9,6 +9,9 @@ export const AuthLayout: React.FC = () => {
     if (user.rol === 'SOCIO') {
       return <Navigate to="/socio/dashboard" replace />;
     } else {
+      if (user.detalles?.cambiarPasswordProximoInicio) {
+        return <Navigate to="/forzar-cambio-password" replace />;
+      }
       return <Navigate to="/admin/dashboard" replace />;
     }
   }

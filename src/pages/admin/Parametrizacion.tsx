@@ -103,6 +103,30 @@ interface ProductoAhorro {
   estado: string; // 'ACTIVO', 'INACTIVO'
 }
 
+interface Agencia {
+  id: number;
+  codigo: string;
+  nombre: string;
+  direccion: string;
+  estado: string;
+}
+
+interface CajaVentanilla {
+  id?: number;
+  codigo: string;
+  nombre: string;
+  agenciaId: number;
+  agenciaNombre?: string;
+  saldoBase: number;
+  saldoActual: number;
+  limiteEfectivoMaximo: number;
+  cuentaContableId: number;
+  cuentaContableNombre?: string;
+  estado: string;
+  estadoOperativo?: string;
+  cajeroAsignado?: string;
+}
+
 const tipoProductoOptions = [
   "Ahorro a la Vista",
   "Ahorro Programado",
@@ -158,7 +182,7 @@ const estadoKeyMap: Record<string, string> = {
 };
 
 export const Parametrizacion: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'institucional' | 'financiero' | 'contabilidad' | 'auditoria' | 'ahorro_productos'>('institucional');
+  const [activeTab, setActiveTab] = useState<'institucional' | 'financiero' | 'contabilidad' | 'auditoria' | 'ahorro_productos' | 'cajas_financieras'>('institucional');
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [originalSettings, setOriginalSettings] = useState<CompanySettings | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -182,6 +206,30 @@ export const Parametrizacion: React.FC = () => {
     cuentaContableGastoId: '',
     estado: 'ACTIVO'
   });
+
+  // Cajas Financieras
+  const [cajas, setCajas] = useState<CajaVentanilla[]>([]);
+  const [agencias, setAgencias] = useState<Agencia[]>([]);
+  const [loadingCajas, setLoadingCajas] = useState(false);
+  const [isCajaModalOpen, setIsCajaModalOpen] = useState(false);
+  const [cajaModalError, setCajaModalError] = useState<string | null>(null);
+  const [editingCaja, setEditingCaja] = useState<CajaVentanilla | null>(null);
+  const [cajaForm, setCajaForm] = useState({
+    codigo: '',
+    nombre: '',
+    agenciaId: '',
+    saldoBase: '0.00',
+    limiteEfectivoMaximo: '0.00',
+    cuentaContableId: '',
+    estado: 'ACTIVA'
+  });
+  
+  // Dropdown states for Caja Form
+  const [cajaCuentaSearch, setCajaCuentaSearch] = useState('');
+  const [cajaCuentaOpen, setCajaCuentaOpen] = useState(false);
+
+  const [cajasSearchQuery, setCajasSearchQuery] = useState('');
+  const [cajasStatusFilter, setCajasStatusFilter] = useState('TODOS');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -286,6 +334,125 @@ export const Parametrizacion: React.FC = () => {
       fetchProductos();
     }
   }, [activeTab]);
+
+  const fetchCajasAndAgencias = async () => {
+    setLoadingCajas(true);
+    try {
+      const [cajasRes, agenciasRes] = await Promise.all([
+        api.get('/cajas-ventanilla'),
+        api.get('/agencias')
+      ]);
+      setCajas(cajasRes.data || []);
+      setAgencias(agenciasRes.data || []);
+    } catch (err: any) {
+      console.error('Error fetching cajas/agencias:', err);
+      setErrorMsg('Error al cargar catálogo de cajas y agencias: ' + (err.response?.data || err.message));
+    } finally {
+      setLoadingCajas(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'cajas_financieras') {
+      fetchCajasAndAgencias();
+    }
+  }, [activeTab]);
+
+  const handleOpenNewCaja = () => {
+    setEditingCaja(null);
+    setCajaForm({
+      codigo: 'Autogenerado',
+      nombre: '',
+      agenciaId: '',
+      saldoBase: '0.00',
+      limiteEfectivoMaximo: '0.00',
+      cuentaContableId: '',
+      estado: 'ACTIVA'
+    });
+    setCajaCuentaSearch('');
+    setCajaCuentaOpen(false);
+    setCajaModalError(null);
+    setIsCajaModalOpen(true);
+  };
+
+  const handleOpenEditCaja = (caja: CajaVentanilla) => {
+    setEditingCaja(caja);
+    
+    // Find the account string for the dropdown
+    const accStr = caja.cuentaContableId && caja.cuentaContableNombre 
+        ? `${accounts.find(a => a.id === caja.cuentaContableId)?.codigoContable || ''} - ${caja.cuentaContableNombre}` 
+        : '';
+        
+    setCajaForm({
+      codigo: caja.codigo,
+      nombre: caja.nombre,
+      agenciaId: String(caja.agenciaId),
+      saldoBase: String(caja.saldoBase),
+      limiteEfectivoMaximo: String(caja.limiteEfectivoMaximo),
+      cuentaContableId: accStr,
+      estado: caja.estado
+    });
+    setCajaCuentaSearch('');
+    setCajaCuentaOpen(false);
+    setCajaModalError(null);
+    setIsCajaModalOpen(true);
+  };
+
+  const handleSaveCaja = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setCajaModalError(null);
+
+    if (!cajaForm.codigo.trim() || !cajaForm.nombre.trim() || !cajaForm.agenciaId) {
+      setCajaModalError('Código, Nombre y Agencia son obligatorios.');
+      return;
+    }
+
+    let cuentaId: number | null = null;
+    if (cajaForm.cuentaContableId) {
+      const code = cajaForm.cuentaContableId.split(' - ')[0];
+      const acc = accounts.find(a => a.codigoContable === code);
+      if (acc) {
+        cuentaId = acc.id;
+      }
+    }
+
+    const payload = {
+      codigo: cajaForm.codigo,
+      nombre: cajaForm.nombre,
+      agenciaId: Number(cajaForm.agenciaId),
+      saldoBase: Number(cajaForm.saldoBase),
+      limiteEfectivoMaximo: Number(cajaForm.limiteEfectivoMaximo),
+      cuentaContableId: cuentaId,
+      estado: cajaForm.estado
+    };
+
+    try {
+      if (editingCaja && editingCaja.id) {
+        await api.put(`/cajas-ventanilla/${editingCaja.id}`, payload);
+        setSuccessMsg('¡Caja actualizada con éxito!');
+      } else {
+        await api.post('/cajas-ventanilla', payload);
+        setSuccessMsg('¡Caja creada con éxito! El saldo inicial ha sido fijado en $0.00 de manera estricta.');
+      }
+      setIsCajaModalOpen(false);
+      fetchCajasAndAgencias();
+    } catch (err: any) {
+      console.error(err);
+      
+      let errMsg = err.message || 'Error desconocido';
+      if (err.response?.data) {
+        if (typeof err.response.data === 'object') {
+           errMsg = err.response.data.message || 'El servidor rechazó la solicitud (Validación fallida).';
+        } else {
+           errMsg = err.response.data;
+        }
+      }
+      
+      setCajaModalError(`No se pudo guardar la caja: ${errMsg}`);
+    }
+  };
 
   const handleOpenNewProduct = () => {
     setEditingProduct(null);
@@ -865,6 +1032,19 @@ export const Parametrizacion: React.FC = () => {
     );
   };
 
+  const filteredCajas = cajas.filter(caja => {
+    const searchLower = cajasSearchQuery.toLowerCase();
+    const matchesSearch = !cajasSearchQuery || 
+      caja.nombre.toLowerCase().includes(searchLower) ||
+      caja.codigo.toLowerCase().includes(searchLower) ||
+      (caja.agenciaNombre && caja.agenciaNombre.toLowerCase().includes(searchLower)) ||
+      (caja.cajeroAsignado && caja.cajeroAsignado.toLowerCase().includes(searchLower));
+      
+    const matchesStatus = cajasStatusFilter === 'TODOS' || caja.estado === cajasStatusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       
@@ -978,6 +1158,25 @@ export const Parametrizacion: React.FC = () => {
           }`}>
             <TrendingUp className="h-4 w-4" />
             <span>Productos de Ahorro</span>
+          </span>
+        </button>
+        
+        <button
+          onClick={() => setActiveTab('cajas_financieras')}
+          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer text-slate-500 hover:text-slate-850"
+        >
+          {activeTab === 'cajas_financieras' && (
+            <motion.div
+              layoutId="activeTabParametrizacion"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+            activeTab === 'cajas_financieras' ? 'text-white' : 'text-slate-500'
+          }`}>
+            <Coins className="h-4 w-4" />
+            <span>Cajas Financieras</span>
           </span>
         </button>
       </div>
@@ -1887,11 +2086,12 @@ export const Parametrizacion: React.FC = () => {
               </div>
             )}
 
-            {/* Modal de Creación/Edición */}
+
+            {/* Modal de Creación/Edición Productos */}
             {isProductModalOpen && (
-              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-6">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 pb-6 px-4 sm:px-6 bg-slate-900/50 backdrop-blur-md overflow-y-auto">
+                <div className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-2xl max-w-2xl w-full flex flex-col mb-16 relative">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
                     <h3 className="text-base font-bold text-slate-800">
                       {editingProduct ? 'Editar Producto de Ahorro' : 'Nuevo Producto de Ahorro'}
                     </h3>
@@ -1904,8 +2104,9 @@ export const Parametrizacion: React.FC = () => {
                     </button>
                   </div>
 
-                  <form onSubmit={handleSaveProduct} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="mt-6">
+                    <form id="product-form" onSubmit={handleSaveProduct} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       
                       <div className="space-y-1.5 col-span-2">
                         <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nombre del Producto</label>
@@ -1919,7 +2120,7 @@ export const Parametrizacion: React.FC = () => {
                         />
                       </div>
 
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 relative z-50">
                         <SearchableCombobox
                           label="Tipo de Producto"
                           value={tipoProductoValueMap[productForm.tipoProducto] || ""}
@@ -1971,7 +2172,7 @@ export const Parametrizacion: React.FC = () => {
                         />
                       </div>
 
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 relative z-40">
                         <SearchableCombobox
                           label="Regla de Retiro"
                           value={tipoRetiroValueMap[productForm.tipoRetiro] || ""}
@@ -1997,7 +2198,7 @@ export const Parametrizacion: React.FC = () => {
                         />
                       </div>
 
-                      <div className="col-span-2">
+                      <div className="col-span-2 relative z-30">
                         <SearchableCombobox
                           label="Cuenta Contable Obligaciones (Pasivo)"
                           placeholder="Buscar cuenta de pasivo..."
@@ -2007,7 +2208,7 @@ export const Parametrizacion: React.FC = () => {
                         />
                       </div>
 
-                      <div className="col-span-2">
+                      <div className="col-span-2 relative z-20">
                         <SearchableCombobox
                           label="Cuenta Contable Gasto por Intereses (Gasto)"
                           placeholder="Buscar cuenta de gasto..."
@@ -2017,7 +2218,7 @@ export const Parametrizacion: React.FC = () => {
                         />
                       </div>
 
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 relative z-10">
                         <SearchableCombobox
                           label="Estado del Producto"
                           value={estadoValueMap[productForm.estado] || ""}
@@ -2030,29 +2231,392 @@ export const Parametrizacion: React.FC = () => {
                       </div>
 
                     </div>
+                  </form>
+                </div>
 
-                    <div className="flex justify-end gap-2 border-t border-slate-100 pt-6">
+                {(() => {
+                  const hasProductChanges = !editingProduct ||
+                    productForm.nombre !== editingProduct.nombre ||
+                    productForm.tipoProducto !== editingProduct.tipoProducto ||
+                    productForm.tasaInteresAnual !== String(editingProduct.tasaInteresAnual) ||
+                    productForm.montoMinimoApertura !== String(editingProduct.montoMinimoApertura) ||
+                    productForm.saldoMinimoRequerido !== String(editingProduct.saldoMinimoRequerido) ||
+                    productForm.tipoRetiro !== editingProduct.tipoRetiro ||
+                    productForm.tasaPenalizacionRetiro !== String(editingProduct.tasaPenalizacionRetiro) ||
+                    productForm.cuentaContablePasivoId !== (editingProduct.cuentaContablePasivo ? `${editingProduct.cuentaContablePasivo.codigoContable} - ${editingProduct.cuentaContablePasivo.nombreCuenta}` : '') ||
+                    productForm.cuentaContableGastoId !== (editingProduct.cuentaContableGasto ? `${editingProduct.cuentaContableGasto.codigoContable} - ${editingProduct.cuentaContableGasto.nombreCuenta}` : '') ||
+                    productForm.estado !== editingProduct.estado;
+
+                  return (
+                    <div className="flex justify-end gap-2 border-t border-slate-100 pt-5 shrink-0">
                       <button
                         type="button"
                         onClick={() => setIsProductModalOpen(false)}
-                        className="py-2.5 px-5 rounded-xl border border-slate-200 hover:bg-slate-55 text-xs font-bold text-slate-600 transition-all cursor-pointer"
+                        className="py-2.5 px-5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-600 transition-all cursor-pointer"
                       >
                         Cancelar
                       </button>
-                      <button
-                        type="submit"
-                        className="py-2.5 px-5 rounded-xl bg-[#0054A6] hover:bg-[#004080] text-white text-xs font-bold transition-all cursor-pointer"
-                      >
-                        Guardar Producto
-                      </button>
+                      {hasProductChanges && (
+                        <button
+                          type="submit"
+                          form="product-form"
+                          className="py-2.5 px-5 rounded-xl bg-[#0054A6] hover:bg-[#004080] text-white text-xs font-bold transition-all cursor-pointer"
+                        >
+                          {editingProduct ? 'Guardar Cambios' : 'Crear Producto'}
+                        </button>
+                      )}
                     </div>
-                  </form>
-                </div>
+                  );
+                })()}
+              </div>
+            </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB E: CAJAS FINANCIERAS */}
+        {activeTab === 'cajas_financieras' && (
+          <div className="space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[#0054A6]" />
+                  Gestión de Cajas Financieras
+                </h2>
+                <p className="text-xs text-slate-400 font-semibold leading-relaxed max-w-3xl">
+                  Configure las ventanillas físicas (cajas) de la cooperativa. Esto habilita el origen de la infraestructura para operaciones en efectivo, estableciendo límites operativos y saldos de bóveda de manera contable estricta.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleOpenNewCaja}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#0054A6] text-white text-xs font-bold hover:bg-[#004385] transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+                >
+                  + Nueva Caja
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-4 mb-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar caja, cajero, código o agencia..."
+                  value={cajasSearchQuery}
+                  onChange={(e) => setCajasSearchQuery(e.target.value)}
+                  className="w-full bg-white border border-slate-100 focus:border-[#0054A6] rounded-2xl pl-11 pr-12 py-3 text-xs font-semibold text-slate-700 outline-none transition-all shadow-sm focus:shadow-md"
+                />
+                {cajasSearchQuery && (
+                  <button 
+                    onClick={() => setCajasSearchQuery('')}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {(cajasSearchQuery || cajasStatusFilter !== 'TODOS') && (
+                <button
+                  type="button"
+                  onClick={() => { setCajasSearchQuery(''); setCajasStatusFilter('TODOS'); }}
+                  className="flex items-center justify-center gap-1.5 px-5 py-3 rounded-2xl bg-rose-50 text-rose-600 text-[11px] font-bold hover:bg-rose-100 hover:text-rose-700 transition-colors uppercase tracking-wider shrink-0"
+                >
+                  <X className="h-3.5 w-3.5" /> Limpiar
+                </button>
+              )}
+
+              <div className="w-full md:w-56 relative shrink-0">
+                <select
+                  value={cajasStatusFilter}
+                  onChange={(e) => setCajasStatusFilter(e.target.value)}
+                  className="w-full bg-white border border-slate-100 focus:border-[#0054A6] rounded-2xl pl-4 pr-10 py-3 text-xs font-bold text-slate-600 outline-none transition-all shadow-sm focus:shadow-md appearance-none cursor-pointer"
+                >
+                  <option value="TODOS">Todos los Estados</option>
+                  <option value="ACTIVA">Activas</option>
+                  <option value="INACTIVA">Inactivas</option>
+                  <option value="ABIERTA">Abiertas</option>
+                  <option value="CERRADA">Cerradas</option>
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+
+            {loadingCajas ? (
+              <div className="flex h-40 items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-[#0054A6]" />
+              </div>
+            ) : cajas.length === 0 ? (
+              <div className="bg-slate-50 border border-slate-100 border-dashed rounded-3xl p-12 text-center">
+                <Coins className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                <p className="text-sm font-bold text-slate-600">No hay Cajas Financieras registradas</p>
+                <p className="text-xs text-slate-400 mt-1">Cree la primera caja para comenzar a operar ventanillas.</p>
+              </div>
+            ) : filteredCajas.length === 0 ? (
+              <div className="bg-slate-50 border border-slate-100 border-dashed rounded-3xl p-12 text-center">
+                <Search className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                <p className="text-sm font-bold text-slate-600">No se encontraron resultados</p>
+                <p className="text-xs text-slate-400 mt-1">Intente ajustar los términos de búsqueda o filtros.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {filteredCajas.map(caja => {
+                  let statusColor = 'bg-slate-400';
+                  let statusBg = 'bg-slate-50 text-slate-600';
+                  let displayStatus = caja.estadoOperativo || caja.estado;
+
+                  if (displayStatus === 'ABIERTA') {
+                    statusColor = 'bg-emerald-500';
+                    statusBg = 'bg-emerald-50 text-emerald-700';
+                  } else if (displayStatus === 'CERRADA') {
+                    statusColor = 'bg-blue-500 bg-[url("data:image/svg+xml,%3Csvg width=\'6\' height=\'6\' viewBox=\'0 0 6 6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.2\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M5 0h1L0 6V5zM6 5v1H5z\'/%3E%3C/g%3E%3C/svg\")]';
+                    statusBg = 'bg-blue-50 text-blue-700';
+                  }
+                  
+                  return (
+                    <div key={caja.id} className="relative bg-white rounded-[1.5rem] border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 overflow-hidden flex flex-col group">
+                      {/* Indicador de Estado Lateral Fino */}
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${statusColor} opacity-90`} />
+                      
+                      <div className="p-5 flex-1 flex flex-col relative z-10 pl-6">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h3 className="text-sm font-black text-slate-800 leading-tight">{caja.nombre}</h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{caja.codigo}</p>
+                          </div>
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${statusBg}`}>
+                            {displayStatus}
+                          </span>
+                        </div>
+                        
+                        <div className="mb-4">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Saldo Físico Actual</p>
+                          <p className="text-2xl font-black text-slate-800 tracking-tight">${caja.saldoActual?.toFixed(2) || '0.00'}</p>
+                        </div>
+                        
+                        <div className="space-y-3 flex-1 mb-5">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                            <span className="text-xs font-bold text-slate-600">{caja.agenciaNombre}</span>
+                          </div>
+                          <div className="flex items-center justify-between border-t border-slate-50 pt-3">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Fondo Inicial</span>
+                            <span className="text-[11px] font-bold text-slate-500">${caja.saldoBase.toFixed(2)}</span>
+                          </div>
+                          <div className="flex items-center justify-between border-t border-slate-50 pt-3">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Límite Max.</span>
+                            <span className="text-[11px] font-bold text-slate-500">${caja.limiteEfectivoMaximo.toFixed(2)}</span>
+                          </div>
+                          <div className="flex items-center justify-between border-t border-slate-50 pt-3">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Cajero</span>
+                            <span className="text-[11px] font-bold text-slate-500">{caja.cajeroAsignado || 'Sin Asignar'}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2 mt-auto pt-3 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditCaja(caja)}
+                            className="flex-1 py-2 px-3 rounded-xl bg-slate-50 hover:bg-blue-50 hover:text-[#0054A6] text-xs font-bold text-slate-600 border border-slate-100 transition-all cursor-pointer text-center"
+                          >
+                            Editar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* Modal de Creación/Edición Cajas */}
+      {isCajaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 pb-6 px-4 sm:px-6 bg-slate-900/50 backdrop-blur-md overflow-y-auto">
+          <div className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-2xl max-w-2xl w-full flex flex-col mb-16 relative">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
+              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <Coins className="h-5 w-5 text-[#0054A6]" />
+                {editingCaja ? 'Configurar Caja Financiera' : 'Nueva Caja Financiera'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsCajaModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {cajaModalError && (
+              <div className="mt-5 bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-center gap-3 animate-fade-in shadow-sm">
+                <AlertCircle className="h-5 w-5 text-rose-600 shrink-0" />
+                <p className="text-xs font-semibold text-rose-700 leading-relaxed">{cajaModalError}</p>
+              </div>
+            )}
+
+            <div className="mt-6">
+              <form id="caja-form" onSubmit={handleSaveCaja} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Código Interno</label>
+                    <input
+                      type="text"
+                      required
+                      value={cajaForm.codigo}
+                      onChange={(e) => setCajaForm({ ...cajaForm, codigo: e.target.value })}
+                      className="w-full bg-slate-50/50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-semibold text-slate-500 outline-none cursor-not-allowed"
+                      placeholder="Autogenerado"
+                      disabled={true}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nombre / Identificador</label>
+                    <input
+                      type="text"
+                      required
+                      value={cajaForm.nombre}
+                      onChange={(e) => setCajaForm({ ...cajaForm, nombre: e.target.value })}
+                      className="w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white border border-slate-100 focus:border-[#0054A6] rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 outline-none transition-all"
+                      placeholder="Ej: Ventanilla 1 - Depósitos"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Agencia Asignada</label>
+                    <div className="relative">
+                      <select
+                        required
+                        value={cajaForm.agenciaId}
+                        onChange={(e) => setCajaForm({ ...cajaForm, agenciaId: e.target.value })}
+                        className="w-full appearance-none bg-slate-50/50 hover:bg-slate-50 focus:bg-white border border-slate-100 focus:border-[#0054A6] rounded-xl pl-4 pr-10 py-3 text-xs font-semibold text-slate-700 outline-none transition-all cursor-pointer"
+                      >
+                        <option value="" disabled>Seleccione una agencia...</option>
+                        {agencias.map(ag => (
+                          <option key={ag.id} value={ag.id}>{ag.codigo} - {ag.nombre}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-3 h-4 w-4 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Límite Max. Efectivo ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      value={cajaForm.limiteEfectivoMaximo}
+                      onChange={(e) => setCajaForm({ ...cajaForm, limiteEfectivoMaximo: e.target.value })}
+                      className="w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white border border-slate-100 focus:border-[#0054A6] rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 outline-none transition-all"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 relative z-60 bg-slate-50/50 border border-slate-100 rounded-xl p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Estado Operativo de Caja</p>
+                      <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+                        {cajaForm.estado === 'ACTIVA' ? 'La ventanilla podrá recibir transacciones.' : 'La ventanilla estará deshabilitada.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCajaForm({ ...cajaForm, estado: cajaForm.estado === 'ACTIVA' ? 'INACTIVA' : 'ACTIVA' })}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        cajaForm.estado === 'ACTIVA' ? 'bg-emerald-500' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          cajaForm.estado === 'ACTIVA' ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 md:col-span-2 relative z-50">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Cuenta Contable de Caja
+                    </label>
+                    <div className="relative">
+                      <input 
+                         type="text" 
+                         value={cajaCuentaOpen ? cajaCuentaSearch : (cajaForm.cuentaContableId || '')}
+                         onChange={(e) => setCajaCuentaSearch(e.target.value)}
+                         onFocus={() => { setCajaCuentaOpen(true); setCajaCuentaSearch(''); }}
+                         placeholder="Seleccione cuenta contable..."
+                         className="w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white border border-slate-100 focus:border-[#0054A6] rounded-xl pl-4 pr-10 py-3 text-xs font-semibold text-slate-700 outline-none transition-all cursor-pointer"
+                      />
+                      <div className="absolute right-3 top-3 flex items-center gap-1 text-slate-400">
+                        {cajaForm.cuentaContableId && !cajaCuentaOpen && (
+                          <button type="button" onClick={() => setCajaForm({...cajaForm, cuentaContableId: ''})} className="hover:text-rose-500 cursor-pointer">
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                        <ChevronDown className="h-4 w-4 pointer-events-none" />
+                      </div>
+                    </div>
+                    {cajaCuentaOpen && (
+                      <div className="absolute left-0 right-0 top-[4.5rem] max-h-48 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-y-auto p-2 space-y-1" style={{ zIndex: 9999 }}>
+                        {accounts.filter(a => a.nombreCuenta.toLowerCase().includes(cajaCuentaSearch.toLowerCase()) || a.codigoContable.includes(cajaCuentaSearch)).map(acc => (
+                          <button
+                            key={acc.id}
+                            type="button"
+                            onClick={() => {
+                              setCajaForm({...cajaForm, cuentaContableId: `${acc.codigoContable} - ${acc.nombreCuenta}`});
+                              setCajaCuentaOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-2.5 text-xs font-medium rounded-xl hover:bg-blue-50 hover:text-[#0054A6] transition-all flex items-start gap-1 cursor-pointer"
+                          >
+                            <span className="font-mono font-bold text-slate-500 shrink-0">{acc.codigoContable}</span>
+                            <span className="text-slate-700 font-bold ml-2 flex-1 text-left leading-normal break-words whitespace-normal">{acc.nombreCuenta}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            {(() => {
+              const hasCajaChanges = !editingCaja ||
+                cajaForm.nombre !== editingCaja.nombre ||
+                cajaForm.agenciaId !== String(editingCaja.agenciaId) ||
+                cajaForm.limiteEfectivoMaximo !== String(editingCaja.limiteEfectivoMaximo) ||
+                cajaForm.estado !== editingCaja.estado ||
+                cajaForm.cuentaContableId !== (editingCaja.cuentaContableId ? `${accounts.find(a => a.id === editingCaja.cuentaContableId)?.codigoContable} - ${accounts.find(a => a.id === editingCaja.cuentaContableId)?.nombreCuenta}` : '');
+
+              return (
+                <div className="flex justify-end gap-2 border-t border-slate-100 pt-5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsCajaModalOpen(false)}
+                    className="py-2.5 px-5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-600 transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  {hasCajaChanges && (
+                    <button
+                      type="submit"
+                      form="caja-form"
+                      className="py-2.5 px-5 rounded-xl bg-[#0054A6] hover:bg-[#004080] text-white text-xs font-bold transition-all cursor-pointer"
+                    >
+                      {editingCaja ? 'Guardar Cambios' : 'Crear Caja'}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
     </div>
   );

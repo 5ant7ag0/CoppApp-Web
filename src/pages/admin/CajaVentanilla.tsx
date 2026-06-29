@@ -13,7 +13,9 @@ import {
   Fingerprint, 
   FileText, 
   Building,
-  Clock
+  Clock,
+  DollarSign,
+  LogOut
 } from 'lucide-react';
 import api from '../../services/api';
 import { motion } from 'framer-motion';
@@ -249,6 +251,8 @@ export const CajaVentanilla: React.FC = () => {
   const [declaracionUafe, setDeclaracionUafe] = useState<boolean>(false);
   const [procesandoTx, setProcesandoTx] = useState<boolean>(false);
   const [txError, setTxError] = useState<string | null>(null);
+
+  const [cedulaModalView, setCedulaModalView] = useState<'FRONTAL' | 'POSTERIOR' | null>(null);
 
   // Crédito y Aportaciones
   const [creditosSocio, setCreditosSocio] = useState<any[]>([]);
@@ -1133,6 +1137,64 @@ export const CajaVentanilla: React.FC = () => {
   return (
     <div className="space-y-8 animate-fade-in relative pt-4">
 
+      {/* Cinta de Métricas de Ventanilla */}
+      {caja && caja.estado === 'APERTURADA' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 no-print mb-8">
+          
+          {/* Estado de Caja */}
+          <Card className="rounded-3xl border border-slate-100 p-5 shadow-[0_4px_12px_rgba(0,0,0,0.01)] bg-white flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">
+                Estado Operativo
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-2xl font-black text-slate-800 block">
+                  Caja Abierta
+                </span>
+              </div>
+            </div>
+            <div className="h-12 w-12 rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-500">
+              <CheckCircle2 className="h-6 w-6" />
+            </div>
+          </Card>
+
+          {/* Efectivo en Caja */}
+          <Card className="rounded-3xl border border-slate-100 p-5 shadow-[0_4px_12px_rgba(0,0,0,0.01)] bg-white flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">
+                Efectivo Disponible
+              </span>
+              <span className="text-2xl font-black text-slate-800 block font-mono">
+                ${saldoTeoricoCierre.toFixed(2)}
+              </span>
+            </div>
+            <div className="h-12 w-12 rounded-2xl bg-blue-50 border border-blue-100/50 flex items-center justify-center text-blue-500">
+              <DollarSign className="h-6 w-6" />
+            </div>
+          </Card>
+
+          {/* Arqueo y Cierre */}
+          <Card 
+            onClick={() => setMostrarPreCierre(true)}
+            className="rounded-3xl border border-slate-100 p-5 shadow-[0_4px_12px_rgba(0,0,0,0.01)] bg-white hover:shadow-[0_12px_25px_rgba(225,29,72,0.04)] hover:border-rose-500/20 transition-all duration-300 cursor-pointer hover:-translate-y-0.5 group flex items-center justify-between"
+          >
+            <div className="space-y-1">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block group-hover:text-rose-500 transition-colors">
+                Fin de Jornada
+              </span>
+              <span className="text-xl md:text-2xl font-black text-slate-800 block group-hover:text-rose-600 transition-colors">
+                Arqueo y Cierre
+              </span>
+            </div>
+            <div className="h-12 w-12 rounded-2xl bg-slate-50 border border-slate-100/50 group-hover:bg-rose-50 group-hover:border-rose-100/50 flex items-center justify-center text-slate-400 group-hover:text-rose-500 transition-colors">
+              <LogOut className="h-6 w-6" />
+            </div>
+          </Card>
+
+        </div>
+      )}
+
       {/* Panel de Operaciones en Dos Columnas */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
         
@@ -1251,13 +1313,20 @@ export const CajaVentanilla: React.FC = () => {
                         >
                           <div className="flex justify-between items-start gap-2">
                             <div>
-                              <span className={`text-[8px] font-extrabold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
-                                isAhorro
-                                  ? 'bg-blue-50 text-blue-700 border-blue-100'
-                                  : 'bg-amber-50 text-amber-700 border-amber-100'
-                              }`}>
-                                {isAhorro ? 'Ahorro a la Vista' : 'Aportaciones'}
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className={`text-[8px] font-extrabold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                                  isAhorro
+                                    ? 'bg-blue-50 text-blue-700 border-blue-100'
+                                    : 'bg-amber-50 text-amber-700 border-amber-100'
+                                }`}>
+                                  {isAhorro ? 'Ahorro a la Vista' : 'Aportaciones'}
+                                </span>
+                                {cta.estado === 'INACTIVA' && (
+                                  <span className="text-[7px] font-black px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-100 uppercase tracking-wider">
+                                    Inactiva
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[10px] font-mono font-bold text-slate-500 block mt-2">{cta.numeroCuenta}</span>
                             </div>
                             {isSelected && (
@@ -1311,7 +1380,10 @@ export const CajaVentanilla: React.FC = () => {
                     {/* Render de imágenes físicas cargadas */}
                     <div className="space-y-1.5">
                       <span className="text-[10px] font-semibold text-slate-400 block text-center">Cédula Frontal</span>
-                      <div className="h-40 rounded-xl border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
+                      <div 
+                        className="h-40 rounded-xl border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center cursor-pointer transition-transform hover:scale-105 active:scale-95 duration-200 shadow-sm hover:shadow-xl"
+                        onClick={() => setCedulaModalView('FRONTAL')}
+                      >
                         <img 
                           src={`http://localhost:8080/api/v1${socioInfo.socio.fotoCedulaFrontalUrl}`} 
                           alt="Cédula Frontal" 
@@ -1322,7 +1394,10 @@ export const CajaVentanilla: React.FC = () => {
                     </div>
                     <div className="space-y-1.5">
                       <span className="text-[10px] font-semibold text-slate-400 block text-center">Cédula Posterior / Firma</span>
-                      <div className="h-40 rounded-xl border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
+                      <div 
+                        className="h-40 rounded-xl border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center cursor-pointer transition-transform hover:scale-105 active:scale-95 duration-200 shadow-sm hover:shadow-xl"
+                        onClick={() => setCedulaModalView('POSTERIOR')}
+                      >
                         <img 
                           src={`http://localhost:8080/api/v1${socioInfo.socio.fotoCedulaPosteriorUrl}`} 
                           alt="Cédula Posterior" 
@@ -1342,17 +1417,21 @@ export const CajaVentanilla: React.FC = () => {
                     <div className="flex flex-col xl:flex-row gap-6 justify-center items-center">
                       <div className="space-y-1 w-full max-w-sm">
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center block">Cédula Frontal</span>
-                        <CedulaFrontalMockup 
-                          nombres={socioInfo.socio.nombresCompletos} 
-                          cedula={socioInfo.socio.identificacion}
-                          avatarUrl={socioInfo.socio.fotoPerfilUrl || null}
-                        />
+                        <div onClick={() => setCedulaModalView('FRONTAL')} className="cursor-pointer transition-transform hover:scale-105 active:scale-95 duration-200 shadow-sm hover:shadow-xl rounded-2xl">
+                          <CedulaFrontalMockup 
+                            nombres={socioInfo.socio.nombresCompletos} 
+                            cedula={socioInfo.socio.identificacion}
+                            avatarUrl={socioInfo.socio.fotoPerfilUrl || null}
+                          />
+                        </div>
                       </div>
                       <div className="space-y-1 w-full max-w-sm">
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center block">Cédula Posterior (Firma)</span>
-                        <CedulaPosteriorMockup 
-                          cedula={socioInfo.socio.identificacion}
-                        />
+                        <div onClick={() => setCedulaModalView('POSTERIOR')} className="cursor-pointer transition-transform hover:scale-105 active:scale-95 duration-200 shadow-sm hover:shadow-xl rounded-2xl">
+                          <CedulaPosteriorMockup 
+                            cedula={socioInfo.socio.identificacion}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1387,6 +1466,10 @@ export const CajaVentanilla: React.FC = () => {
                   if (!isAhorroVista) return;
                   setActiveTab('DEPOSITO');
                   setTxError(null);
+                  setMontoTx('');
+                  setConceptoTx('');
+                  setDepositante('');
+                  setDeclaracionUafe(false);
                 }}
                 title={!isAhorroVista ? 'Transacción no permitida para este tipo de cuenta' : ''}
                 className={`relative flex-1 py-2 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 rounded-full ${
@@ -1414,6 +1497,9 @@ export const CajaVentanilla: React.FC = () => {
                   if (!isAhorroVista) return;
                   setActiveTab('RETIRO');
                   setTxError(null);
+                  setMontoTx('');
+                  setConceptoTx('');
+                  setDeclaracionUafe(false);
                 }}
                 title={!isAhorroVista ? 'Transacción no permitida para este tipo de cuenta' : ''}
                 className={`relative flex-1 py-2 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 rounded-full ${
@@ -1441,6 +1527,8 @@ export const CajaVentanilla: React.FC = () => {
                   if (!isAhorroVista) return;
                   setActiveTab('PAGO_CREDITO');
                   setTxError(null);
+                  setConceptoTx('');
+                  setDeclaracionUafe(false);
                   if (cuotaPendiente) {
                     const cap = (cuotaPendiente.capitalProyectado || 0) - (cuotaPendiente.capitalPagado || 0);
                     const int = (cuotaPendiente.interesProyectado || 0) - (cuotaPendiente.interesPagado || 0);
@@ -1478,6 +1566,8 @@ export const CajaVentanilla: React.FC = () => {
                   setActiveTab('APORTACIONES');
                   setTxError(null);
                   setMontoTx('');
+                  setConceptoTx('');
+                  setDeclaracionUafe(false);
                 }}
                 title={!isAportaciones ? 'Transacción no permitida para este tipo de cuenta' : ''}
                 className={`relative flex-1 py-2 text-[10px] font-extrabold tracking-wider uppercase flex items-center justify-center gap-1 rounded-full ${
@@ -2457,6 +2547,59 @@ export const CajaVentanilla: React.FC = () => {
           >
             <X className="h-4 w-4" />
           </button>
+        </div>
+      )}
+
+      {/* Modal Cédula */}
+      {cedulaModalView && socioInfo && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+          onClick={() => setCedulaModalView(null)}
+        >
+          <div 
+            className="bg-white p-6 rounded-[2rem] shadow-2xl relative max-w-3xl w-full flex flex-col items-center border border-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setCedulaModalView(null)}
+              className="absolute top-5 right-5 p-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-full transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest mb-6">
+              {cedulaModalView === 'FRONTAL' ? 'Cédula Frontal' : 'Cédula Posterior'}
+            </h3>
+            
+            <div className="w-full max-w-2xl scale-110 md:scale-125 origin-top mb-12 flex justify-center">
+              {cedulaModalView === 'FRONTAL' ? (
+                (!useMockups && socioInfo.socio.fotoCedulaFrontalUrl) ? (
+                  <img 
+                    src={`http://localhost:8080/api/v1${socioInfo.socio.fotoCedulaFrontalUrl}`} 
+                    alt="Cédula Frontal Ampliada" 
+                    className="w-full max-w-sm rounded-2xl shadow-xl object-contain"
+                  />
+                ) : (
+                  <CedulaFrontalMockup 
+                    nombres={socioInfo.socio.nombresCompletos} 
+                    cedula={socioInfo.socio.identificacion}
+                    avatarUrl={socioInfo.socio.fotoPerfilUrl || null}
+                  />
+                )
+              ) : (
+                (!useMockups && socioInfo.socio.fotoCedulaPosteriorUrl) ? (
+                  <img 
+                    src={`http://localhost:8080/api/v1${socioInfo.socio.fotoCedulaPosteriorUrl}`} 
+                    alt="Cédula Posterior Ampliada" 
+                    className="w-full max-w-sm rounded-2xl shadow-xl object-contain"
+                  />
+                ) : (
+                  <CedulaPosteriorMockup 
+                    cedula={socioInfo.socio.identificacion}
+                  />
+                )
+              )}
+            </div>
+          </div>
         </div>
       )}
 

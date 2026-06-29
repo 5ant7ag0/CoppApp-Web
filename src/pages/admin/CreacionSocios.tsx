@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -22,8 +23,10 @@ interface Beneficiario {
 }
 
 export const CreacionSocios: React.FC = () => {
+  const { user } = useAuth();
+  const isContador = user?.rol === 'CONTADOR';
   // Pestaña activa: 'nuevo' | 'registrados'
-  const [activeTab, setActiveTab] = useState<'nuevo' | 'registrados'>('nuevo');
+  const [activeTab, setActiveTab] = useState<'nuevo' | 'registrados'>(isContador ? 'registrados' : 'nuevo');
 
   // Pasos del formulario: 1, 2, 3
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -67,6 +70,15 @@ export const CreacionSocios: React.FC = () => {
   const [docCedulaFrontal, setDocCedulaFrontal] = useState<File | null>(null);
   const [docCedulaPosterior, setDocCedulaPosterior] = useState<File | null>(null);
   const [docFirmaDigital, setDocFirmaDigital] = useState<File | null>(null);
+
+  // Previsualizaciones de imágenes de documentos
+  const [previewFrontal, setPreviewFrontal] = useState<string>('');
+  const [previewPosterior, setPreviewPosterior] = useState<string>('');
+  const [previewFirma, setPreviewFirma] = useState<string>('');
+
+  // Estados para verificación de identificación en tiempo real
+  const [checkingIdentificacion, setCheckingIdentificacion] = useState<boolean>(false);
+  const [identificacionExisteMsg, setIdentificacionExisteMsg] = useState<string>('');
 
   // Modal confirmatorio final
   const [mostrarExitoModal, setMostrarExitoModal] = useState<boolean>(false);
@@ -228,8 +240,48 @@ export const CreacionSocios: React.FC = () => {
       errs.cargoPep = 'El cargo / función pública es obligatorio para personas expuestas políticamente';
     }
 
+    // Si ya existe en base de datos
+    if (identificacionExisteMsg) {
+      errs.identificacion = identificacionExisteMsg;
+    }
+
     setErrorsPaso1(errs);
-  }, [identificacion, tipoIdentificacion, nombresCompletos, telefono, correo, fechaNacimiento, esPep, cargoPep]);
+  }, [identificacion, tipoIdentificacion, nombresCompletos, telefono, correo, fechaNacimiento, esPep, cargoPep, identificacionExisteMsg]);
+
+  // Verificar si la identificación ya existe (en tiempo real con debounce)
+  useEffect(() => {
+    let esFormatoValido = false;
+    if (tipoIdentificacion === 'C' && /^\d{10}$/.test(identificacion) && validarCedulaEcuatoriana(identificacion)) {
+      esFormatoValido = true;
+    } else if (tipoIdentificacion === 'R' && /^\d{13}$/.test(identificacion) && validarRucEcuatoriano(identificacion)) {
+      esFormatoValido = true;
+    } else if (tipoIdentificacion === 'P' && identificacion.length >= 5 && identificacion.length <= 15) {
+      esFormatoValido = true;
+    }
+
+    if (!esFormatoValido) {
+      setIdentificacionExisteMsg('');
+      return;
+    }
+
+    const delayDebounce = setTimeout(async () => {
+      setCheckingIdentificacion(true);
+      setIdentificacionExisteMsg('');
+      try {
+        const response = await api.get(`/socios/buscar?identificacion=${identificacion}`);
+        if (response.data && response.data.nombresCompletos) {
+          setIdentificacionExisteMsg(`⚠️ Esta identificación ya está registrada para el socio: ${response.data.nombresCompletos}`);
+        }
+      } catch (error: any) {
+        // Si el socio no existe, el backend devuelve 400. Esto es lo correcto para un nuevo registro.
+        setIdentificacionExisteMsg('');
+      } finally {
+        setCheckingIdentificacion(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(delayDebounce);
+  }, [identificacion, tipoIdentificacion]);
 
   // Validaciones en tiempo real para el Paso 2
   useEffect(() => {
@@ -1426,6 +1478,12 @@ export const CreacionSocios: React.FC = () => {
     setDocCedulaFrontal(null);
     setDocCedulaPosterior(null);
     setDocFirmaDigital(null);
+    if (previewFrontal) URL.revokeObjectURL(previewFrontal);
+    if (previewPosterior) URL.revokeObjectURL(previewPosterior);
+    if (previewFirma) URL.revokeObjectURL(previewFirma);
+    setPreviewFrontal('');
+    setPreviewPosterior('');
+    setPreviewFirma('');
   };
 
   const stepIsValid = (step: number) => {
@@ -1538,44 +1596,46 @@ export const CreacionSocios: React.FC = () => {
               Creación de Socios y Apertura de Cuentas
             </h2>
           </div>
-          <div className="flex items-center gap-1 bg-[#F1F3F6] p-1 rounded-full border border-slate-100/50 flex-row">
-            <button
-              onClick={() => setActiveTab('nuevo')}
-              className="relative px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 text-slate-500 hover:text-slate-805"
-            >
-              {activeTab === 'nuevo' && (
-                <motion.div
-                  layoutId="activeTabSocios"
-                  className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
-                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                />
-              )}
-              <span className={`relative z-10 flex items-center gap-1.5 transition-colors duration-300 ${
-                activeTab === 'nuevo' ? 'text-white' : 'text-slate-500'
-              }`}>
-                <Plus className="h-3.5 w-3.5" />
-                Nuevo Registro
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('registrados')}
-              className="relative px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 text-slate-500 hover:text-slate-805"
-            >
-              {activeTab === 'registrados' && (
-                <motion.div
-                  layoutId="activeTabSocios"
-                  className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
-                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                />
-              )}
-              <span className={`relative z-10 flex items-center gap-1.5 transition-colors duration-300 ${
-                activeTab === 'registrados' ? 'text-white' : 'text-slate-500'
-              }`}>
-                <Users className="h-3.5 w-3.5" />
-                Socios Registrados
-              </span>
-            </button>
-          </div>
+          {!isContador && (
+            <div className="flex items-center gap-1 bg-[#F1F3F6] p-1 rounded-full border border-slate-100/50 flex-row">
+              <button
+                onClick={() => setActiveTab('nuevo')}
+                className="relative px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 text-slate-500 hover:text-slate-805"
+              >
+                {activeTab === 'nuevo' && (
+                  <motion.div
+                    layoutId="activeTabSocios"
+                    className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className={`relative z-10 flex items-center gap-1.5 transition-colors duration-300 ${
+                  activeTab === 'nuevo' ? 'text-white' : 'text-slate-500'
+                }`}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Nuevo Registro
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab('registrados')}
+                className="relative px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 text-slate-500 hover:text-slate-805"
+              >
+                {activeTab === 'registrados' && (
+                  <motion.div
+                    layoutId="activeTabSocios"
+                    className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className={`relative z-10 flex items-center gap-1.5 transition-colors duration-300 ${
+                  activeTab === 'registrados' ? 'text-white' : 'text-slate-500'
+                }`}>
+                  <Users className="h-3.5 w-3.5" />
+                  Socios Registrados
+                </span>
+              </button>
+            </div>
+          )}
         </div>
 
         {activeTab === 'nuevo' ? (
@@ -1685,7 +1745,10 @@ export const CreacionSocios: React.FC = () => {
                           placeholder={tipoIdentificacion === 'C' ? 'Ej: 1724285888' : tipoIdentificacion === 'R' ? 'Ej: 1724285888001' : 'Ej: 0987654321'}
                           value={identificacion}
                           onChange={(e) => {
-                            let val = e.target.value.replace(/\D/g, '');
+                            let val = e.target.value;
+                            if (tipoIdentificacion !== 'P') {
+                              val = val.replace(/\D/g, '');
+                            }
                             if (tipoIdentificacion === 'C') {
                               val = val.substring(0, 10);
                             } else if (tipoIdentificacion === 'R') {
@@ -1703,7 +1766,9 @@ export const CreacionSocios: React.FC = () => {
                         />
                         {identificacion && (
                           <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                            {errorsPaso1.identificacion ? (
+                            {checkingIdentificacion ? (
+                              <Loader2 className="h-3.5 w-3.5 text-[#0054A6] animate-spin" />
+                            ) : errorsPaso1.identificacion ? (
                               <AlertTriangle className="h-4.5 w-4.5 text-rose-500 animate-pulse" />
                             ) : (
                               <Check className="h-4.5 w-4.5 text-emerald-500" />
@@ -2222,17 +2287,38 @@ export const CreacionSocios: React.FC = () => {
                             accept="image/*,application/pdf"
                             id="doc_frontal"
                             className="hidden"
-                            onChange={(e) => setDocCedulaFrontal(e.target.files?.[0] || null)}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              setDocCedulaFrontal(file);
+                              if (file && file.type.startsWith('image/')) {
+                                if (previewFrontal) URL.revokeObjectURL(previewFrontal);
+                                setPreviewFrontal(URL.createObjectURL(file));
+                              } else {
+                                if (previewFrontal) URL.revokeObjectURL(previewFrontal);
+                                setPreviewFrontal('');
+                              }
+                            }}
                           />
                           <label
                             htmlFor="doc_frontal"
-                            className="border-2 border-dashed border-slate-200 hover:border-[#0054A6]/30 bg-slate-50/50 hover:bg-slate-50 rounded-2xl p-4.5 text-center cursor-pointer transition-all flex flex-col items-center gap-1.5 w-full h-32 justify-center select-none"
+                            className="border-2 border-dashed border-slate-200 hover:border-[#0054A6]/30 bg-slate-50/50 hover:bg-slate-50 rounded-2xl p-4.5 text-center cursor-pointer transition-all flex flex-col items-center gap-1.5 w-full h-32 justify-center select-none overflow-hidden"
                           >
-                            <UploadCloud className="h-6 w-6 text-slate-400" />
-                            <span className="text-[10px] font-bold text-slate-655 truncate max-w-full">
-                              {docCedulaFrontal ? docCedulaFrontal.name : 'Subir Cédula Frontal'}
-                            </span>
-                            <span className="text-[8px] font-semibold text-slate-400">PDF, PNG, JPG</span>
+                            {previewFrontal ? (
+                              <div className="relative w-full h-full rounded-xl overflow-hidden flex items-center justify-center bg-slate-50">
+                                <img src={previewFrontal} alt="Cédula Frontal" className="w-full h-full object-contain" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
+                                  Cambiar Imagen
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <UploadCloud className="h-6 w-6 text-slate-400" />
+                                <span className="text-[10px] font-bold text-slate-655 truncate max-w-full">
+                                  {docCedulaFrontal ? docCedulaFrontal.name : 'Subir Cédula Frontal'}
+                                </span>
+                                <span className="text-[8px] font-semibold text-slate-400">PDF, PNG, JPG</span>
+                              </>
+                            )}
                           </label>
                         </div>
                       </div>
@@ -2246,17 +2332,38 @@ export const CreacionSocios: React.FC = () => {
                             accept="image/*,application/pdf"
                             id="doc_posterior"
                             className="hidden"
-                            onChange={(e) => setDocCedulaPosterior(e.target.files?.[0] || null)}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              setDocCedulaPosterior(file);
+                              if (file && file.type.startsWith('image/')) {
+                                if (previewPosterior) URL.revokeObjectURL(previewPosterior);
+                                setPreviewPosterior(URL.createObjectURL(file));
+                              } else {
+                                if (previewPosterior) URL.revokeObjectURL(previewPosterior);
+                                setPreviewPosterior('');
+                              }
+                            }}
                           />
                           <label
                             htmlFor="doc_posterior"
-                            className="border-2 border-dashed border-slate-200 hover:border-[#0054A6]/30 bg-slate-50/50 hover:bg-slate-50 rounded-2xl p-4.5 text-center cursor-pointer transition-all flex flex-col items-center gap-1.5 w-full h-32 justify-center select-none"
+                            className="border-2 border-dashed border-slate-200 hover:border-[#0054A6]/30 bg-slate-50/50 hover:bg-slate-50 rounded-2xl p-4.5 text-center cursor-pointer transition-all flex flex-col items-center gap-1.5 w-full h-32 justify-center select-none overflow-hidden"
                           >
-                            <UploadCloud className="h-6 w-6 text-slate-400" />
-                            <span className="text-[10px] font-bold text-slate-655 truncate max-w-full">
-                              {docCedulaPosterior ? docCedulaPosterior.name : 'Subir Cédula Posterior'}
-                            </span>
-                            <span className="text-[8px] font-semibold text-slate-400">PDF, PNG, JPG</span>
+                            {previewPosterior ? (
+                              <div className="relative w-full h-full rounded-xl overflow-hidden flex items-center justify-center bg-slate-50">
+                                <img src={previewPosterior} alt="Cédula Posterior" className="w-full h-full object-contain" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
+                                  Cambiar Imagen
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <UploadCloud className="h-6 w-6 text-slate-400" />
+                                <span className="text-[10px] font-bold text-slate-655 truncate max-w-full">
+                                  {docCedulaPosterior ? docCedulaPosterior.name : 'Subir Cédula Posterior'}
+                                </span>
+                                <span className="text-[8px] font-semibold text-slate-400">PDF, PNG, JPG</span>
+                              </>
+                            )}
                           </label>
                         </div>
                       </div>
@@ -2270,17 +2377,38 @@ export const CreacionSocios: React.FC = () => {
                             accept="image/png,image/jpeg,image/jpg"
                             id="doc_firma"
                             className="hidden"
-                            onChange={(e) => setDocFirmaDigital(e.target.files?.[0] || null)}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              setDocFirmaDigital(file);
+                              if (file && file.type.startsWith('image/')) {
+                                if (previewFirma) URL.revokeObjectURL(previewFirma);
+                                setPreviewFirma(URL.createObjectURL(file));
+                              } else {
+                                if (previewFirma) URL.revokeObjectURL(previewFirma);
+                                setPreviewFirma('');
+                              }
+                            }}
                           />
                           <label
                             htmlFor="doc_firma"
-                            className="border-2 border-dashed border-slate-200 hover:border-[#0054A6]/30 bg-slate-50/50 hover:bg-slate-50 rounded-2xl p-4.5 text-center cursor-pointer transition-all flex flex-col items-center gap-1.5 w-full h-32 justify-center select-none"
+                            className="border-2 border-dashed border-slate-200 hover:border-[#0054A6]/30 bg-slate-50/50 hover:bg-slate-50 rounded-2xl p-4.5 text-center cursor-pointer transition-all flex flex-col items-center gap-1.5 w-full h-32 justify-center select-none overflow-hidden"
                           >
-                            <UploadCloud className="h-6 w-6 text-slate-400" />
-                            <span className="text-[10px] font-bold text-slate-655 truncate max-w-full">
-                              {docFirmaDigital ? docFirmaDigital.name : 'Subir Firma Digitalizada'}
-                            </span>
-                            <span className="text-[8px] font-semibold text-slate-400">PNG, JPG (Fondo transparente)</span>
+                            {previewFirma ? (
+                              <div className="relative w-full h-full rounded-xl overflow-hidden flex items-center justify-center bg-slate-50">
+                                <img src={previewFirma} alt="Firma Manuscrita" className="w-full h-full object-contain" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
+                                  Cambiar Imagen
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <UploadCloud className="h-6 w-6 text-slate-400" />
+                                <span className="text-[10px] font-bold text-slate-655 truncate max-w-full">
+                                  {docFirmaDigital ? docFirmaDigital.name : 'Subir Firma Digitalizada'}
+                                </span>
+                                <span className="text-[8px] font-semibold text-slate-400">PNG, JPG (Fondo transparente)</span>
+                              </>
+                            )}
                           </label>
                         </div>
                       </div>
@@ -2392,23 +2520,26 @@ export const CreacionSocios: React.FC = () => {
                   <table className="w-full text-left border-collapse table-fixed">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-100">
-                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[12%]">Identificación</th>
-                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[24%]">Nombres Completos</th>
-                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[12%]">Celular</th>
-                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[20%]">Correo</th>
-                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider text-center w-[8%]">Es PEP</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[15%]">Identificación</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[35%]">Nombres Completos</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[15%]">Celular</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[25%]">Correo</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider text-center w-[10%]">Es PEP</th>
                         <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[10%]">Estado</th>
-                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider text-right w-[14%]">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {sociosFiltrados.map((s) => (
-                        <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-4 py-3 text-xs font-bold text-slate-800 font-mono truncate w-[12%]">{s.identificacion}</td>
-                          <td className="px-4 py-3 text-xs font-extrabold text-slate-700 uppercase truncate w-[24%]" title={s.nombresCompletos}>{s.nombresCompletos}</td>
-                          <td className="px-4 py-3 text-xs font-semibold text-slate-500 font-mono truncate w-[12%]">{s.telefono}</td>
-                          <td className="px-4 py-3 text-xs font-medium text-slate-500 truncate w-[20%]" title={s.correo}>{s.correo}</td>
-                          <td className="px-4 py-3 text-xs text-center w-[8%]">
+                        <tr 
+                          key={s.id} 
+                          onClick={() => handleVerDetalle(s)}
+                          className="hover:bg-slate-50/50 transition-colors cursor-pointer"
+                        >
+                          <td className="px-4 py-3 text-xs font-bold text-slate-800 font-mono truncate w-[15%]">{s.identificacion}</td>
+                          <td className="px-4 py-3 text-xs font-extrabold text-slate-700 uppercase truncate w-[35%]" title={s.nombresCompletos}>{s.nombresCompletos}</td>
+                          <td className="px-4 py-3 text-xs font-semibold text-slate-500 font-mono truncate w-[15%]">{s.telefono}</td>
+                          <td className="px-4 py-3 text-xs font-medium text-slate-500 truncate w-[25%]" title={s.correo}>{s.correo}</td>
+                          <td className="px-4 py-3 text-xs text-center w-[10%]">
                             {s.esPep ? (
                               <span className="px-2 py-0.5 text-[9px] font-black text-amber-700 bg-amber-50 border border-amber-100 rounded-md">SÍ</span>
                             ) : (
@@ -2425,15 +2556,6 @@ export const CreacionSocios: React.FC = () => {
                             }`}>
                               {s.estado === 'PENDIENTE_APROBACION' ? 'PENDIENTE' : s.estado}
                             </span>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-right w-[14%] space-x-1 whitespace-nowrap">
-                            <button
-                              onClick={() => handleVerDetalle(s)}
-                              className="text-[10px] font-black text-[#0054A6] hover:text-[#004080] inline-flex items-center gap-0.5 cursor-pointer bg-blue-50/50 hover:bg-blue-50 px-2 py-1 rounded-lg border border-blue-100/30"
-                            >
-                              <Search className="h-3 w-3" />
-                              Detalle
-                            </button>
                           </td>
                         </tr>
                       ))}
@@ -2670,7 +2792,7 @@ export const CreacionSocios: React.FC = () => {
               <div className="flex items-center gap-2">
                 {activeDetailTab === 'perfil' && (
                   <>
-                    {!isEditing ? (
+                    {!isEditing && !isContador ? (
                       <Button
                         onClick={() => setIsEditing(true)}
                         variant="outline"
@@ -2679,7 +2801,8 @@ export const CreacionSocios: React.FC = () => {
                         <Pencil className="h-3 w-3 text-[#0054A6]" />
                         Editar Datos
                       </Button>
-                    ) : (
+                    ) : null}
+                    {isEditing && (
                       <div className="flex gap-2">
                         <Button
                           onClick={() => setIsEditing(false)}
@@ -3173,42 +3296,51 @@ export const CreacionSocios: React.FC = () => {
                                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
                                   onClick={() => setLightboxImage({ url: docUrl, title: "Cédula Anverso" })}
                                 />
-                                <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-xs p-1 rounded-lg border border-slate-150 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-250 z-20">
-                                  <button
-                                    onClick={() => setLightboxImage({ url: docUrl, title: "Cédula Anverso" })}
-                                    className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center"
-                                    title="Visualizar"
-                                  >
-                                    <Eye className="h-3.5 w-3.5" />
-                                  </button>
-                                  <label className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center relative">
-                                    <input 
-                                      type="file" 
-                                      accept="image/*"
-                                      className="hidden"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) handleUploadDocument('cedula-frontal', file);
-                                      }}
-                                    />
-                                    <UploadCloud className="h-3.5 w-3.5" />
-                                  </label>
-                                </div>
+                                {!isContador && (
+                                  <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-xs p-1 rounded-lg border border-slate-150 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-250 z-20">
+                                    <button
+                                      onClick={() => setLightboxImage({ url: docUrl, title: "Cédula Anverso" })}
+                                      className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center"
+                                      title="Visualizar"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" />
+                                    </button>
+                                    <label className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center relative">
+                                      <input 
+                                        type="file" 
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) handleUploadDocument('cedula-frontal', file);
+                                        }}
+                                      />
+                                      <UploadCloud className="h-3.5 w-3.5" />
+                                    </label>
+                                  </div>
+                                )}
                               </>
                             ) : (
-                              <label className="flex flex-col items-center gap-1.5 text-slate-400 hover:text-[#0054A6] cursor-pointer transition-colors p-4 w-full h-full justify-center select-none">
-                                <input 
-                                  type="file" 
-                                  accept="image/*"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) handleUploadDocument('cedula-frontal', file);
-                                  }}
-                                />
-                                <UploadCloud className="h-6 w-6 text-slate-350 group-hover:scale-110 transition-transform duration-200" />
-                                <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Subir Documento</span>
-                              </label>
+                              isContador ? (
+                                <div className="flex flex-col items-center gap-1.5 text-slate-350 p-4 w-full h-full justify-center select-none">
+                                  <FileText className="h-6 w-6 text-slate-300" />
+                                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Sin Documento</span>
+                                </div>
+                              ) : (
+                                <label className="flex flex-col items-center gap-1.5 text-slate-400 hover:text-[#0054A6] cursor-pointer transition-colors p-4 w-full h-full justify-center select-none">
+                                  <input 
+                                    type="file" 
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleUploadDocument('cedula-frontal', file);
+                                    }}
+                                  />
+                                  <UploadCloud className="h-6 w-6 text-slate-350 group-hover:scale-110 transition-transform duration-200" />
+                                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Subir Documento</span>
+                                </label>
+                              )
                             )}
                           </div>
                         </div>
@@ -3241,42 +3373,51 @@ export const CreacionSocios: React.FC = () => {
                                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
                                   onClick={() => setLightboxImage({ url: docUrl, title: "Cédula Reverso" })}
                                 />
-                                <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-xs p-1 rounded-lg border border-slate-150 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-250 z-20">
-                                  <button
-                                    onClick={() => setLightboxImage({ url: docUrl, title: "Cédula Reverso" })}
-                                    className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center"
-                                    title="Visualizar"
-                                  >
-                                    <Eye className="h-3.5 w-3.5" />
-                                  </button>
-                                  <label className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center relative">
-                                    <input 
-                                      type="file" 
-                                      accept="image/*"
-                                      className="hidden"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) handleUploadDocument('cedula-posterior', file);
-                                      }}
-                                    />
-                                    <UploadCloud className="h-3.5 w-3.5" />
-                                  </label>
-                                </div>
+                                {!isContador && (
+                                  <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-xs p-1 rounded-lg border border-slate-150 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-250 z-20">
+                                    <button
+                                      onClick={() => setLightboxImage({ url: docUrl, title: "Cédula Reverso" })}
+                                      className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center"
+                                      title="Visualizar"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" />
+                                    </button>
+                                    <label className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center relative">
+                                      <input 
+                                        type="file" 
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) handleUploadDocument('cedula-posterior', file);
+                                        }}
+                                      />
+                                      <UploadCloud className="h-3.5 w-3.5" />
+                                    </label>
+                                  </div>
+                                )}
                               </>
                             ) : (
-                              <label className="flex flex-col items-center gap-1.5 text-slate-400 hover:text-[#0054A6] cursor-pointer transition-colors p-4 w-full h-full justify-center select-none">
-                                <input 
-                                  type="file" 
-                                  accept="image/*"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) handleUploadDocument('cedula-posterior', file);
-                                  }}
-                                />
-                                <UploadCloud className="h-6 w-6 text-slate-350 group-hover:scale-110 transition-transform duration-200" />
-                                <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Subir Documento</span>
-                              </label>
+                              isContador ? (
+                                <div className="flex flex-col items-center gap-1.5 text-slate-350 p-4 w-full h-full justify-center select-none">
+                                  <FileText className="h-6 w-6 text-slate-300" />
+                                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Sin Documento</span>
+                                </div>
+                              ) : (
+                                <label className="flex flex-col items-center gap-1.5 text-slate-400 hover:text-[#0054A6] cursor-pointer transition-colors p-4 w-full h-full justify-center select-none">
+                                  <input 
+                                    type="file" 
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleUploadDocument('cedula-posterior', file);
+                                    }}
+                                  />
+                                  <UploadCloud className="h-6 w-6 text-slate-350 group-hover:scale-110 transition-transform duration-200" />
+                                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Subir Documento</span>
+                                </label>
+                              )
                             )}
                           </div>
                         </div>
@@ -3309,42 +3450,51 @@ export const CreacionSocios: React.FC = () => {
                                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
                                   onClick={() => setLightboxImage({ url: docUrl, title: "Firma Registrada" })}
                                 />
-                                <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-xs p-1 rounded-lg border border-slate-150 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-250 z-20">
-                                  <button
-                                    onClick={() => setLightboxImage({ url: docUrl, title: "Firma Registrada" })}
-                                    className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center"
-                                    title="Visualizar"
-                                  >
-                                    <Eye className="h-3.5 w-3.5" />
-                                  </button>
-                                  <label className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center relative">
-                                    <input 
-                                      type="file" 
-                                      accept="image/*"
-                                      className="hidden"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) handleUploadDocument('firma', file);
-                                      }}
-                                    />
-                                    <UploadCloud className="h-3.5 w-3.5" />
-                                  </label>
-                                </div>
+                                {!isContador && (
+                                  <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/90 backdrop-blur-xs p-1 rounded-lg border border-slate-150 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-250 z-20">
+                                    <button
+                                      onClick={() => setLightboxImage({ url: docUrl, title: "Firma Registrada" })}
+                                      className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center"
+                                      title="Visualizar"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" />
+                                    </button>
+                                    <label className="p-1 rounded-md text-slate-600 hover:text-[#0054A6] hover:bg-slate-100 transition-all cursor-pointer flex items-center justify-center relative">
+                                      <input 
+                                        type="file" 
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) handleUploadDocument('firma', file);
+                                        }}
+                                      />
+                                      <UploadCloud className="h-3.5 w-3.5" />
+                                    </label>
+                                  </div>
+                                )}
                               </>
                             ) : (
-                              <label className="flex flex-col items-center gap-1.5 text-slate-400 hover:text-[#0054A6] cursor-pointer transition-colors p-4 w-full h-full justify-center select-none">
-                                <input 
-                                  type="file" 
-                                  accept="image/*"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) handleUploadDocument('firma', file);
-                                  }}
-                                />
-                                <UploadCloud className="h-6 w-6 text-slate-350 group-hover:scale-110 transition-transform duration-200" />
-                                <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Subir Documento</span>
-                              </label>
+                              isContador ? (
+                                <div className="flex flex-col items-center gap-1.5 text-slate-350 p-4 w-full h-full justify-center select-none">
+                                  <FileText className="h-6 w-6 text-slate-300" />
+                                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Sin Documento</span>
+                                </div>
+                              ) : (
+                                <label className="flex flex-col items-center gap-1.5 text-slate-400 hover:text-[#0054A6] cursor-pointer transition-colors p-4 w-full h-full justify-center select-none">
+                                  <input 
+                                    type="file" 
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleUploadDocument('firma', file);
+                                    }}
+                                  />
+                                  <UploadCloud className="h-6 w-6 text-slate-350 group-hover:scale-110 transition-transform duration-200" />
+                                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">Subir Documento</span>
+                                </label>
+                              )
                             )}
                           </div>
                         </div>
@@ -3533,11 +3683,10 @@ export const CreacionSocios: React.FC = () => {
                         <tr className="bg-slate-50 border-b border-slate-100">
                           <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[15%]">Nº Crédito</th>
                           <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[13%]">Fecha Solicitud</th>
-                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[12%]">Monto</th>
-                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[14%]">Saldo Deudor</th>
-                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[21%]">Próximo Vencimiento</th>
-                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[15%]">Estado</th>
-                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[10%] text-right">Acciones</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[15%]">Monto</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[15%]">Saldo Deudor</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[22%]">Próximo Vencimiento</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[20%] text-right">Estado</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">

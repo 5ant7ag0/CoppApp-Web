@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Navigate, Link, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import api from '../services/api';
@@ -17,88 +18,9 @@ export const AdminLayout: React.FC = () => {
   const { isAuthenticated, user, isLoading, logout } = useAuth();
   const { activeTenant } = useTenant();
   const location = useLocation();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const isCajero = user?.rol === 'CAJERO';
   const activePath = location.pathname;
-
-  // Estados de Caja en caliente para el cajero
-  const [cajaActiva, setCajaActiva] = useState<any>(null);
-  const [efectivoActual, setEfectivoActual] = useState<number>(0);
-
-  const fetchCajaStatus = async () => {
-    if (!isCajero) return;
-    try {
-      const resCaja = await api.get('/cajas/activa');
-      setCajaActiva(resCaja.data);
-
-      if (resCaja.data) {
-        const resMovs = await api.get('/cajas/movimientos');
-        const movimientos = resMovs.data || [];
-
-        // Helper para identificar depósitos puente para pago de crédito
-        const esPuenteCredito = (m: any) => {
-          const desc = (m.descripcion || '').toLowerCase();
-          return m.tipoTransaccion === 'CREDITO' && (
-            desc.includes('para pago de crédito') ||
-            desc.includes('para pago de credito') ||
-            desc.includes('para pago de cuota')
-          );
-        };
-
-        // Helper para identificar ingresos físicos reales a la caja
-        const esIngresoEfectivo = (m: any) => {
-          const desc = (m.descripcion || '').toLowerCase();
-          if (desc.startsWith('[anulada]')) return false;
-          if (esPuenteCredito(m)) return false;
-          if (m.tipoTransaccion === 'CREDITO') return true;
-          if (m.tipoTransaccion === 'DEBITO' && (
-            desc.includes('pago de cuota') ||
-            desc.includes('pago de crédito') ||
-            desc.includes('pago de credito')
-          )) {
-            return true;
-          }
-          return false;
-        };
-
-        // Helper para identificar egresos físicos reales de la caja
-        const esEgresoEfectivo = (m: any) => {
-          const desc = (m.descripcion || '').toLowerCase();
-          if (desc.startsWith('[anulada]')) return false;
-          if (m.tipoTransaccion === 'DEBITO' && (
-            desc.includes('pago de cuota') ||
-            desc.includes('pago de crédito') ||
-            desc.includes('pago de credito')
-          )) {
-            return false;
-          }
-          return m.tipoTransaccion === 'DEBITO';
-        };
-
-        const ingresos = movimientos
-          .filter((m: any) => esIngresoEfectivo(m))
-          .reduce((sum: number, current: any) => sum + current.monto, 0);
-        const egresos = movimientos
-          .filter((m: any) => esEgresoEfectivo(m))
-          .reduce((sum: number, current: any) => sum + current.monto, 0);
-        setEfectivoActual(resCaja.data.montoApertura + ingresos - egresos);
-      } else {
-        setEfectivoActual(0);
-      }
-    } catch (err) {
-      console.error('Error fetching caja status in navbar:', err);
-    }
-  };
-
-  useEffect(() => {
-    if (isAuthenticated && isCajero) {
-      fetchCajaStatus();
-      window.addEventListener('caja-updated', fetchCajaStatus);
-    }
-    return () => {
-      window.removeEventListener('caja-updated', fetchCajaStatus);
-    };
-  }, [isAuthenticated, isCajero]);
 
   // Logo institucional dinámico
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -155,6 +77,10 @@ export const AdminLayout: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
+  if (user.detalles?.cambiarPasswordProximoInicio) {
+    return <Navigate to="/forzar-cambio-password" replace />;
+  }
+
   const initials = user?.nombresCompletos
     ? user.nombresCompletos.split(' ').slice(0, 2).map((n: string) => n[0]).join('').toUpperCase()
     : 'U';
@@ -189,61 +115,74 @@ export const AdminLayout: React.FC = () => {
 
           <nav className="flex flex-col gap-1.5 flex-1 overflow-y-auto scrollbar-none pr-1">
             {/* GRUPO 1: BALCÓN DE SERVICIOS */}
-            <span className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 mt-2 select-none">
-              Balcón de Servicios
-            </span>
-            <Link
-              to="/admin/socios"
-              className={
-                activePath === '/admin/socios'
-                  ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                  : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-              }
-            >
-              <Users className="h-5 w-5 shrink-0" />
-              <span>Socios</span>
-            </Link>
-            <Link
-              to="/admin/creditos"
-              className={
-                activePath === '/admin/creditos'
-                  ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                  : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-              }
-            >
-              <CreditCard className="h-5 w-5 shrink-0" />
-              <span>Créditos</span>
-            </Link>
-            <Link
-              to="/admin/dashboard"
-              className={
-                activePath === '/admin/dashboard'
-                  ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                  : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-              }
-            >
-              <Monitor className="h-5 w-5 shrink-0" />
-              <span>Ventanilla</span>
-            </Link>
+            {(user?.rol === 'OFICIAL_DE_CREDITO' || user?.rol === 'CONTADOR' || user?.rol === 'GERENTE_GENERAL' || user?.rol === 'SUPER_ADMIN_SAAS' || user?.rol === 'ADMINISTRADOR' || user?.rol === 'CAJERO') && (
+              <>
+                <span className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 mt-2 select-none">
+                  Balcón de Servicios
+                </span>
+                {(user?.rol === 'OFICIAL_DE_CREDITO' || user?.rol === 'CONTADOR' || user?.rol === 'GERENTE_GENERAL' || user?.rol === 'SUPER_ADMIN_SAAS' || user?.rol === 'ADMINISTRADOR') && (
+                  <Link
+                    to="/admin/socios"
+                    className={
+                      activePath === '/admin/socios'
+                        ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
+                        : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
+                    }
+                  >
+                    <Users className="h-5 w-5 shrink-0" />
+                    <span>{user?.rol === 'CONTADOR' ? 'Socios (Consulta)' : 'Socios'}</span>
+                  </Link>
+                )}
+                {(user?.rol === 'OFICIAL_DE_CREDITO' || user?.rol === 'CONTADOR' || user?.rol === 'GERENTE_GENERAL' || user?.rol === 'SUPER_ADMIN_SAAS' || user?.rol === 'ADMINISTRADOR') && (
+                  <Link
+                    to="/admin/creditos"
+                    className={
+                      activePath === '/admin/creditos'
+                        ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
+                        : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
+                    }
+                  >
+                    <CreditCard className="h-5 w-5 shrink-0" />
+                    <span>{user?.rol === 'CONTADOR' ? 'Créditos (Consulta)' : 'Créditos'}</span>
+                  </Link>
+                )}
+                {user?.rol === 'CAJERO' && (
+                  <Link
+                    to="/admin/dashboard"
+                    className={
+                      activePath === '/admin/dashboard'
+                        ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
+                        : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
+                    }
+                  >
+                    <Monitor className="h-5 w-5 shrink-0" />
+                    <span>Ventanilla</span>
+                  </Link>
+                )}
+              </>
+            )}
 
             {/* GRUPO 2: FINANZAS Y CONTROL */}
-            <span className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 mt-6 select-none">
-              Finanzas y Control
-            </span>
-            <Link
-              to="/admin/contabilidad"
-              className={
-                isContabilidadRoute
-                  ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-                  : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
-              }
-            >
-              <Briefcase className="h-5 w-5 shrink-0" />
-              <span>Contabilidad</span>
-            </Link>
+            {(user?.rol === 'CONTADOR' || user?.rol === 'GERENTE_GENERAL' || user?.rol === 'SUPER_ADMIN_SAAS' || user?.rol === 'ADMINISTRADOR') && (
+              <>
+                <span className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 mt-6 select-none">
+                  Finanzas y Control
+                </span>
+                <Link
+                  to="/admin/contabilidad"
+                  className={
+                    isContabilidadRoute
+                      ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
+                      : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
+                  }
+                >
+                  <Briefcase className="h-5 w-5 shrink-0" />
+                  <span>{user?.rol === 'CONTADOR' ? 'Contabilidad' : 'Contabilidad (Lectura)'}</span>
+                </Link>
+              </>
+            )}
 
-            {/* GRUPO 3: SISTEMA */}
-            {(user?.rol === 'ADMINISTRADOR' || user?.rol === 'GERENTE_GENERAL') && (
+            {(user?.rol === 'ADMINISTRADOR' || user?.rol === 'GERENTE_GENERAL' || user?.rol === 'SUPER_ADMIN_SAAS') && (
               <>
                 <span className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 mt-6 select-none">
                   Sistema
@@ -259,6 +198,17 @@ export const AdminLayout: React.FC = () => {
                   <Settings className="h-5 w-5 shrink-0" />
                   <span>Parametrización</span>
                 </Link>
+                <Link
+                  to="/admin/gestion-equipo"
+                  className={
+                    activePath === '/admin/gestion-equipo'
+                      ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
+                      : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
+                  }
+                >
+                  <Users className="h-5 w-5 shrink-0" />
+                  <span>Gestión de Equipo</span>
+                </Link>
               </>
             )}
           </nav>
@@ -266,69 +216,101 @@ export const AdminLayout: React.FC = () => {
 
         {/* Footer Sidebar with elegant user profile and SocioLayout logout button */}
         <div className="border-t border-slate-100 pt-5 space-y-4">
-          <div className="flex items-center gap-3 px-2">
-            <div className="h-9 w-9 rounded-full bg-[#0054A6]/10 border border-[#0054A6]/20 font-black text-xs text-[#0054A6] flex items-center justify-center shrink-0 select-none">
-              {initials}
+          <div className="group relative">
+            <div className="flex items-center gap-3 px-2 p-2 rounded-2xl hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-100">
+              <div className="h-9 w-9 rounded-full bg-[#0054A6]/10 border border-[#0054A6]/20 font-black text-xs text-[#0054A6] flex items-center justify-center shrink-0 select-none overflow-hidden">
+                {user?.detalles?.fotoPerfilUrl || (user as any)?.fotoPerfilUrl ? (
+                  <img src={user?.detalles?.fotoPerfilUrl || (user as any)?.fotoPerfilUrl} alt="Perfil" className="h-full w-full object-cover" />
+                ) : (
+                  initials
+                )}
+              </div>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="text-xs font-bold text-slate-800 truncate leading-tight">
+                  {user.nombresCompletos}
+                </p>
+                <div className="mt-1">
+                  <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold tracking-wider uppercase ${
+                    user.rol === 'GERENTE_GENERAL' || user.rol === 'SUPER_ADMIN_SAAS'
+                      ? 'bg-rose-50 text-rose-600 border border-rose-100'
+                      : user.rol === 'CAJERO'
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                      : 'bg-blue-50 text-blue-600 border border-blue-100'
+                  }`}>
+                    {user.rol === 'OFICIAL_DE_CREDITO' ? 'OFICIAL DE CRÉDITO' : user.rol === 'CONTADOR' ? 'CONTADOR' : user.rol.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-slate-800 truncate leading-tight">
-                {user.nombresCompletos}
-              </p>
-              <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5 leading-none truncate">
-                {user.rol === 'OFICIAL_DE_CREDITO' ? 'Oficial de Crédito' : user.rol === 'CONTADOR' ? 'Contador' : user.rol === 'CAJERO' ? 'Cajero' : user.rol}
-              </p>
+
+            {/* Hover Menu */}
+            <div className="absolute bottom-0 left-full ml-4 w-[160px] opacity-0 -translate-x-3 invisible group-hover:opacity-100 group-hover:translate-x-0 group-hover:visible transition-all duration-300 ease-out z-50">
+              <div className="bg-white/95 backdrop-blur-xl border border-slate-100 shadow-[0_15px_40px_rgba(0,0,0,0.08)] rounded-2xl p-1.5 overflow-hidden relative">
+                {/* Flecha lateral */}
+                <div className="absolute top-[22px] -left-[5px] w-2.5 h-2.5 bg-white border-l border-b border-slate-100 rotate-45" />
+                <button
+                  onClick={() => setShowLogoutModal(true)}
+                  className="relative w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-colors cursor-pointer group/btn"
+                >
+                  <div className="h-7 w-7 rounded-lg bg-white/60 flex items-center justify-center group-hover/btn:bg-white transition-colors shrink-0 shadow-[0_1px_2px_rgba(225,29,72,0.1)]">
+                    <LogOut className="h-3.5 w-3.5 text-rose-500 group-hover/btn:text-rose-600" />
+                  </div>
+                  <span className="truncate">Cerrar Sesión</span>
+                </button>
+              </div>
             </div>
           </div>
-          <button
-            onClick={logout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold transition-all duration-300 cursor-pointer shadow-[0_4px_12px_rgba(225,29,72,0.02)]"
-            title="Cerrar Sesión"
-          >
-            <LogOut className="h-4 w-5 shrink-0" />
-            <span className="text-xs">Cerrar Sesión</span>
-          </button>
         </div>
       </aside>
 
       {/* 3. Área de Trabajo (Main Workspace) */}
       <main className="flex-1 min-w-0 flex flex-col md:py-2 space-y-6">
         
-        {/* Controles de Cajero en caliente si existen */}
-        {isCajero && cajaActiva && (
-          <div className="flex justify-end items-center pb-4 border-b border-slate-100/80">
-            <div className="flex items-center gap-3">
-              {/* Botón de Arqueo rápido para el cajero si está en su dashboard */}
-              {activePath === '/admin/dashboard' && (
-                <button
-                  onClick={() => {
-                    window.dispatchEvent(new CustomEvent('trigger-arqueo'));
-                  }}
-                  className="border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-350 font-bold rounded-2xl h-8.5 px-4 cursor-pointer text-[11px] transition-all active:scale-95 flex items-center justify-center shadow-sm"
-                >
-                  Arqueo y cierre
-                </button>
-              )}
-
-              {/* Caja Status en caliente */}
-              <div className="flex items-center gap-2 select-none animate-fade-in text-[10px] font-extrabold">
-                <div className="px-2.5 py-1 bg-emerald-50 border border-emerald-100 rounded-full text-emerald-700 flex items-center gap-1.5 shadow-sm">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Caja Abierta</span>
-                </div>
-                <div className="px-2.5 py-1 bg-blue-50 border border-blue-100 rounded-full text-blue-700 shadow-sm flex items-center gap-1">
-                  <span>Efectivo:</span>
-                  <span className="font-mono font-black">${efectivoActual.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Content Outlet */}
         <div className="flex-1 w-full overflow-y-auto pb-8 scrollbar-none pr-1">
           <Outlet />
         </div>
       </main>
+
+      {/* Logout Confirmation Modal */}
+      <AnimatePresence mode="wait">
+        {showLogoutModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full flex flex-col items-center text-center"
+            >
+              <div className="h-16 w-16 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 mb-4 shadow-sm border border-rose-100">
+                <LogOut className="h-8 w-8" />
+              </div>
+              <h3 className="text-lg font-black text-slate-800 mb-2">¿Cerrar sesión?</h3>
+              <p className="text-xs text-slate-500 font-medium mb-6">
+                Estás a punto de salir del sistema de forma segura. ¿Deseas continuar?
+              </p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setShowLogoutModal(false)}
+                  className="flex-1 py-3 px-4 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer border border-slate-200"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowLogoutModal(false);
+                    logout();
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs transition-colors shadow-sm cursor-pointer"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
