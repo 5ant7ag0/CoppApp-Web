@@ -12,7 +12,7 @@ import {
   Plus, ArrowRight, ArrowLeft, Check, Loader2, Users,
   Mail, Phone, Calendar, Heart, Search, Printer, X, Pencil, Eye,
   CreditCard, ArrowRightLeft, Copy, Circle, AlertCircle, Download, Lock,
-  FolderOpen
+  FolderOpen, IdCard, Activity
 } from 'lucide-react';
 
 interface Beneficiario {
@@ -2520,12 +2520,42 @@ export const CreacionSocios: React.FC = () => {
                   <table className="w-full text-left border-collapse table-fixed">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-100">
-                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[15%]">Identificación</th>
-                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[35%]">Nombres Completos</th>
-                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[15%]">Celular</th>
-                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[25%]">Correo</th>
-                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider text-center w-[10%]">Es PEP</th>
-                        <th className="px-4 py-3 text-[10px] font-black text-slate-450 uppercase tracking-wider w-[10%]">Estado</th>
+                        <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-[15%]">
+                          <div className="flex items-center gap-1.5">
+                            <IdCard className="w-3.5 h-3.5 text-slate-400" />
+                            Identificación
+                          </div>
+                        </th>
+                        <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-[35%]">
+                          <div className="flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-slate-400" />
+                            Nombres Completos
+                          </div>
+                        </th>
+                        <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-[15%]">
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5 text-slate-400" />
+                            Celular
+                          </div>
+                        </th>
+                        <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-[25%]">
+                          <div className="flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5 text-slate-400" />
+                            Correo
+                          </div>
+                        </th>
+                        <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider text-center w-[10%]">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
+                            Es PEP
+                          </div>
+                        </th>
+                        <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-[10%]">
+                          <div className="flex items-center gap-1.5">
+                            <Activity className="w-3.5 h-3.5 text-slate-400" />
+                            Estado
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -2535,7 +2565,21 @@ export const CreacionSocios: React.FC = () => {
                           onClick={() => handleVerDetalle(s)}
                           className="hover:bg-slate-50/50 transition-colors cursor-pointer"
                         >
-                          <td className="px-4 py-3 text-xs font-bold text-slate-800 font-mono truncate w-[15%]">{s.identificacion}</td>
+                          <td className="px-4 py-3 text-xs font-bold text-slate-800 font-mono truncate w-[15%]">
+                            <div className="flex items-center gap-1.5 group">
+                              {s.identificacion}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigator.clipboard.writeText(s.identificacion);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-200 rounded-md text-slate-400 hover:text-[#0054A6]"
+                                title="Copiar identificación"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </td>
                           <td className="px-4 py-3 text-xs font-extrabold text-slate-700 uppercase truncate w-[35%]" title={s.nombresCompletos}>{s.nombresCompletos}</td>
                           <td className="px-4 py-3 text-xs font-semibold text-slate-500 font-mono truncate w-[15%]">{s.telefono}</td>
                           <td className="px-4 py-3 text-xs font-medium text-slate-500 truncate w-[25%]" title={s.correo}>{s.correo}</td>

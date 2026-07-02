@@ -177,7 +177,7 @@ export const AdminLayout: React.FC = () => {
                   }
                 >
                   <Briefcase className="h-5 w-5 shrink-0" />
-                  <span>{user?.rol === 'CONTADOR' ? 'Contabilidad' : 'Contabilidad (Lectura)'}</span>
+                  <span>Contabilidad</span>
                 </Link>
               </>
             )}
