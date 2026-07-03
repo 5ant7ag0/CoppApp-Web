@@ -25,6 +25,7 @@ import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { jsPDF } from 'jspdf';
+import { maskAccountNumber } from '../../utils/securityFormatters';
 
 interface CajaActiva {
   id: number;
@@ -942,44 +943,43 @@ export const CajaVentanilla: React.FC = () => {
       format: [80, 130]
     });
 
-    // 1. Dibujar icono de edificio vectorizado (x: 37 a 43, y: 10 a 18)
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.35);
-    doc.roundedRect(37, 10, 6, 8, 1, 1);
-    doc.setFillColor(0, 0, 0);
-    doc.circle(38.5, 12, 0.35, 'F');
-    doc.circle(40, 12, 0.35, 'F');
-    doc.circle(41.5, 12, 0.35, 'F');
-    doc.circle(38.5, 14, 0.35, 'F');
-    doc.circle(40, 14, 0.35, 'F');
-    doc.circle(41.5, 14, 0.35, 'F');
-    doc.rect(39.2, 16.2, 1.6, 1.8);
 
     // 2. Cabecera Centrada
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
     
-    const instName = activeTenant?.name?.toUpperCase().replace(" LTDA.", "").trim() || "COOPERATIVA DE AHORRO Y CRÉDITO ITQ";
-    doc.text(instName, 40, 23, { align: "center" });
+    const instName = activeTenant?.name?.toUpperCase().replace(" LTDA.", "").trim() || "COOPERATIVA DE AHORRO Y CRÉDITO";
+    
+    if (activeTenant?.logoBase64) {
+      try {
+        let imgType = 'PNG';
+        if (activeTenant.logoBase64.startsWith('data:image/jpeg')) imgType = 'JPEG';
+        doc.addImage(activeTenant.logoBase64, imgType, 32, 5, 16, 16, undefined, 'FAST');
+      } catch (e) {
+        console.warn('Error drawing logo in ticket', e);
+      }
+    }
+
+    doc.text(instName, 40, 26, { align: "center" });
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
-    doc.text("Canal Ventanilla", 40, 28, { align: "center" });
-    doc.text(ticketData.referencia, 40, 33, { align: "center" });
+    doc.text("Canal Ventanilla", 40, 30, { align: "center" });
+    doc.text(ticketData.referencia, 40, 35, { align: "center" });
 
-    // 3. Tabla de Detalles alineada a la izquierda (x = 8)
-    let currentY = 40;
+    // 3. Tabla de Detalles alineada a la izquierda (x = 12)
+    let currentY = 42;
     doc.setFontSize(8.5);
 
     const printLine = (label: string, value: string) => {
       doc.setFont("helvetica", "bold");
       const labelText = label + ": ";
-      doc.text(labelText, 8, currentY);
+      doc.text(labelText, 12, currentY);
       
       doc.setFont("helvetica", "normal");
       const textWidth = doc.getTextWidth(labelText);
-      doc.text(value || 'N/A', 8 + textWidth, currentY);
+      doc.text(value || 'N/A', 12 + textWidth, currentY);
       currentY += 5;
     };
 
@@ -999,7 +999,7 @@ export const CajaVentanilla: React.FC = () => {
     printLine("CÉDULA / DNI", ticketData.socioCedula);
 
     // Nro Cuenta
-    printLine("NRO. CUENTA", ticketData.cuentaNumero);
+    printLine("NRO. CUENTA", maskAccountNumber(ticketData.cuentaNumero));
 
     // Operación
     let tipoTxStr = "";
@@ -1018,37 +1018,29 @@ export const CajaVentanilla: React.FC = () => {
     // Glosa (Salto de línea inteligente con alineación de margen)
     doc.setFont("helvetica", "bold");
     const glosaLabel = "GLOSA: ";
-    doc.text(glosaLabel, 8, currentY);
+    doc.text(glosaLabel, 12, currentY);
     doc.setFont("helvetica", "normal");
     const glosaWidth = doc.getTextWidth(glosaLabel);
     
     // Obtener la primera línea del concepto que encaje junto al label
-    const firstLineMaxW = 80 - 16 - glosaWidth;
+    const firstLineMaxW = 80 - 24 - glosaWidth;
     const firstLineSplit = doc.splitTextToSize(ticketData.concepto, firstLineMaxW);
     const firstLineText = firstLineSplit[0] || '';
-    doc.text(firstLineText, 8 + glosaWidth, currentY);
+    doc.text(firstLineText, 12 + glosaWidth, currentY);
     currentY += 5;
     
-    // Escribir el resto del concepto alineado a la izquierda (x = 8)
+    // Escribir el resto del concepto alineado a la izquierda (x = 12)
     const remainingText = ticketData.concepto.substring(firstLineText.length).trim();
     if (remainingText) {
-      const remainingSplit = doc.splitTextToSize(remainingText, 80 - 16);
+      const remainingSplit = doc.splitTextToSize(remainingText, 80 - 24);
       for (let i = 0; i < remainingSplit.length; i++) {
-        doc.text(remainingSplit[i], 8, currentY);
+        doc.text(remainingSplit[i], 12, currentY);
         currentY += 5;
       }
     }
 
-    // 4. Firmas y pie de página
-    currentY += 2;
-    doc.setFont("helvetica", "normal");
-    doc.text("------------------------------------", 40, currentY, { align: "center" });
-    
-    currentY += 8;
-    doc.text("Firma del Socio / Cliente", 40, currentY, { align: "center" });
-
-    currentY += 6;
-    doc.text(`C.I. ${ticketData.socioCedula}`, 40, currentY, { align: "center" });
+    // 4. Pie de página
+    currentY += 4;
 
     currentY += 8;
     doc.text("Comprobante de Ventanilla Electrónico", 40, currentY, { align: "center" });
@@ -2027,7 +2019,11 @@ export const CajaVentanilla: React.FC = () => {
             {/* Area de Impresión */}
             <div ref={ticketRef} className="font-mono text-[11px] text-slate-800 space-y-4 pt-2">
               <div className="text-center space-y-1">
-                <Building className="h-6 w-6 text-[#0054A6] mx-auto mb-1.5" />
+                {activeTenant?.logoBase64 ? (
+                  <img src={activeTenant.logoBase64} alt="Logo" className="h-8 w-auto mx-auto mb-1.5" />
+                ) : (
+                  <Building className="h-6 w-6 text-[#0054A6] mx-auto mb-1.5" />
+                )}
                 <h4 className="font-extrabold text-[12px] uppercase tracking-wide">
                   {activeTenant?.name?.toUpperCase() || 'ITQ'}
                 </h4>
@@ -2056,7 +2052,7 @@ export const CajaVentanilla: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span>NRO. CUENTA:</span>
-                  <span className="font-bold">{ticketData.cuentaNumero}</span>
+                  <span className="font-bold">{maskAccountNumber(ticketData.cuentaNumero)}</span>
                 </div>
               </div>
 
@@ -2102,11 +2098,7 @@ export const CajaVentanilla: React.FC = () => {
 
               <div className="border-t border-dashed border-slate-200 my-3" />
 
-              <div className="pt-8 text-center space-y-1">
-                <p className="text-[9px] text-slate-400">------------------------------------</p>
-                <p className="font-extrabold uppercase text-slate-600">Firma del Socio / Cliente</p>
-                <p className="text-[9px] text-slate-400 font-bold uppercase">C.I. {ticketData.socioCedula}</p>
-              </div>
+
 
               <div className="text-center pt-3 text-[9px] text-slate-400">
                 <p>Comprobante de Ventanilla Electrónico</p>

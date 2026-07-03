@@ -18,6 +18,8 @@ import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { useTenant } from '../../context/TenantContext';
 import { jsPDF } from 'jspdf';
+import { maskAccountNumber } from '../../utils/securityFormatters';
+import { drawReceiptHeader } from '../../utils/pdfGenerators';
 
 interface Account {
   id: number;
@@ -312,8 +314,8 @@ export const Inicio: React.FC = () => {
     const isEnviada = parsed.transferType === 'ENVIADA';
     const remitente = isEnviada ? (user?.nombresCompletos || '') : parsed.nombres;
     const beneficiario = isEnviada ? parsed.nombres : (user?.nombresCompletos || '');
-    const ctaOrigen = isEnviada ? (mainAccount?.numeroCuenta || '-') : parsed.cuentaAsociada;
-    const ctaDestino = isEnviada ? parsed.cuentaAsociada : (mainAccount?.numeroCuenta || '-');
+    const ctaOrigen = maskAccountNumber(isEnviada ? (mainAccount?.numeroCuenta || '-') : parsed.cuentaAsociada);
+    const ctaDestino = maskAccountNumber(isEnviada ? parsed.cuentaAsociada : (mainAccount?.numeroCuenta || '-'));
     
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -329,11 +331,8 @@ export const Inicio: React.FC = () => {
     doc.setFillColor(16, 185, 129);
     doc.rect(5, 5, 138, 3, 'F');
 
-    // Cooperative Name
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(148, 163, 184); // slate-400
-    doc.text(activeTenant?.name?.toUpperCase() || "COOPERATIVA DE AHORRO Y CRÉDITO ITQ", 74, 22, { align: "center" });
+    // Cooperative Name and Logo
+    drawReceiptHeader(doc, activeTenant, 74, 22);
 
     // Receipt Header Title
     doc.setFontSize(15);
@@ -858,9 +857,14 @@ export const Inicio: React.FC = () => {
             </button>
 
             <div className="flex flex-col items-center text-center space-y-4 pt-4">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                {activeTenant?.name || 'Cooperativa de Ahorro y Crédito ITQ'}
-              </span>
+              <div className="flex items-center justify-center space-x-2">
+                {activeTenant?.logoBase64 && (
+                  <img src={activeTenant.logoBase64} alt="Logo" className="h-5 w-auto" />
+                )}
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  {activeTenant?.name || 'Cooperativa de Ahorro y Crédito'}
+                </span>
+              </div>
               <div className="h-16 w-16 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500 shadow-sm animate-scale-up">
                 <CheckCircle2 className="h-10 w-10" />
               </div>

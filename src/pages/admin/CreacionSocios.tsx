@@ -14,6 +14,8 @@ import {
   CreditCard, ArrowRightLeft, Copy, Circle, AlertCircle, Download, Lock,
   FolderOpen, IdCard, Activity
 } from 'lucide-react';
+import { useTenant } from '../../context/TenantContext';
+import { drawExecutiveHeader } from '../../utils/pdfGenerators';
 
 interface Beneficiario {
   nombresCompletos: string;
@@ -24,6 +26,7 @@ interface Beneficiario {
 
 export const CreacionSocios: React.FC = () => {
   const { user } = useAuth();
+  const { activeTenant } = useTenant();
   const isContador = user?.rol === 'CONTADOR';
   // Pestaña activa: 'nuevo' | 'registrados'
   const [activeTab, setActiveTab] = useState<'nuevo' | 'registrados'>(isContador ? 'registrados' : 'nuevo');
@@ -438,22 +441,12 @@ export const CreacionSocios: React.FC = () => {
       doc.text(value || 'N/A', x + labelWidth, yPos);
     };
 
-    let currentY = 15;
-
-    // Encabezado institucional
-    doc.setFillColor(0, 84, 166);
-    doc.rect(margin, currentY, pageWidth - 2 * margin, 2, 'F');
-    currentY += 8;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(0, 84, 166);
-    doc.text("COOPERATIVA DE AHORRO Y CRÉDITO ITQ LTDA.", margin, currentY);
+    let currentY = drawExecutiveHeader(doc, activeTenant, 15);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(100, 116, 139);
-    doc.text(`RUC: 1791234567001  |  Emisión: ${new Date().toLocaleDateString('es-EC')} ${new Date().toLocaleTimeString('es-EC')}`, pageWidth - margin, currentY, { align: 'right' });
+    doc.text(`Emisión: ${new Date().toLocaleDateString('es-EC')} ${new Date().toLocaleTimeString('es-EC')}`, pageWidth - margin, currentY - 5, { align: 'right' });
 
     currentY += 5;
     doc.setFont("helvetica", "bold");
@@ -665,19 +658,8 @@ export const CreacionSocios: React.FC = () => {
 
     const margin = 15;
     const pageWidth = 210;
-    let currentY = 15;
+    let currentY = drawExecutiveHeader(doc, activeTenant, 15);
 
-    // Header
-    doc.setFillColor(0, 84, 166);
-    doc.rect(margin, currentY, pageWidth - 2 * margin, 2, 'F');
-    currentY += 8;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(0, 84, 166);
-    doc.text("COOPERATIVA DE AHORRO Y CRÉDITO ITQ LTDA.", margin, currentY);
-
-    currentY += 5;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(26, 26, 26);
@@ -801,19 +783,7 @@ export const CreacionSocios: React.FC = () => {
 
     const margin = 20;
     const pageWidth = 210;
-    let currentY = 20;
-
-    // Header
-    doc.setFillColor(0, 84, 166);
-    doc.rect(margin, currentY, pageWidth - 2 * margin, 2, 'F');
-    currentY += 10;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(0, 84, 166);
-    doc.text("COOPERATIVA DE AHORRO Y CRÉDITO ITQ LTDA.", margin, currentY);
-
-    currentY += 6;
+    let currentY = drawExecutiveHeader(doc, activeTenant, 20);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.setTextColor(26, 26, 26);
@@ -837,7 +807,7 @@ export const CreacionSocios: React.FC = () => {
     doc.setFontSize(9);
     doc.setTextColor(51, 65, 85);
     
-    const textoPagare = `Por el presente PAGARÉ A LA ORDEN, yo, ${socio.nombresCompletos}, portador de la identificación nº ${socio.identificacion}, en mi calidad de DEUDOR PRINCIPAL, me obligo a pagar incondicional e irrevocablemente a la orden de la COOPERATIVA DE AHORRO Y CRÉDITO ITQ LTDA., en sus oficinas de esta ciudad de Quito, la cantidad de $${parseFloat(cred.montoSolicitado || 0).toFixed(2)} USD (DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA), más los intereses generados a la tasa del ${parseFloat(cred.tasaInteresAnual || 0).toFixed(2)}% anual.\n\n` +
+    const textoPagare = `Por el presente PAGARÉ A LA ORDEN, yo, ${socio.nombresCompletos}, portador de la identificación nº ${socio.identificacion}, en mi calidad de DEUDOR PRINCIPAL, me obligo a pagar incondicional e irrevocablemente a la orden de ${activeTenant?.name?.toUpperCase() || 'LA COOPERATIVA'}, en sus oficinas de esta ciudad de Quito, la cantidad de $${parseFloat(cred.montoSolicitado || 0).toFixed(2)} USD (DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA), más los intereses generados a la tasa del ${parseFloat(cred.tasaInteresAnual || 0).toFixed(2)}% anual.\n\n` +
       `Este valor será cancelado en el plazo de ${cred.plazoMeses} meses, mediante cuotas consecutivas mensuales de acuerdo con la tabla de amortización adjunta a este título valor.\n\n` +
       `En caso de mora en el pago de una o más cuotas de capital o intereses, la cooperativa queda facultada para declarar vencida y exigible la totalidad de la obligación pendiente de pago y demandar por la vía coactiva o ejecutiva el saldo total deudor. El deudor acepta que el interés de mora sea cobrado a la tasa máxima permitida por la ley vigente al momento de la mora.\n\n` +
       `Para todos los efectos legales que se deriven de este pagaré, el deudor renuncia a fuero y domicilio, y se somete expresamente a los jueces y tribunales de la ciudad de Quito. Expresamente se exime a la cooperativa del protesto y de la presentación para el pago de este pagaré.`;
@@ -890,19 +860,8 @@ export const CreacionSocios: React.FC = () => {
 
     const margin = 15;
     const pageWidth = 210;
-    let currentY = 15;
+    let currentY = drawExecutiveHeader(doc, activeTenant, 15);
 
-    // Header
-    doc.setFillColor(0, 84, 166);
-    doc.rect(margin, currentY, pageWidth - 2 * margin, 2, 'F');
-    currentY += 8;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(0, 84, 166);
-    doc.text("COOPERATIVA DE AHORRO Y CRÉDITO ITQ LTDA.", margin, currentY);
-
-    currentY += 5;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(26, 26, 26);

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Card } from '../../components/ui/card';
@@ -106,6 +107,7 @@ const filterVisibleAccounts = (accounts: any[] | undefined | null, virtualCode?:
 export const ContabilidadDashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const { activeTenant } = useTenant();
   const isLectura = user?.rol === 'GERENTE_GENERAL' || user?.rol === 'SUPER_ADMIN_SAAS';
   const rawSection = (searchParams.get('section') || 'PLAN').toUpperCase();
   const activeSection = (isLectura && rawSection === 'CIERRES') ? 'PLAN' : rawSection;
@@ -448,12 +450,12 @@ export const ContabilidadDashboard: React.FC = () => {
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(16);
-    doc.text('COOPERATIVA DE AHORRO Y CRÉDITO ITQ', 15, 22);
+    doc.text(activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO', 15, 22);
 
     doc.setFontSize(8);
     doc.setFont('Helvetica', 'normal');
     doc.setTextColor(120, 120, 120);
-    doc.text('R.U.C. 1792345678001 | DIRECCIÓN MATRIZ: AV. AMAZONAS N31-10 Y MARIANA DE JESÚS', 15, 27);
+    doc.text(`R.U.C. ${activeTenant?.ruc || '1790000000001'} | DIRECCIÓN MATRIZ: ${((activeTenant as any)?.address) || 'AV. PRINCIPAL'}`, 15, 27);
     doc.text('CANAL: SISTEMA CORE BANCARIO | CONTABILIDAD GENERAL', 15, 31);
 
     // Voucher Title Box
@@ -783,7 +785,7 @@ export const ContabilidadDashboard: React.FC = () => {
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(14);
-    doc.text('COOPERATIVA DE AHORRO Y CRÉDITO ITQ', 15, 20);
+    doc.text(activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO', 15, 20);
 
     doc.setFontSize(10);
     doc.text('ESTADO DE RESULTADOS (PÉRDIDAS Y GANANCIAS)', 15, 25);
@@ -967,7 +969,7 @@ export const ContabilidadDashboard: React.FC = () => {
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(14);
-    doc.text('COOPERATIVA DE AHORRO Y CRÉDITO ITQ', 15, 20);
+    doc.text(activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO', 15, 20);
 
     doc.setFontSize(10);
     doc.text('BALANCE GENERAL (ESTADO DE SITUACIÓN FINANCIERA)', 15, 25);
@@ -1193,7 +1195,7 @@ export const ContabilidadDashboard: React.FC = () => {
       
       // Encabezado informativo de la cuenta
       csvContent += `LIBRO MAYOR DE CONTABILIDAD;;;;;;\n`;
-      csvContent += `COOPERATIVA DE AHORRO Y CRÉDITO ITQ;;;;;;\n`;
+      csvContent += `${activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO'}\n`;
       csvContent += `CUENTA CONTABLE:;${data.codigoContable} - ${data.nombreCuenta};;;;;\n`;
       csvContent += `TIPO DE NATURALEZA:;${data.tipoCuenta} (${['ACTIVO', 'GASTO'].includes(data.tipoCuenta) ? 'Deudora' : 'Acreedora'});;;;;\n`;
       csvContent += `PERIODO DESDE:;${fechaDesdeMayor};HASTA:;${fechaHastaMayor};;;\n`;

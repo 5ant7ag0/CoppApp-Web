@@ -16,6 +16,8 @@ import {
   Search, RefreshCcw, User, Hash, DollarSign, CalendarDays, Activity
 } from 'lucide-react';
 import { SimuladorCredito } from '../../components/SimuladorCredito';
+import { useTenant } from '../../context/TenantContext';
+import { drawExecutiveHeader } from '../../utils/pdfGenerators';
 
 interface Socio {
   id: number;
@@ -231,6 +233,7 @@ const getCreditScore = (socio: Socio | undefined, cuota: number) => {
 
 export const AprobacionCreditos: React.FC = () => {
   const { user } = useAuth();
+  const { activeTenant } = useTenant();
   
   // Estados para solicitud presencial
   const [mostrarPresencialModal, setMostrarPresencialModal] = useState<boolean>(false);
@@ -468,22 +471,7 @@ export const AprobacionCreditos: React.FC = () => {
     });
 
     const marginX = 20;
-    let currentY = 20;
-
-    // PAGINA 1: Membrete Institucional
-    doc.setFont("times", "bold");
-    doc.setFontSize(14);
-    doc.text("COOPERATIVA DE AHORRO Y CRÉDITO ITQ", 105, currentY, { align: "center" });
-    
-    currentY += 5;
-    doc.setFontSize(10);
-    doc.text("RUC: 1791234567001", 105, currentY, { align: "center" });
-    
-    currentY += 5;
-    doc.setFont("times", "normal");
-    doc.text("Dirección Matriz: Av. Antonio de Ulloa N28-30, Quito, Ecuador", 105, currentY, { align: "center" });
-    
-    currentY += 12;
+    let currentY = drawExecutiveHeader(doc, activeTenant, 20);
 
     // Título del Pagaré
     doc.setFont("times", "bold");
@@ -609,22 +597,7 @@ export const AprobacionCreditos: React.FC = () => {
       format: 'a4'
     });
 
-    let currentY = 20;
-
-    // Membrete Institucional
-    doc.setFont("times", "bold");
-    doc.setFontSize(14);
-    doc.text("COOPERATIVA DE AHORRO Y CRÉDITO ITQ", 105, currentY, { align: "center" });
-    
-    currentY += 5;
-    doc.setFontSize(10);
-    doc.text("RUC: 1791234567001", 105, currentY, { align: "center" });
-    
-    currentY += 5;
-    doc.setFont("times", "normal");
-    doc.text("Dirección Matriz: Av. Antonio de Ulloa N28-30, Quito, Ecuador", 105, currentY, { align: "center" });
-    
-    currentY += 12;
+    let currentY = drawExecutiveHeader(doc, activeTenant, 20);
 
     // Título de la tabla
     doc.setFont("times", "bold");
