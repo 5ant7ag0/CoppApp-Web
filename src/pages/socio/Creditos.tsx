@@ -25,6 +25,10 @@ interface Credit {
   plazoMeses: number;
   tasaInteresAnual: number;
   estado: string;
+  productoCredito?: {
+    id: number;
+    nombre: string;
+  };
 }
 
 interface AmortizationCuota {
@@ -90,7 +94,7 @@ export const Creditos: React.FC = () => {
   const handlePayCuota = async () => {
     if (!credit || !metrics.nextCuota || !savingsAccount) return;
     
-    const amountToPay = getCuotaPendingAmount(metrics.nextCuota);
+    const amountToPay = Number(getCuotaPendingAmount(metrics.nextCuota).toFixed(2));
     setPaying(true);
     setErrorMsg(null);
     try {
@@ -270,8 +274,7 @@ export const Creditos: React.FC = () => {
           {/* CONTENIDO TABA 1: CRÉDITO ACTIVO */}
           {activeTab === 'activo' && (() => {
               const solicitudes = creditsList.filter(c => 
-                c.estado !== 'DESEMBOLSADO' && 
-                c.estado !== 'VIGENTE' && 
+                ['SOLICITADO', 'EN_REVISION', 'APROBADO', 'RECHAZADO'].includes(c.estado) && 
                 !dismissedSolicitudes.includes(c.id)
               );
 
@@ -527,6 +530,13 @@ export const Creditos: React.FC = () => {
                                     </span>
                                   </div>
 
+                                  {sol.productoCredito?.nombre && (
+                                    <div className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 w-fit">
+                                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">Línea de Crédito</span>
+                                      <span className="text-xs font-black text-slate-800">{sol.productoCredito.nombre}</span>
+                                    </div>
+                                  )}
+
                                   <div className="grid grid-cols-3 gap-2 border-b border-dashed border-slate-100/80 pb-4">
                                     <div>
                                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Monto</span>
@@ -597,7 +607,7 @@ export const Creditos: React.FC = () => {
                     montoSolicitado: params.montoSolicitado,
                     plazoMeses: params.plazoMeses,
                     tasaInteresAnual: params.tasaInteresAnual,
-                    tasaMoraAnual: 5.00,
+                    productoCredito: { id: params.productoCreditoId },
                     tipoAmortizacion: params.tipoAmortizacion,
                     garantiaDescripcion: `Garantía Quirografaria (Firma Personal). Destino: ${params.destinoFondo}`
                   });

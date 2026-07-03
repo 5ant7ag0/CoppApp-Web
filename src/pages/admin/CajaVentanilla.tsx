@@ -594,9 +594,10 @@ export const CajaVentanilla: React.FC = () => {
       return;
     }
 
-    const montoNum = parseFloat(montoTx);
-    if (isNaN(montoNum) || montoNum <= 0.00) {
-      setTxError('El monto a transferir debe ser mayor a $0.00.');
+    const parsed = parseFloat(montoTx.replace(',', '.'));
+    const montoNum = isNaN(parsed) ? 0 : Number(parsed.toFixed(2));
+    if (montoNum <= 0.00) {
+      setTxError('El monto de la transacción debe ser mayor a $0.00.');
       return;
     }
 

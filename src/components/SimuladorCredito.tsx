@@ -18,6 +18,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select } from './ui/select';
 import api from '../services/api';
+import { useEffect } from 'react';
 
 interface CuotaSimulada {
   numeroCuota: number;
@@ -35,17 +36,22 @@ interface SimuladorCreditoProps {
     tasaInteresAnual: number;
     tipoAmortizacion: string;
     destinoFondo: string;
+    productoCreditoId: number;
   }) => Promise<any>;
   buttonLabel?: string;
   successMessage?: string;
   onSuccessClose?: () => void;
 }
 
-const INTERES_RATES = {
-  CONSUMO: 12.5,
-  VIVIENDA: 9.5,
-  MICROCREDITO: 15.0
-};
+interface ProductoCredito {
+  id: number;
+  nombre: string;
+  tasaInteresAnual: number;
+  montoMinimo: number;
+  montoMaximo: number;
+  plazoMinimoMeses: number;
+  plazoMaximoMeses: number;
+}
 
 const formatCurrency = (val: number | undefined | null) => {
   const v = val ?? 0;
@@ -69,13 +75,32 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
   onSuccessClose
 }) => {
   // Estados del Simulador
+  const [productos, setProductos] = useState<ProductoCredito[]>([]);
   const [simMonto, setSimMonto] = useState<string>('5000');
   const [simPlazo, setSimPlazo] = useState<string>('12');
-  const [simTipo, setSimTipo] = useState<'CONSUMO' | 'VIVIENDA' | 'MICROCREDITO'>('CONSUMO');
+  const [simProductoId, setSimProductoId] = useState<number | ''>('');
   const [simSistema, setSimSistema] = useState<'FRANCES' | 'ALEMAN' | 'AMERICANO'>('FRANCES');
   const [simulatedCuotas, setSimulatedCuotas] = useState<CuotaSimulada[] | null>(null);
   const [simLoading, setSimLoading] = useState<boolean>(false);
   const [simError, setSimError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProductos = async () => {
+      try {
+        const res = await api.get('/productos-credito/activos');
+        const prods = (res.data || []);
+        setProductos(prods);
+        if (prods.length > 0) {
+          setSimProductoId(prods[0].id);
+          setSimMonto(String(prods[0].montoMinimo));
+          setSimPlazo(String(prods[0].plazoMinimoMeses));
+        }
+      } catch (err) {
+        console.error('Error fetching productos de crédito:', err);
+      }
+    };
+    fetchProductos();
+  }, []);
 
   // Estados de la Solicitud de Crédito Post-Simulación
   const [isApplyModalOpen, setIsApplyModalOpen] = useState<boolean>(false);
@@ -93,15 +118,23 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
 
     const montoVal = parseFloat(simMonto);
     const plazoVal = parseInt(simPlazo);
-    const tasaVal = INTERES_RATES[simTipo];
+    const productoSel = productos.find(p => p.id === Number(simProductoId));
 
-    if (isNaN(montoVal) || montoVal <= 0) {
-      setSimError('El monto solicitado debe ser un valor positivo mayor a cero.');
+    if (!productoSel) {
+      setSimError('Debe seleccionar un producto de crédito válido.');
       setSimLoading(false);
       return;
     }
-    if (isNaN(plazoVal) || plazoVal <= 0) {
-      setSimError('El plazo en meses debe ser mayor a cero.');
+
+    const tasaVal = productoSel.tasaInteresAnual;
+
+    if (isNaN(montoVal) || montoVal < productoSel.montoMinimo || montoVal > productoSel.montoMaximo) {
+      setSimError(`El monto solicitado debe estar entre ${formatCurrency(productoSel.montoMinimo)} y ${formatCurrency(productoSel.montoMaximo)}.`);
+      setSimLoading(false);
+      return;
+    }
+    if (isNaN(plazoVal) || plazoVal < productoSel.plazoMinimoMeses || plazoVal > productoSel.plazoMaximoMeses) {
+      setSimError(`El plazo en meses debe estar entre ${productoSel.plazoMinimoMeses} y ${productoSel.plazoMaximoMeses} meses.`);
       setSimLoading(false);
       return;
     }
@@ -126,9 +159,15 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
 
   // Limpiar Simulación
   const handleClearSimulation = () => {
-    setSimMonto('');
-    setSimPlazo('');
-    setSimTipo('CONSUMO');
+    if (productos.length > 0) {
+      setSimMonto(String(productos[0].montoMinimo));
+      setSimPlazo(String(productos[0].plazoMinimoMeses));
+      setSimProductoId(productos[0].id);
+    } else {
+      setSimMonto('');
+      setSimPlazo('');
+      setSimProductoId('');
+    }
     setSimSistema('FRANCES');
     setSimulatedCuotas(null);
     setSimError(null);
@@ -147,7 +186,14 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
 
     const montoVal = parseFloat(simMonto);
     const plazoVal = parseInt(simPlazo);
-    const tasaVal = INTERES_RATES[simTipo];
+    const productoSel = productos.find(p => p.id === Number(simProductoId));
+
+    if (!productoSel) {
+      setApplyError('Error: No se ha seleccionado un producto de crédito válido.');
+      return;
+    }
+
+    const tasaVal = productoSel.tasaInteresAnual;
 
     try {
       const result = await onApply({
@@ -155,9 +201,9 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
         plazoMeses: plazoVal,
         tasaInteresAnual: tasaVal,
         tipoAmortizacion: simSistema,
-        destinoFondo
+        destinoFondo,
+        productoCreditoId: productoSel.id
       });
-
       setApplySuccessData(result);
       setIsApplyModalOpen(false);
     } catch (err: any) {
@@ -206,12 +252,20 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
               <div className="space-y-1.5">
                 <Select 
                   label="Línea de Crédito"
-                  value={simTipo} 
-                  onChange={(e) => setSimTipo(e.target.value as any)}
+                  value={String(simProductoId)} 
+                  onChange={(e) => {
+                    const pid = Number(e.target.value);
+                    setSimProductoId(pid);
+                    const sel = productos.find(p => p.id === pid);
+                    if (sel) {
+                      setSimMonto(String(sel.montoMinimo));
+                      setSimPlazo(String(sel.plazoMinimoMeses));
+                    }
+                  }}
                 >
-                  <option value="CONSUMO">Crédito de Consumo (12.5%)</option>
-                  <option value="VIVIENDA">Crédito Hipotecario / Vivienda (9.5%)</option>
-                  <option value="MICROCREDITO">Microcrédito Productivo (15.0%)</option>
+                  {productos.map(p => (
+                    <option key={p.id} value={p.id}>{p.nombre} ({p.tasaInteresAnual}%)</option>
+                  ))}
                 </Select>
               </div>
 
@@ -242,8 +296,8 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
                     value={simPlazo}
                     onChange={(e) => setSimPlazo(e.target.value)}
                     placeholder="Plazo"
-                    min="3"
-                    max="120"
+                    min={productos.find(x => x.id === Number(simProductoId))?.plazoMinimoMeses || 1}
+                    max={productos.find(x => x.id === Number(simProductoId))?.plazoMaximoMeses || 120}
                     className="pl-10 pr-4 bg-white/50 border-slate-200/60 focus-visible:ring-4 focus-visible:ring-[#0054A6]/10 focus-visible:border-[#0054A6] h-[42px]"
                   />
                 </div>
@@ -262,6 +316,23 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
                 </Select>
               </div>
 
+              {/* Información Adicional del Producto Seleccionado */}
+              {simProductoId && (() => {
+                const p = productos.find(x => x.id === Number(simProductoId));
+                if (!p) return null;
+                return (
+                  <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-2">
+                    <div className="flex items-start gap-2">
+                      <Info className="h-4 w-4 shrink-0 mt-0.5 text-[#0054A6]" />
+                      <div className="space-y-1">
+                        <p><strong>Rango de Monto:</strong> {formatCurrency(p.montoMinimo)} - {formatCurrency(p.montoMaximo)}</p>
+                        <p><strong>Plazo Permitido:</strong> {p.plazoMinimoMeses} a {p.plazoMaximoMeses} meses</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Tasa fija leída de solo lectura */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-slate-500">Tasa de Interés Nominal Anual</label>
@@ -269,7 +340,10 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
                   <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input 
                     type="text" 
-                    value={`${INTERES_RATES[simTipo].toFixed(2)} %`}
+                    value={(() => {
+                      const p = productos.find(x => x.id === Number(simProductoId));
+                      return p ? `${p.tasaInteresAnual.toFixed(2)} %` : '0.00 %';
+                    })()}
                     readOnly 
                     className="pl-10 pr-4 border border-slate-200 rounded-xl py-2.5 h-[42px] bg-slate-50 text-slate-500 cursor-not-allowed border-none focus-visible:ring-0"
                   />
@@ -454,6 +528,11 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
               </p>
             </div>
 
+            {(() => {
+              const productoSel = productos.find(p => p.id === Number(simProductoId));
+              return (
+                <>
+
             {applyError && (
               <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600 flex items-start gap-2 mb-4 animate-fade-in font-medium">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -465,7 +544,7 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
             <div className="space-y-3 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs mb-6">
               <div className="flex justify-between">
                 <span className="text-slate-400">Línea de Crédito</span>
-                <span className="font-bold text-slate-700 capitalize">{simTipo.toLowerCase()}</span>
+                <span className="font-bold text-slate-700 capitalize">{productoSel?.nombre || 'N/A'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Monto Solicitado</span>
@@ -477,7 +556,7 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Tasa de Interés</span>
-                <span className="font-bold text-slate-700">{INTERES_RATES[simTipo]}% anual</span>
+                <span className="font-bold text-slate-700">{productoSel?.tasaInteresAnual || 0}% anual</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Amortización</span>
@@ -522,6 +601,9 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
                 )}
               </Button>
             </form>
+            </>
+            );
+            })()}
 
           </div>
         </div>
@@ -562,7 +644,9 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Línea de Crédito</span>
-                  <span className="font-semibold text-slate-700 capitalize">{simTipo.toLowerCase()}</span>
+                  <span className="font-semibold text-slate-700 capitalize">
+                    {productos.find(p => p.id === Number(simProductoId))?.nombre || ''}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Plazo Solicitado</span>

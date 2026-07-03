@@ -103,6 +103,23 @@ interface ProductoAhorro {
   estado: string; // 'ACTIVO', 'INACTIVO'
 }
 
+interface ProductoCredito {
+  id?: number;
+  nombre: string;
+  montoMinimo: number;
+  montoMaximo: number;
+  plazoMinimoMeses: number;
+  plazoMaximoMeses: number;
+  tasaInteresAnual: number;
+  tasaMoraAnual: number;
+  porcentajeSeguroDesgravamen: number;
+  cuentaContableCartera: Account;
+  cuentaContableIngresosIntereses: Account;
+  cuentaContableMora: Account;
+  cuentaContableSeguro?: Account;
+  estado: string;
+}
+
 interface Agencia {
   id: number;
   codigo: string;
@@ -182,7 +199,7 @@ const estadoKeyMap: Record<string, string> = {
 };
 
 export const Parametrizacion: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'institucional' | 'financiero' | 'contabilidad' | 'auditoria' | 'ahorro_productos' | 'cajas_financieras'>('institucional');
+  const [activeTab, setActiveTab] = useState<'institucional' | 'financiero' | 'contabilidad' | 'auditoria' | 'ahorro_productos' | 'credito_productos' | 'cajas_financieras'>('institucional');
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [originalSettings, setOriginalSettings] = useState<CompanySettings | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -204,6 +221,27 @@ export const Parametrizacion: React.FC = () => {
     tasaPenalizacionRetiro: '0.00',
     cuentaContablePasivoId: '',
     cuentaContableGastoId: '',
+    estado: 'ACTIVO'
+  });
+
+  // Productos de Crédito
+  const [productosCredito, setProductosCredito] = useState<ProductoCredito[]>([]);
+  const [loadingProductosCredito, setLoadingProductosCredito] = useState(false);
+  const [isProductCreditoModalOpen, setIsProductCreditoModalOpen] = useState(false);
+  const [editingProductCredito, setEditingProductCredito] = useState<ProductoCredito | null>(null);
+  const [productCreditoForm, setProductCreditoForm] = useState({
+    nombre: '',
+    montoMinimo: '0.00',
+    montoMaximo: '0.00',
+    plazoMinimoMeses: '1',
+    plazoMaximoMeses: '12',
+    tasaInteresAnual: '0.00',
+    tasaMoraAnual: '0.00',
+    porcentajeSeguroDesgravamen: '0.00',
+    cuentaContableCarteraId: '',
+    cuentaContableIngresosInteresesId: '',
+    cuentaContableMoraId: '',
+    cuentaContableSeguroId: '',
     estado: 'ACTIVO'
   });
 
@@ -553,7 +591,122 @@ export const Parametrizacion: React.FC = () => {
       setErrorMsg('Error al inactivar producto: ' + (err.response?.data || err.message));
     }
   };
+  const fetchProductosCredito = async () => {
+    setLoadingProductosCredito(true);
+    try {
+      const res = await api.get('/productos-credito');
+      setProductosCredito(res.data || []);
+    } catch (err: any) {
+      console.error('Error fetching productos credito:', err);
+      setErrorMsg('Error al cargar catálogo de productos de crédito: ' + (err.response?.data || err.message));
+    } finally {
+      setLoadingProductosCredito(false);
+    }
+  };
 
+  useEffect(() => {
+    if (activeTab === 'credito_productos') {
+      fetchProductosCredito();
+    }
+  }, [activeTab]);
+
+  const handleOpenNewProductCredito = () => {
+    setEditingProductCredito(null);
+    setProductCreditoForm({
+      nombre: '',
+      montoMinimo: '0.00',
+      montoMaximo: '0.00',
+      plazoMinimoMeses: '1',
+      plazoMaximoMeses: '12',
+      tasaInteresAnual: '0.00',
+      tasaMoraAnual: '0.00',
+      porcentajeSeguroDesgravamen: '0.00',
+      cuentaContableCarteraId: '',
+      cuentaContableIngresosInteresesId: '',
+      cuentaContableMoraId: '',
+      cuentaContableSeguroId: '',
+      estado: 'ACTIVO'
+    });
+    setIsProductCreditoModalOpen(true);
+  };
+
+  const handleOpenEditProductCredito = (prod: ProductoCredito) => {
+    setEditingProductCredito(prod);
+    setProductCreditoForm({
+      nombre: prod.nombre,
+      montoMinimo: String(prod.montoMinimo),
+      montoMaximo: String(prod.montoMaximo),
+      plazoMinimoMeses: String(prod.plazoMinimoMeses),
+      plazoMaximoMeses: String(prod.plazoMaximoMeses),
+      tasaInteresAnual: String(prod.tasaInteresAnual),
+      tasaMoraAnual: String(prod.tasaMoraAnual),
+      porcentajeSeguroDesgravamen: String(prod.porcentajeSeguroDesgravamen),
+      cuentaContableCarteraId: prod.cuentaContableCartera ? `${prod.cuentaContableCartera.codigoContable} - ${prod.cuentaContableCartera.nombreCuenta}` : '',
+      cuentaContableIngresosInteresesId: prod.cuentaContableIngresosIntereses ? `${prod.cuentaContableIngresosIntereses.codigoContable} - ${prod.cuentaContableIngresosIntereses.nombreCuenta}` : '',
+      cuentaContableMoraId: prod.cuentaContableMora ? `${prod.cuentaContableMora.codigoContable} - ${prod.cuentaContableMora.nombreCuenta}` : '',
+      cuentaContableSeguroId: prod.cuentaContableSeguro ? `${prod.cuentaContableSeguro.codigoContable} - ${prod.cuentaContableSeguro.nombreCuenta}` : '',
+      estado: prod.estado
+    });
+    setIsProductCreditoModalOpen(true);
+  };
+
+  const handleSaveProductCredito = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (!productCreditoForm.nombre.trim()) {
+      alert('El nombre del producto es requerido.');
+      return;
+    }
+    
+    const extractId = (str: string) => {
+      const code = str.split(' - ')[0];
+      const acc = accounts.find(a => a.codigoContable === code);
+      return acc ? acc.id : null;
+    };
+
+    const carteraId = extractId(productCreditoForm.cuentaContableCarteraId);
+    const ingresosId = extractId(productCreditoForm.cuentaContableIngresosInteresesId);
+    const moraId = extractId(productCreditoForm.cuentaContableMoraId);
+    const seguroId = extractId(productCreditoForm.cuentaContableSeguroId);
+
+    if (!carteraId || !ingresosId || !moraId) {
+      alert('Debe seleccionar cuentas contables válidas para Cartera, Ingresos por Intereses y Mora.');
+      return;
+    }
+
+    const payload = {
+      nombre: productCreditoForm.nombre,
+      montoMinimo: Number(productCreditoForm.montoMinimo),
+      montoMaximo: Number(productCreditoForm.montoMaximo),
+      plazoMinimoMeses: Number(productCreditoForm.plazoMinimoMeses),
+      plazoMaximoMeses: Number(productCreditoForm.plazoMaximoMeses),
+      tasaInteresAnual: Number(productCreditoForm.tasaInteresAnual),
+      tasaMoraAnual: Number(productCreditoForm.tasaMoraAnual),
+      porcentajeSeguroDesgravamen: Number(productCreditoForm.porcentajeSeguroDesgravamen),
+      cuentaContableCarteraId: carteraId,
+      cuentaContableIngresosInteresesId: ingresosId,
+      cuentaContableMoraId: moraId,
+      cuentaContableSeguroId: seguroId,
+      estado: productCreditoForm.estado
+    };
+
+    try {
+      if (editingProductCredito && editingProductCredito.id) {
+        await api.put(`/productos-credito/${editingProductCredito.id}`, payload);
+        setSuccessMsg('¡Producto de crédito actualizado con éxito!');
+      } else {
+        await api.post('/productos-credito', payload);
+        setSuccessMsg('¡Producto de crédito creado con éxito!');
+      }
+      setIsProductCreditoModalOpen(false);
+      fetchProductosCredito();
+    } catch (err: any) {
+      console.error(err);
+      alert('Error al guardar producto de crédito: ' + (err.response?.data || err.message));
+    }
+  };
   // Validaciones en tiempo real
   const validateField = (field: string, value: string, currentSettings?: CompanySettings) => {
     const errors = { ...validationErrors };
@@ -1158,6 +1311,25 @@ export const Parametrizacion: React.FC = () => {
           }`}>
             <TrendingUp className="h-4 w-4" />
             <span>Productos de Ahorro</span>
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('credito_productos')}
+          className="relative flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold transition-all duration-300 cursor-pointer text-slate-500 hover:text-slate-850"
+        >
+          {activeTab === 'credito_productos' && (
+            <motion.div
+              layoutId="activeTabParametrizacion"
+              className="absolute inset-0 bg-[#0054A6] rounded-full shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className={`relative z-10 flex items-center gap-2 transition-colors duration-300 ${
+            activeTab === 'credito_productos' ? 'text-white' : 'text-slate-500'
+          }`}>
+            <Coins className="h-4 w-4" />
+            <span>Productos de Crédito</span>
           </span>
         </button>
         
@@ -2268,6 +2440,360 @@ export const Parametrizacion: React.FC = () => {
                     </div>
                   );
                 })()}
+              </div>
+            </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB PRODUCTOS DE CRÉDITO */}
+        {activeTab === 'credito_productos' && (
+          <div className="space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[#0054A6]" />
+                  Catálogo de Productos de Crédito
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Defina los tipos de crédito, tasas, plazos y su parametrización contable.
+                </p>
+              </div>
+              <button
+                onClick={handleOpenNewProductCredito}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#0054A6] hover:bg-[#004080] text-white text-xs font-bold transition-all shadow-[0_4px_12px_rgba(0,84,166,0.15)] hover:shadow-[0_6px_16px_rgba(0,84,166,0.25)] cursor-pointer whitespace-nowrap flex-shrink-0"
+              >
+                + Nuevo Producto
+              </button>
+            </div>
+
+            {loadingProductosCredito ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 text-[#0054A6] animate-spin" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {productosCredito.map(prod => (
+                  <div key={prod.id} className="group relative bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col">
+                    <div className="p-6 pb-5 border-b border-slate-100 relative">
+                      <div className="flex justify-between items-start gap-4 mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-blue-50/50 flex items-center justify-center border border-blue-100 flex-shrink-0">
+                            <Coins className="h-5 w-5 text-[#0054A6]" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-slate-800 leading-tight">{prod.nombre}</h3>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wide mt-1 bg-green-50 text-green-700">
+                              {estadoValueMap[prod.estado] || prod.estado}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3 mt-4">
+                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-0.5">Tasa Interés</p>
+                          <p className="text-sm font-semibold text-slate-700">{prod.tasaInteresAnual}%</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-0.5">Monto Máx.</p>
+                          <p className="text-sm font-semibold text-slate-700">${prod.montoMaximo}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="p-5 flex-1 bg-slate-50/50">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between text-xs">
+                          <span className="text-slate-500">Monto Mínimo</span>
+                          <span className="font-semibold text-slate-700">${prod.montoMinimo}</span>
+                        </div>
+                        <div className="flex items-start justify-between text-xs">
+                          <span className="text-slate-500">Plazo</span>
+                          <span className="font-semibold text-slate-700">{prod.plazoMinimoMeses} a {prod.plazoMaximoMeses} meses</span>
+                        </div>
+                        <div className="flex items-start justify-between text-xs">
+                          <span className="text-slate-500">Tasa Mora</span>
+                          <span className="font-semibold text-slate-700">{prod.tasaMoraAnual}%</span>
+                        </div>
+                        <div className="flex items-start justify-between text-xs">
+                          <span className="text-slate-500">Seguro Desgrav.</span>
+                          <span className="font-semibold text-slate-700">{prod.porcentajeSeguroDesgravamen}%</span>
+                        </div>
+                        <div className="pt-3 border-t border-slate-200/60 mt-1">
+                          <div className="flex items-start justify-between text-[11px] mb-1.5">
+                            <span className="text-slate-500 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-blue-400" /> Cartera</span>
+                            <span className="font-medium text-slate-700 truncate max-w-[140px]" title={prod.cuentaContableCartera?.nombreCuenta}>{prod.cuentaContableCartera?.codigoContable}</span>
+                          </div>
+                          <div className="flex items-start justify-between text-[11px] mb-1.5">
+                            <span className="text-slate-500 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-green-400" /> Ingresos Int.</span>
+                            <span className="font-medium text-slate-700 truncate max-w-[140px]" title={prod.cuentaContableIngresosIntereses?.nombreCuenta}>{prod.cuentaContableIngresosIntereses?.codigoContable}</span>
+                          </div>
+                          <div className="flex items-start justify-between text-[11px]">
+                            <span className="text-slate-500 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-red-400" /> Mora</span>
+                            <span className="font-medium text-slate-700 truncate max-w-[140px]" title={prod.cuentaContableMora?.nombreCuenta}>{prod.cuentaContableMora?.codigoContable}</span>
+                          </div>
+                          {prod.cuentaContableSeguro && (
+                            <div className="flex items-start justify-between text-[11px] mt-1.5">
+                              <span className="text-slate-500 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-purple-400" /> Seguro</span>
+                              <span className="font-medium text-slate-700 truncate max-w-[140px]" title={prod.cuentaContableSeguro?.nombreCuenta}>{prod.cuentaContableSeguro?.codigoContable}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="p-4 border-t border-slate-100 bg-white grid grid-cols-2 gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <button
+                        onClick={() => handleOpenEditProductCredito(prod)}
+                        className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => alert('Para inactivar, edite el producto.')}
+                        className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        Desactivar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Add New Product Card */}
+                <div 
+                  onClick={handleOpenNewProductCredito}
+                  className="min-h-[300px] border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-8 cursor-pointer hover:bg-slate-50 hover:border-[#0054A6]/30 group transition-all"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 group-hover:bg-[#0054A6]/10 flex items-center justify-center mb-4 transition-colors">
+                    <span className="text-xl text-slate-400 group-hover:text-[#0054A6] transition-colors">+</span>
+                  </div>
+                  <h3 className="font-bold text-slate-700 group-hover:text-[#0054A6] transition-colors">Nuevo Producto de Crédito</h3>
+                  <p className="text-xs text-slate-500 text-center mt-2 max-w-[200px]">Configure un nuevo tipo de crédito y sus enlaces contables</p>
+                </div>
+              </div>
+            )}
+
+            {/* Modal for New/Edit Product Crédito */}
+            {isProductCreditoModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto">
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden relative mt-8 mb-8 my-auto max-h-[90vh] flex flex-col">
+                <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 flex-shrink-0">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-800">
+                      {editingProductCredito ? 'Editar Producto de Crédito' : 'Nuevo Producto de Crédito'}
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-1">Configure los parámetros financieros y contables del producto.</p>
+                  </div>
+                  <button 
+                    onClick={() => setIsProductCreditoModalOpen(false)}
+                    className="p-2 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
+                  <form id="product-credito-form" onSubmit={handleSaveProductCredito} className="space-y-8">
+                    
+                    {/* Sección 1: Datos Generales */}
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#0054A6]" />
+                        Datos Generales
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold tracking-wide uppercase text-slate-500">
+                            Nombre del Producto <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={productCreditoForm.nombre}
+                            onChange={(e) => setProductCreditoForm({...productCreditoForm, nombre: e.target.value})}
+                            placeholder="Ej. Crédito Consumo"
+                            className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#0054A6] focus:ring-1 focus:ring-[#0054A6] transition-all placeholder:text-slate-400 text-slate-700"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold tracking-wide uppercase text-slate-500">
+                            Estado
+                          </label>
+                          <div className="relative">
+                            <select
+                              value={productCreditoForm.estado}
+                              onChange={(e) => setProductCreditoForm({...productCreditoForm, estado: e.target.value})}
+                              className="w-full h-11 px-4 pr-10 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#0054A6] focus:ring-1 focus:ring-[#0054A6] transition-all text-slate-700 appearance-none cursor-pointer"
+                            >
+                              <option value="ACTIVO">Activo</option>
+                              <option value="INACTIVO">Inactivo</option>
+                            </select>
+                            <ChevronDown className="absolute right-4 top-3.5 h-4 w-4 text-slate-400 pointer-events-none" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sección 2: Límites Financieros */}
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        Límites Financieros
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold tracking-wide uppercase text-slate-500">
+                            Monto Mínimo ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={productCreditoForm.montoMinimo}
+                            onChange={(e) => setProductCreditoForm({...productCreditoForm, montoMinimo: e.target.value})}
+                            className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#0054A6] focus:ring-1 focus:ring-[#0054A6] transition-all text-slate-700"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold tracking-wide uppercase text-slate-500">
+                            Monto Máximo ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={productCreditoForm.montoMaximo}
+                            onChange={(e) => setProductCreditoForm({...productCreditoForm, montoMaximo: e.target.value})}
+                            className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#0054A6] focus:ring-1 focus:ring-[#0054A6] transition-all text-slate-700"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold tracking-wide uppercase text-slate-500">
+                            Plazo Mínimo (Meses)
+                          </label>
+                          <input
+                            type="number"
+                            value={productCreditoForm.plazoMinimoMeses}
+                            onChange={(e) => setProductCreditoForm({...productCreditoForm, plazoMinimoMeses: e.target.value})}
+                            className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#0054A6] focus:ring-1 focus:ring-[#0054A6] transition-all text-slate-700"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold tracking-wide uppercase text-slate-500">
+                            Plazo Máximo (Meses)
+                          </label>
+                          <input
+                            type="number"
+                            value={productCreditoForm.plazoMaximoMeses}
+                            onChange={(e) => setProductCreditoForm({...productCreditoForm, plazoMaximoMeses: e.target.value})}
+                            className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#0054A6] focus:ring-1 focus:ring-[#0054A6] transition-all text-slate-700"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5">
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold tracking-wide uppercase text-slate-500">
+                            Tasa Anual Nominal (%)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={productCreditoForm.tasaInteresAnual}
+                            onChange={(e) => setProductCreditoForm({...productCreditoForm, tasaInteresAnual: e.target.value})}
+                            className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#0054A6] focus:ring-1 focus:ring-[#0054A6] transition-all text-slate-700 font-bold text-blue-600 bg-blue-50/30"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold tracking-wide uppercase text-slate-500">
+                            Tasa de Mora (%)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={productCreditoForm.tasaMoraAnual}
+                            onChange={(e) => setProductCreditoForm({...productCreditoForm, tasaMoraAnual: e.target.value})}
+                            className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#0054A6] focus:ring-1 focus:ring-[#0054A6] transition-all text-slate-700"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold tracking-wide uppercase text-slate-500 flex items-center gap-2">
+                            Seguro Desgravamen (%)
+                            <span className="relative group cursor-help">
+                              <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-normal text-center leading-relaxed">
+                                Porcentaje sobre el monto solicitado para el seguro. Poner 0 para no cobrar seguro.
+                              </div>
+                            </span>
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={productCreditoForm.porcentajeSeguroDesgravamen}
+                            onChange={(e) => setProductCreditoForm({...productCreditoForm, porcentajeSeguroDesgravamen: e.target.value})}
+                            className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#0054A6] focus:ring-1 focus:ring-[#0054A6] transition-all text-slate-700"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sección 3: Enlaces Contables */}
+                    <div className="bg-slate-50/50 -mx-8 px-8 py-6 border-y border-slate-100">
+                      <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                        Enlaces Contables Partida Doble
+                      </h3>
+                      <p className="text-xs text-slate-500 mb-5">
+                        Mapeo contable del producto de crédito.
+                      </p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                        <SearchableCombobox
+                          label="Cuenta Cartera de Créditos (Activo)"
+                          value={productCreditoForm.cuentaContableCarteraId}
+                          onChange={(val) => setProductCreditoForm({...productCreditoForm, cuentaContableCarteraId: val})}
+                          options={accounts.map(a => `${a.codigoContable} - ${a.nombreCuenta}`)}
+                          placeholder="Buscar cuenta 1.4.x..."
+                        />
+                        <SearchableCombobox
+                          label="Cuenta Ingresos por Intereses (Ingreso)"
+                          value={productCreditoForm.cuentaContableIngresosInteresesId}
+                          onChange={(val) => setProductCreditoForm({...productCreditoForm, cuentaContableIngresosInteresesId: val})}
+                          options={accounts.map(a => `${a.codigoContable} - ${a.nombreCuenta}`)}
+                          placeholder="Buscar cuenta 5.1.x..."
+                        />
+                        <SearchableCombobox
+                          label="Cuenta Ingresos por Mora (Ingreso)"
+                          value={productCreditoForm.cuentaContableMoraId}
+                          onChange={(val) => setProductCreditoForm({...productCreditoForm, cuentaContableMoraId: val})}
+                          options={accounts.map(a => `${a.codigoContable} - ${a.nombreCuenta}`)}
+                          placeholder="Buscar cuenta 5.1.x..."
+                        />
+                        <SearchableCombobox
+                          label="Cuenta Pasivo/Ingreso Seguro Desgravamen"
+                          value={productCreditoForm.cuentaContableSeguroId}
+                          onChange={(val) => setProductCreditoForm({...productCreditoForm, cuentaContableSeguroId: val})}
+                          options={accounts.map(a => `${a.codigoContable} - ${a.nombreCuenta}`)}
+                          placeholder="Opcional. Buscar cuenta..."
+                        />
+                      </div>
+                    </div>
+                  </form>
+                </div>
+
+                <div className="px-8 py-5 border-t border-slate-100 bg-white flex items-center justify-end gap-3 flex-shrink-0">
+                  <button
+                    onClick={() => setIsProductCreditoModalOpen(false)}
+                    className="py-2.5 px-5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    form="product-credito-form"
+                    className="py-2.5 px-5 rounded-xl bg-[#0054A6] hover:bg-[#004080] text-white text-xs font-bold transition-all cursor-pointer"
+                  >
+                    {editingProductCredito ? 'Guardar Cambios' : 'Crear Producto'}
+                  </button>
+                </div>
               </div>
             </div>
             )}
