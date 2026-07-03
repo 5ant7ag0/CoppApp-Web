@@ -96,6 +96,7 @@ export const Creditos: React.FC = () => {
     try {
       await api.post('/creditos/pagar', {
         creditoId: credit.id,
+        origenFondos: 'CUENTA',
         cuentaAhorrosId: savingsAccount.id,
         monto: amountToPay
       });

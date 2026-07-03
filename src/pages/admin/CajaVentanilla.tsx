@@ -512,9 +512,9 @@ export const CajaVentanilla: React.FC = () => {
   const fetchCreditos = async (socioId: number) => {
     setCargandoCredito(true);
     try {
-      const res = await api.get('/creditos');
+      const res = await api.get(`/creditos/socio/${socioId}`);
       const todos = res.data || [];
-      const activos = todos.filter((c: any) => c.socio?.id === socioId && (c.estado === 'DESEMBOLSADO' || c.estado === 'EN_MORA'));
+      const activos = todos.filter((c: any) => c.estado === 'DESEMBOLSADO' || c.estado === 'EN_MORA');
       setCreditosSocio(activos);
       if (activos.length > 0) {
         setCreditoSeleccionado(activos[0]);
@@ -675,18 +675,11 @@ export const CajaVentanilla: React.FC = () => {
 
       if (confirmTxData.tipo === 'PAGO_CREDITO') {
         if (!creditoSeleccionado || !cuotaPendiente) return;
-        // 1. Depósito del efectivo en la cuenta de ahorros
-        await api.post('/cuentas/deposito', {
-          cuentaAhorrosId: targetAccountId,
-          monto: confirmTxData.monto,
-          concepto: `Depósito en efectivo para pago de crédito Contrato: ${creditoSeleccionado.numeroCredito}`,
-          declaracionOrigenFondos: false
-        });
-
-        // 2. Cobro/Pago del crédito
+        
+        // 1. Cobro/Pago del crédito directo
         await api.post('/creditos/pagar', {
           creditoId: creditoSeleccionado.id,
-          cuentaAhorrosId: targetAccountId,
+          origenFondos: 'EFECTIVO',
           monto: confirmTxData.monto
         });
 
