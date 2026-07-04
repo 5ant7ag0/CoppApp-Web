@@ -88,14 +88,15 @@ export const drawReceiptHeader = (
       let imgType = 'PNG';
       if (tenant.logoBase64.startsWith('data:image/jpeg')) imgType = 'JPEG';
       
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
       const textWidth = doc.getTextWidth(tName);
+      
       const totalWidth = 12 + 4 + textWidth; // logo (12) + gap (4) + text
       const startX = centerX - (totalWidth / 2);
       
       doc.addImage(tenant.logoBase64, imgType, startX, y - 8, 12, 12, undefined, 'FAST');
       
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
       doc.setTextColor(148, 163, 184); // slate-400
       doc.text(tName, startX + 16, y, { align: "left" });
     } catch (e) {

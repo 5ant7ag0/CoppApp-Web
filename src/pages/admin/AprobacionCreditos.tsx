@@ -10,13 +10,14 @@ import { TablaAmortizacion } from '../../components/shared/TablaAmortizacion';
 import { 
   Layers, Clock, X, CheckCircle2, 
   AlertTriangle, AlertCircle, Loader2, 
-  TrendingUp, Ban, Printer, Building,
+  Ban, Printer, Building,
   Eye, FileText, LayoutGrid, List,
   SlidersHorizontal, FileDown,
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
   Search, RefreshCcw, User, Hash, DollarSign, CalendarDays, Activity
 } from 'lucide-react';
 import { SimuladorCredito } from '../../components/SimuladorCredito';
+import { PerfilCrediticioSocio } from '../../components/shared/PerfilCrediticioSocio';
 import { useTenant } from '../../context/TenantContext';
 import { drawExecutiveHeader, generarPdfTablaAmortizacionUniversal } from '../../utils/pdfGenerators';
 
@@ -28,6 +29,7 @@ interface Socio {
   telefono: string;
   correo: string;
   actividadEconomica: string;
+  fotoPerfilUrl?: string;
   ingresosMensuales: number;
   gastosMensuales: number;
   deudasActuales: number;
@@ -204,37 +206,7 @@ const numeroALetras = (num: number): string => {
   return `${texto} CON ${centavos} CENTAVOS`;
 };
 
-// Simulador determinista de Score Crediticio (Rango 300 a 1000)
-const getCreditScore = (socio: Socio | undefined, cuota: number) => {
-  if (!socio) return 600;
-  const ing = socio.ingresosMensuales ?? (socio as any).ingresos ?? 0;
-  const gas = socio.gastosMensuales ?? (socio as any).gastos ?? 0;
-  const deu = socio.deudasActuales ?? (socio as any).deudas ?? 0;
-  const netFlow = Number(ing) - Number(gas);
-  
-  let score = 700;
-  
-  if (netFlow > 0) {
-    score += Math.min(150, Math.floor(netFlow / 10));
-  } else {
-    score -= 150;
-  }
-  
-  if (deu > 0) {
-    score -= Math.min(150, Math.floor(deu / 5));
-  }
-  
-  const ratio = netFlow > 0 ? (cuota / netFlow) * 100 : 100;
-  if (ratio > 40) {
-    score -= 200;
-  } else if (netFlow <= 0) {
-    score -= 250;
-  } else {
-    score += 50;
-  }
-  
-  return Math.max(300, Math.min(1000, score));
-};
+
 
 export const AprobacionCreditos: React.FC = () => {
   const { user } = useAuth();
@@ -244,6 +216,7 @@ export const AprobacionCreditos: React.FC = () => {
   const [mostrarPresencialModal, setMostrarPresencialModal] = useState<boolean>(false);
   const [presencialCedula, setPresencialCedula] = useState<string>('');
   const [presencialSocio, setPresencialSocio] = useState<Socio | null>(null);
+  const [presencialCuotaProyectada, setPresencialCuotaProyectada] = useState<number>(0);
   const [buscarSocioLoading, setBuscarSocioLoading] = useState<boolean>(false);
   const [buscarSocioError, setBuscarSocioError] = useState<string | null>(null);
   
@@ -984,15 +957,7 @@ export const AprobacionCreditos: React.FC = () => {
   const colDesembolsadosSliced = colDesembolsados.slice(0, 30);
 
   // Cálculos de riesgo con verificaciones nulas y fallbacks lógicos
-  const ingresos = creditoSeleccionado?.socio?.ingresosMensuales ?? (creditoSeleccionado?.socio as any)?.ingresos ?? 0;
-  const gastos = creditoSeleccionado?.socio?.gastosMensuales ?? (creditoSeleccionado?.socio as any)?.gastos ?? 0;
-  const deudas = creditoSeleccionado?.socio?.deudasActuales ?? (creditoSeleccionado?.socio as any)?.deudas ?? 0;
-
-  const flujoNeto = Number(ingresos) - Number(gastos);
   const cuotaProyectada = tablaAmortizacion.length > 0 ? (tablaAmortizacion[0]?.total ?? 0) : 0;
-  
-  const porcentajeCapacidad = flujoNeto > 0 ? (cuotaProyectada / flujoNeto) * 100 : 100;
-  const superaCapacidad = flujoNeto <= 0 || porcentajeCapacidad > 40;
 
   const handleSort = (field: keyof Credito | 'socio.nombresCompletos') => {
     if (sortField === field) {
@@ -1621,7 +1586,7 @@ export const AprobacionCreditos: React.FC = () => {
             </div>
 
             {/* Header del Modal */}
-            <div className="flex flex-col md:flex-row justify-between items-start gap-4 pb-0 border-b border-slate-100 mb-4 shrink-0 mt-2">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4 shrink-0 mt-2">
               
               {/* Contenedor Izquierdo: Título y Pestañas */}
               <div className="flex flex-col gap-4 w-full md:w-auto">
@@ -1742,182 +1707,27 @@ export const AprobacionCreditos: React.FC = () => {
                 {/* Cuerpo de Dos Columnas */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
               
-              {/* Columna Izquierda: Perfil de Riesgo */}
+              {/* Columna Izquierda: Perfil de Riesgo (Componente Compartido) */}
               <div className="space-y-4">
-                <div className="space-y-2.5">
-                  <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
-                    Perfil del Socio Solicitante
-                  </h4>
-                  
-                  {/* Datos Básicos */}
-                  <Card className="rounded-2xl border border-slate-100 bg-slate-50/50 p-3.5 space-y-2.5 shadow-none">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-450 font-medium">Socio:</span>
-                      <span className="font-extrabold text-slate-700 uppercase">{creditoSeleccionado.socio?.nombresCompletos}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-450 font-medium">Cédula:</span>
-                      <span className="font-bold text-slate-700 font-mono">{creditoSeleccionado.socio?.identificacion}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-450 font-medium">Actividad Económica:</span>
-                      <span className="font-semibold text-slate-700">{creditoSeleccionado.socio?.actividadEconomica || 'No declarada'}</span>
-                    </div>
-                  </Card>
-                </div>
-
-                {/* Score Crediticio (Media Dona Gauge SVG) */}
-                <Card className="rounded-3xl border border-slate-100 p-4 shadow-sm bg-white space-y-1">
-                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
-                    Score de Buró Crediticio
-                  </h5>
-                  <div className="relative flex flex-col items-center">
-                    {(() => {
-                      const scoreVal = getCreditScore(creditoSeleccionado.socio, cuotaProyectada);
-                      const percent = Math.min(100, Math.max(0, ((scoreVal - 300) / 700) * 100));
-                      
-                      let strokeColor = '#EF4444';
-                      let scoreLabel = 'RIESGO ALTO';
-                      let scoreClass = 'text-rose-500';
-                      
-                      if (scoreVal >= 600 && scoreVal < 800) {
-                        strokeColor = '#F59E0B';
-                        scoreLabel = 'RIESGO MEDIO';
-                        scoreClass = 'text-amber-500';
-                      } else if (scoreVal >= 800) {
-                        strokeColor = '#10B981';
-                        scoreLabel = 'EXCELENTE';
-                        scoreClass = 'text-emerald-500';
-                      }
-                      
-                      const offsetVal = 251.3 - (percent / 100) * 251.3;
-                      
-                      return (
-                        <>
-                          <svg viewBox="0 0 200 110" className="w-full max-w-[160px] mx-auto">
-                            <circle
-                              cx="100"
-                              cy="100"
-                              r="80"
-                              fill="transparent"
-                              stroke="#F1F5F9"
-                              strokeWidth="12"
-                              strokeDasharray="251.3 502.6"
-                              transform="rotate(-180 100 100)"
-                              strokeLinecap="round"
-                            />
-                            <circle
-                              cx="100"
-                              cy="100"
-                              r="80"
-                              fill="transparent"
-                              stroke={strokeColor}
-                              strokeWidth="12"
-                              strokeDasharray="251.3 502.6"
-                              strokeDashoffset={offsetVal}
-                              transform="rotate(-180 100 100)"
-                              strokeLinecap="round"
-                              className="transition-all duration-1000 ease-out"
-                            />
-                            <text x="100" y="80" textAnchor="middle" className="text-3xl font-black fill-slate-800 tracking-tight font-sans">
-                              {scoreVal}
-                            </text>
-                            <text x="100" y="98" textAnchor="middle" className={`text-[8px] font-black tracking-widest uppercase fill-current ${scoreClass} font-sans`}>
-                              {scoreLabel}
-                            </text>
-                          </svg>
-                          <div className="text-[9px] text-slate-400 font-semibold text-center mt-1">
-                            Rango de Calificación SEPS (300 a 1000)
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                </Card>
-
-                {/* Ingresos y Gastos con formateador de moneda */}
-                <div className="space-y-2.5">
-                  <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
-                    Ingresos y Gastos Declarados
-                  </h4>
-
-                  <Card className="rounded-3xl border border-slate-100 p-4 space-y-3 shadow-sm bg-white">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-550 font-semibold flex items-center gap-1.5">
-                        <TrendingUp className="h-4 w-4 text-emerald-500" />
-                        Ingresos Mensuales (+):
-                      </span>
-                      <span className="font-bold text-emerald-600 font-mono text-sm">
-                        {formatCurrency(Number(ingresos))}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-550 font-semibold flex items-center gap-1.5">
-                        <Ban className="h-4 w-4 text-rose-500" />
-                        Gastos Mensuales (-):
-                      </span>
-                      <span className="font-bold text-rose-600 font-mono text-sm">
-                        {formatCurrency(Number(gastos))}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs border-b border-dashed border-slate-100 pb-2.5">
-                      <span className="text-slate-550 font-semibold flex items-center gap-1.5">
-                        <AlertCircle className="h-4 w-4 text-slate-400" />
-                        Otras Deudas Actuales:
-                      </span>
-                      <span className="font-bold text-slate-600 font-mono">
-                        {formatCurrency(Number(deudas))}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center pt-0.5">
-                      <span className="text-slate-800 text-xs font-black uppercase tracking-wider">
-                        Flujo Neto Mensual:
-                      </span>
-                      <span className={`font-black font-mono text-base ${flujoNeto > 0 ? 'text-[#0054A6]' : 'text-rose-600'}`}>
-                        {formatCurrency(flujoNeto)}
-                      </span>
-                    </div>
-                  </Card>
-
-                  {/* Banner de Advertencia del 40% */}
-                  {superaCapacidad && (
-                    <div className="p-3 bg-amber-50 border border-amber-100 rounded-3xl flex gap-3 items-start animate-fade-in">
-                      <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                      <div className="space-y-1">
-                        <h4 className="text-xs font-black text-amber-800 uppercase tracking-wide">Alerta de Capacidad de Pago</h4>
-                        <p className="text-[11px] text-amber-700 leading-relaxed font-semibold">
-                          Alto riesgo de impago: La cuota proyectada de {formatCurrency(cuotaProyectada)} representa el{' '}
-                          {flujoNeto > 0 ? porcentajeCapacidad.toFixed(1) : '100+'}% del flujo neto mensual. Supera la capacidad de pago SEPS (límite del 40%).
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Motivo de rechazo previo */}
-                {creditoSeleccionado.estado === 'RECHAZADO' && creditoSeleccionado.motivoRechazo && (
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
-                      Historial de Resolución
-                    </h4>
-                    <div className="p-4 bg-rose-50/50 border border-rose-100/50 rounded-2xl">
-                      <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest block mb-1">Motivo de Rechazo:</span>
-                      <p className="text-xs text-rose-700 font-bold leading-relaxed">{creditoSeleccionado.motivoRechazo}</p>
-                    </div>
-                  </div>
+                {creditoSeleccionado.socio && (
+                  <PerfilCrediticioSocio 
+                    socio={creditoSeleccionado.socio} 
+                    cuotaProyectada={cuotaProyectada}
+                    estadoCredito={creditoSeleccionado.estado}
+                    motivoRechazo={creditoSeleccionado.motivoRechazo}
+                  />
                 )}
               </div>
 
               {/* Columna Derecha: Proyección Financiera y Notas */}
-              <div className="space-y-4 flex flex-col justify-between">
+              <div className="space-y-4">
                 
                 <div className="space-y-2.5">
                   <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
                     Proyección Financiera
                   </h4>
 
-                  <Card className="rounded-2xl border border-slate-100 bg-slate-50/50 p-3.5 space-y-2.5 shadow-none">
+                  <Card className="rounded-2xl border border-slate-100 bg-slate-50/50 p-3.5 space-y-2.5 shadow-none min-h-[185px]">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-450 font-medium">Monto Solicitado:</span>
                       <span className="font-extrabold text-slate-800 font-mono">{formatCurrency(creditoSeleccionado.montoSolicitado)}</span>
@@ -1942,7 +1752,7 @@ export const AprobacionCreditos: React.FC = () => {
                 </div>
 
                 {/* Notas Internas / Bitácora */}
-                <div className="space-y-2.5">
+                <div className="space-y-2.5 mt-[145px]">
                   <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">
                     Notas Internas / Bitácora
                   </h4>
@@ -1960,7 +1770,7 @@ export const AprobacionCreditos: React.FC = () => {
             </div>
 
             {/* Footer de Resoluciones (Botones de Cierre) */}
-            <div className="border-t border-slate-100 pt-6 flex gap-4 w-full">
+            <div className="pt-2 flex gap-4 w-full">
               
               {/* Controles para Créditos en Análisis (Solicitados / En Revisión) */}
               {(creditoSeleccionado.estado === 'SOLICITADO' || creditoSeleccionado.estado === 'EN_REVISION') && (
@@ -2636,14 +2446,11 @@ export const AprobacionCreditos: React.FC = () => {
             </button>
 
             {/* Encabezado del Modal */}
-            <div className="pb-4 border-b border-slate-100 mb-6">
+            <div className="pb-0 mb-4">
               <h3 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
                 <Building className="h-5.5 w-5.5 text-[#0054A6]" />
-                Originación de Crédito Presencial (Ventanilla)
+                Solicitud de Crédito
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Cree una nueva solicitud física en ventanilla asociándola a un socio activo.
-              </p>
             </div>
 
             {/* Contenido principal */}
@@ -2651,15 +2458,6 @@ export const AprobacionCreditos: React.FC = () => {
               
               {/* PASO A: Identificación (Buscador por Cédula) */}
               <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-blue-50 text-[#0054A6] flex items-center justify-center text-xs font-bold font-mono">
-                    A
-                  </div>
-                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Identificación del Socio
-                  </h4>
-                </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                   <div className="sm:col-span-2 space-y-1.5 relative">
                     <label className="block text-xs font-semibold text-slate-500">Cédula o RUC del Socio</label>
@@ -2719,40 +2517,19 @@ export const AprobacionCreditos: React.FC = () => {
                   </div>
                 )}
 
-                {/* Perfil del Socio Encontrado */}
+                {/* Perfil del Socio Encontrado (Reactivo al Simulador) */}
                 {presencialSocio && (
-                  <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-3 animate-fade-in text-xs">
-                    <div className="flex justify-between items-center pb-2 border-b border-slate-200/50">
-                      <span className="font-semibold text-slate-800 text-sm">{presencialSocio.nombresCompletos}</span>
-                      <span className="inline-flex items-center text-[9px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-100 bg-emerald-50 text-emerald-700 uppercase tracking-wider">
-                        Activo
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-650">
-                      <div>
-                        <span className="text-slate-400 font-medium block text-[10px] uppercase">Identificación:</span>
-                        <span className="font-mono font-bold">{presencialSocio.identificacion}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 font-medium block text-[10px] uppercase">Correo Electrónico:</span>
-                        <span className="font-bold">{presencialSocio.correo}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 font-medium block text-[10px] uppercase">Ingresos Mensuales:</span>
-                        <span className="font-bold text-slate-800">{formatCurrency(presencialSocio.ingresosMensuales)}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 font-medium block text-[10px] uppercase">Gastos Mensuales:</span>
-                        <span className="font-bold text-slate-800">{formatCurrency(presencialSocio.gastosMensuales)}</span>
-                      </div>
-                    </div>
-                  </div>
+                  <PerfilCrediticioSocio 
+                    socio={presencialSocio} 
+                    cuotaProyectada={presencialCuotaProyectada}
+                    layout="grid"
+                  />
                 )}
               </div>
 
               {/* PASO B: Simulador (Sólo si el socio fue validado con éxito) */}
               {presencialSocio && (
-                <div className="space-y-4 border-t border-slate-100 pt-6 animate-fade-in">
+                <div className="space-y-4 animate-fade-in pt-2">
                   <div className="flex items-center gap-2">
                     <div className="h-6 w-6 rounded-full bg-blue-50 text-[#0054A6] flex items-center justify-center text-xs font-bold font-mono">
                       B
@@ -2765,6 +2542,13 @@ export const AprobacionCreditos: React.FC = () => {
                   <SimuladorCredito
                     buttonLabel="Registrar Solicitud Presencial"
                     successMessage="La solicitud presencial ha sido registrada directamente en estado EN ANÁLISIS."
+                    onSimulationUpdate={(cuotas) => {
+                      if (cuotas && cuotas.length > 0) {
+                        setPresencialCuotaProyectada(cuotas[0].cuotaTotal || 0);
+                      } else {
+                        setPresencialCuotaProyectada(0);
+                      }
+                    }}
                     onApply={async (params) => {
                       const response = await api.post('/creditos/solicitar?presencial=true', {
                         socio: { id: presencialSocio.id },

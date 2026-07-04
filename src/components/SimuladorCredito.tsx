@@ -41,6 +41,7 @@ interface SimuladorCreditoProps {
   buttonLabel?: string;
   successMessage?: string;
   onSuccessClose?: () => void;
+  onSimulationUpdate?: (cuotas: CuotaSimulada[] | null) => void;
 }
 
 interface ProductoCredito {
@@ -72,7 +73,8 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
   onApply, 
   buttonLabel = "Solicitar Crédito",
   successMessage = "Esta solicitud será revisada por un oficial de crédito asignado.",
-  onSuccessClose
+  onSuccessClose,
+  onSimulationUpdate
 }) => {
   // Estados del Simulador
   const [productos, setProductos] = useState<ProductoCredito[]>([]);
@@ -108,6 +110,12 @@ export const SimuladorCredito: React.FC<SimuladorCreditoProps> = ({
   const [applyLoading, setApplyLoading] = useState<boolean>(false);
   const [applySuccessData, setApplySuccessData] = useState<any | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (onSimulationUpdate) {
+      onSimulationUpdate(simulatedCuotas);
+    }
+  }, [simulatedCuotas, onSimulationUpdate]);
 
   // Simulación de Crédito
   const handleSimulate = async (e: React.FormEvent) => {
