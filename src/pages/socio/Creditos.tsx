@@ -8,14 +8,18 @@ import {
   PiggyBank,
   X,
   Info,
-  CheckCircle2
+  CheckCircle2,
+  Printer
 } from 'lucide-react';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import api from '../../services/api';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import { SimuladorCredito } from '../../components/SimuladorCredito';
+import { TablaAmortizacion } from '../../components/shared/TablaAmortizacion';
+import { generarPdfTablaAmortizacionUniversal } from '../../utils/pdfGenerators';
 
 interface Credit {
   id: number;
@@ -48,6 +52,7 @@ interface AmortizationCuota {
 
 export const Creditos: React.FC = () => {
   const { user } = useAuth();
+  const { activeTenant } = useTenant();
 
   // Pestañas: 'activo' o 'simulador'
   const [activeTab, setActiveTab] = useState<string>('activo');
@@ -397,66 +402,34 @@ export const Creditos: React.FC = () => {
 
                         {/* Tabla de Amortización */}
                         <Card className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_15px_40px_-10px_rgba(0,84,166,0.02)]">
-                          <h3 className="text-sm font-bold text-slate-700 mb-4">Tabla de Amortización Oficial (Contrato {credit.numeroCredito})</h3>
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left border-collapse">
-                              <thead>
-                                <tr className="border-b border-slate-100 text-slate-400 font-semibold text-xs bg-slate-50/10">
-                                  <th className="py-3 px-4 rounded-l-2xl text-center whitespace-nowrap">N° Cuota</th>
-                                  <th className="py-3 px-4 text-center whitespace-nowrap">Fecha Vencimiento</th>
-                                  <th className="py-3 px-4 text-center whitespace-nowrap">Capital</th>
-                                  <th className="py-3 px-4 text-center whitespace-nowrap">Interés</th>
-                                  <th className="py-3 px-4 text-center whitespace-nowrap">Cuota Total</th>
-                                  <th className="py-3 px-4 text-center whitespace-nowrap">Saldo Restante</th>
-                                  <th className="py-3 px-4 text-center rounded-r-2xl whitespace-nowrap">Estado</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {amortization.map((cuota) => {
-                                  let badgeClass = '';
-                                  let estadoStr = '';
-                                  
-                                  if (cuota.estado === 'PAGADA') {
-                                    badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
-                                    estadoStr = 'Pagada';
-                                  } else if (cuota.estado === 'EN_MORA') {
-                                    badgeClass = 'bg-rose-50 text-rose-700 border-rose-100';
-                                    estadoStr = 'En Mora';
-                                  } else {
-                                    badgeClass = 'bg-amber-50 text-amber-700 border-amber-100';
-                                    estadoStr = 'Pendiente';
-                                  }
-
-                                  return (
-                                    <tr key={cuota.id} className="border-b border-slate-50 hover:bg-slate-50/30 transition-all duration-150">
-                                      <td className="py-3.5 px-4 text-xs font-bold text-slate-500 text-center whitespace-nowrap">
-                                        {cuota.numeroCuota}
-                                      </td>
-                                      <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 text-center whitespace-nowrap">
-                                        {formatTxDate(cuota.fechaVencimiento)}
-                                      </td>
-                                      <td className="py-3.5 px-4 text-sm text-center font-semibold text-slate-700 whitespace-nowrap">
-                                        {formatCurrency(cuota.capitalProyectado)}
-                                      </td>
-                                      <td className="py-3.5 px-4 text-sm text-center font-semibold text-slate-600 whitespace-nowrap">
-                                        {formatCurrency(cuota.interesProyectado)}
-                                      </td>
-                                      <td className="py-3.5 px-4 text-sm text-center font-extrabold text-[#0054A6] whitespace-nowrap">
-                                        {formatCurrency(cuota.cuotaTotalProyectada)}
-                                      </td>
-                                      <td className="py-3.5 px-4 text-sm text-center font-semibold text-slate-500 whitespace-nowrap">
-                                        {formatCurrency(cuota.saldoRemanente)}
-                                      </td>
-                                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                        <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-full border ${badgeClass} uppercase tracking-wider`}>
-                                          {estadoStr}
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                            <h3 className="text-sm font-bold text-slate-700">Tabla de Amortización Oficial (Contrato {credit.numeroCredito})</h3>
+                            <button
+                              onClick={() => {
+                                const credCopy = { ...credit, cuotas: amortization };
+                                generarPdfTablaAmortizacionUniversal(credCopy, user, amortization, activeTenant, "Canal Digital - " + (user?.nombresCompletos || "Socio"));
+                              }}
+                              className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-[#0054A6] text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-sm shrink-0 cursor-pointer"
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                              Imprimir PDF
+                            </button>
+                          </div>
+                          <div className="mt-2">
+                            <TablaAmortizacion
+                              credito={credit}
+                              cuotas={amortization.map((cuota: any) => ({
+                                num: cuota.numeroCuota,
+                                fecha: cuota.fechaVencimiento || 'N/A',
+                                capital: cuota.capitalProyectado || 0,
+                                interes: cuota.interesProyectado || 0,
+                                total: cuota.cuotaTotalProyectada || (parseFloat(cuota.capitalProyectado || 0) + parseFloat(cuota.interesProyectado || 0)),
+                                saldo: cuota.saldoRemanente || 0,
+                                estado: cuota.estado
+                              }))}
+                              mostrarResumenSuperior={false}
+                              isEmbedded={true}
+                            />
                           </div>
                         </Card>
                       </div>

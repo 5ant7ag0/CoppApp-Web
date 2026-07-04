@@ -6,16 +6,17 @@ import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { TablaAmortizacion } from '../../components/shared/TablaAmortizacion';
 import { 
   User, MapPin, Briefcase, DollarSign, FileText, 
   UploadCloud, CheckCircle2, AlertTriangle, Trash2, 
   Plus, ArrowRight, ArrowLeft, Check, Loader2, Users,
   Mail, Phone, Calendar, Heart, Search, Printer, X, Pencil, Eye,
-  CreditCard, ArrowRightLeft, Copy, Circle, AlertCircle, Download, Lock,
+  CreditCard, ArrowRightLeft, Copy, AlertCircle, Download, Lock,
   FolderOpen, IdCard, Activity
 } from 'lucide-react';
 import { useTenant } from '../../context/TenantContext';
-import { drawExecutiveHeader } from '../../utils/pdfGenerators';
+import { drawExecutiveHeader, generarPdfTablaAmortizacionUniversal } from '../../utils/pdfGenerators';
 
 interface Beneficiario {
   nombresCompletos: string;
@@ -656,130 +657,7 @@ export const CreacionSocios: React.FC = () => {
     doc.save(`ficha_kyc_${socio.identificacion}.pdf`);
   };
 
-  // Descarga la tabla de amortización en PDF usando jsPDF y autoTable
-  const descargarAmortizacionPdf = (cred: any, socio: any) => {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
-
-    const margin = 15;
-    const pageWidth = 210;
-    let currentY = drawExecutiveHeader(doc, activeTenant, 15);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(26, 26, 26);
-    doc.text("TABLA DE AMORTIZACIÓN Y CRONOGRAMA DE PAGOS", margin, currentY);
-
-    currentY += 3;
-    doc.setDrawColor(226, 232, 240);
-    doc.line(margin, currentY, pageWidth - margin, currentY);
-
-    // Socio and Credit details
-    currentY += 8;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(0, 84, 166);
-    doc.text("DETALLES DEL SOCIO Y CRÉDITO", margin, currentY);
-    currentY += 2;
-    doc.line(margin, currentY, pageWidth - margin, currentY);
-
-    currentY += 6;
-    
-    // Rows of details helper
-    const drawRow = (l1: string, v1: string, l2: string, v2: string, y: number) => {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8.5);
-      doc.setTextColor(100, 116, 139);
-      doc.text(l1 + ":", margin, y);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(26, 26, 26);
-      doc.text(v1, margin + 30, y);
-
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(100, 116, 139);
-      doc.text(l2 + ":", 110, y);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(26, 26, 26);
-      doc.text(v2, 110 + 32, y);
-    };
-
-    drawRow("Socio", socio.nombresCompletos, "Identificación", socio.identificacion, currentY);
-    currentY += 5;
-    drawRow("Nº Crédito", cred.numeroCredito, "Fecha Solicitud", cred.fechaSolicitud ? new Date(cred.fechaSolicitud).toLocaleDateString('es-EC') : 'N/A', currentY);
-    currentY += 5;
-    drawRow("Monto Solicitado", `$${parseFloat(cred.montoSolicitado || 0).toFixed(2)}`, "Plazo", `${cred.plazoMeses} meses`, currentY);
-    currentY += 5;
-    const totalCapitalPagado = cred.cuotas ? cred.cuotas.reduce((sum: number, cuota: any) => sum + parseFloat(cuota.capitalPagado || 0), 0) : 0;
-    const saldoDeudor = cred.estado === 'DESEMBOLSADO' || cred.estado === 'EN_MORA'
-      ? Math.max(0, parseFloat(cred.montoDesembolsado || 0) - totalCapitalPagado)
-      : 0;
-    drawRow("Saldo Deudor", `$${saldoDeudor.toFixed(2)}`, "Tipo Amortización", cred.tipoAmortizacion || 'FRANCES', currentY);
-    currentY += 5;
-    drawRow("Tasa Interés", `${parseFloat(cred.tasaInteresAnual || 0).toFixed(2)}% Anual`, "Estado Crédito", getEstadoCreditoBadge(cred.estado).label, currentY);
-
-    currentY += 8;
-
-    // Build amortization table body
-    let runningBalance = parseFloat(cred.montoDesembolsado || cred.montoSolicitado || 0);
-    const cuotasOrdenadas = cred.cuotas ? [...cred.cuotas].sort((a, b) => a.numeroCuota - b.numeroCuota).map((cuota) => {
-      runningBalance = runningBalance - parseFloat(cuota.capitalProyectado || 0);
-      return {
-        ...cuota,
-        saldoRestante: Math.max(0, runningBalance)
-      };
-    }) : [];
-
-    const tableBody = cuotasOrdenadas.map((cuota: any) => {
-      const totalCuota = parseFloat(cuota.cuotaTotalProyectada || (parseFloat(cuota.capitalProyectado || 0) + parseFloat(cuota.interesProyectado || 0)));
-      return [
-        `Cuota #${cuota.numeroCuota}`,
-        cuota.fechaVencimiento ? new Date(cuota.fechaVencimiento).toLocaleDateString('es-EC') : 'N/A',
-        `$${parseFloat(cuota.capitalProyectado || 0).toFixed(2)}`,
-        `$${parseFloat(cuota.interesProyectado || 0).toFixed(2)}`,
-        `$${totalCuota.toFixed(2)}`,
-        `$${cuota.saldoRestante.toFixed(2)}`,
-        cuota.estado
-      ];
-    });
-
-    autoTable(doc, {
-      startY: currentY,
-      margin: { left: margin, right: margin },
-      head: [['Cuota', 'Vencimiento', 'Capital', 'Interés', 'Total Cuota', 'Saldo Restante', 'Estado']],
-      body: tableBody,
-      theme: 'grid',
-      styles: {
-        fontSize: 8,
-        cellPadding: 2,
-        valign: 'middle'
-      },
-      headStyles: {
-        fillColor: [0, 84, 166],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold'
-      },
-      didDrawPage: (data) => {
-        currentY = data.cursor ? data.cursor.y : currentY + 15;
-      }
-    });
-
-    // Signature line at bottom
-    currentY += 20;
-    if (currentY > 260) {
-      doc.addPage();
-      currentY = 30;
-    }
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text("Este documento es una copia digital de la tabla de amortización correspondiente al crédito indicado.", margin, currentY);
-
-    doc.save(`tabla_amortizacion_${cred.numeroCredito}.pdf`);
-  };
+  // Se removió descargarAmortizacionPdf (se usa el generador universal de utilidades)
 
   // Descarga el pagaré digital en PDF usando jsPDF
   const generarPagareDoc = (cred: any, socio: any) => {
@@ -3888,7 +3766,7 @@ export const CreacionSocios: React.FC = () => {
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        descargarAmortizacionPdf(cred, selectedSocio);
+                                        generarPdfTablaAmortizacionUniversal(cred, selectedSocio, cred.cuotas, activeTenant, user?.nombresCompletos || "Administrador");
                                       }}
                                       className="p-1.5 rounded-full bg-slate-50 text-slate-400 hover:text-[#0054A6] hover:bg-blue-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
                                       title="Imprimir tabla"
@@ -3929,65 +3807,21 @@ export const CreacionSocios: React.FC = () => {
                                           <span className="text-xs text-slate-400 font-medium">No se registra cronograma de pagos para este crédito.</span>
                                         </div>
                                       ) : (
-                                        <div className="overflow-hidden border border-slate-100 rounded-xl">
-                                          <table className="w-full text-left border-collapse table-fixed">
-                                            <thead>
-                                              <tr className="bg-slate-50/60 border-b border-slate-100">
-                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[10%] text-center">Cuota</th>
-                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%] text-center">Vencimiento</th>
-                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%] text-center">Capital</th>
-                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%] text-center">Interés</th>
-                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%] text-center">Total</th>
-                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%] text-center">Saldo Restante</th>
-                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[20%] text-center">Estado</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100/60 text-xs">
-                                              {cuotasOrdenadas.map((cuota: any) => {
-                                                const totalCuota = parseFloat(cuota.cuotaTotalProyectada || (parseFloat(cuota.capitalProyectado || 0) + parseFloat(cuota.interesProyectado || 0)));
-                                                
-                                                return (
-                                                  <tr key={cuota.id} className="hover:bg-slate-50/30 transition-colors">
-                                                    <td className="px-3 py-2 font-bold text-slate-600 font-mono text-center">
-                                                      #{cuota.numeroCuota}
-                                                    </td>
-                                                    <td className="px-3 py-2 text-slate-500 font-mono text-center">
-                                                      {cuota.fechaVencimiento ? new Date(cuota.fechaVencimiento).toLocaleDateString('es-EC') : 'N/A'}
-                                                    </td>
-                                                    <td className="px-3 py-2 text-slate-600 font-mono text-center">
-                                                      ${parseFloat(cuota.capitalProyectado || 0).toFixed(2)}
-                                                    </td>
-                                                    <td className="px-3 py-2 text-slate-500 font-mono text-center">
-                                                      ${parseFloat(cuota.interesProyectado || 0).toFixed(2)}
-                                                    </td>
-                                                    <td className="px-3 py-2 font-bold text-slate-700 font-mono text-center">
-                                                      ${totalCuota.toFixed(2)}
-                                                    </td>
-                                                    <td className="px-3 py-2 text-slate-500 font-mono text-center">
-                                                      ${cuota.saldoRestante.toFixed(2)}
-                                                    </td>
-                                                    <td className="px-3 py-2 text-center">
-                                                      <div className="flex items-center justify-center">
-                                                        {cuota.estado === 'PAGADA' ? (
-                                                          <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-md">
-                                                            <Check className="h-3 w-3 text-emerald-600 stroke-[3]" /> PAGADA
-                                                          </span>
-                                                        ) : cuota.estado === 'PENDIENTE' ? (
-                                                          <span className="inline-flex items-center gap-1 text-[9px] font-black text-slate-500 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-md">
-                                                            PENDIENTE
-                                                          </span>
-                                                        ) : (
-                                                          <span className="inline-flex items-center gap-1 text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded-md">
-                                                            <AlertCircle className="h-3 w-3 text-rose-600" /> ATRASADA
-                                                          </span>
-                                                        )}
-                                                      </div>
-                                                    </td>
-                                                  </tr>
-                                                );
-                                              })}
-                                            </tbody>
-                                          </table>
+                                        <div className="mt-2">
+                                          <TablaAmortizacion
+                                            credito={cred}
+                                            cuotas={cuotasOrdenadas.map((cuota: any) => ({
+                                              num: cuota.numeroCuota,
+                                              fecha: cuota.fechaVencimiento || 'N/A',
+                                              capital: cuota.capitalProyectado || 0,
+                                              interes: cuota.interesProyectado || 0,
+                                              total: cuota.cuotaTotalProyectada || (parseFloat(cuota.capitalProyectado || 0) + parseFloat(cuota.interesProyectado || 0)),
+                                              saldo: cuota.saldoRestante || 0,
+                                              estado: cuota.estado
+                                            }))}
+                                            mostrarResumenSuperior={false}
+                                            isEmbedded={true}
+                                          />
                                         </div>
                                       )}
                                     </div>

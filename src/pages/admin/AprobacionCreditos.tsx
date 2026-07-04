@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button';
 import { useAuth } from '../../context/AuthContext';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { TablaAmortizacion } from '../../components/shared/TablaAmortizacion';
 import { 
   Layers, Clock, X, CheckCircle2, 
   AlertTriangle, AlertCircle, Loader2, 
@@ -17,7 +18,7 @@ import {
 } from 'lucide-react';
 import { SimuladorCredito } from '../../components/SimuladorCredito';
 import { useTenant } from '../../context/TenantContext';
-import { drawExecutiveHeader } from '../../utils/pdfGenerators';
+import { drawExecutiveHeader, generarPdfTablaAmortizacionUniversal } from '../../utils/pdfGenerators';
 
 interface Socio {
   id: number;
@@ -56,13 +57,14 @@ interface Credito {
   motivoRechazo?: string;
 }
 
-interface CuotaProyectada {
+export interface CuotaProyectada {
   num: number;
   fecha: string;
   capital: number;
   interes: number;
   total: number;
   saldo: number;
+  estado: string;
 }
 
 // Formateador de moneda regional estándar ($500.00)
@@ -591,70 +593,6 @@ export const AprobacionCreditos: React.FC = () => {
 
     doc.save(`Pagare_${cred.numeroCredito}.pdf`);
   };
-
-  // Genera Exclusivamente la Tabla de Amortización con Membrete (Créditos ya Aprobados/Desembolsados)
-  const descargarTablaAmortizacionPdf = (cred: Credito, cuotas: CuotaProyectada[]) => {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
-
-    let currentY = drawExecutiveHeader(doc, activeTenant, 20);
-
-    // Título de la tabla
-    doc.setFont("times", "bold");
-    doc.setFontSize(13);
-    doc.text("TABLA DE AMORTIZACIÓN", 105, currentY, { align: "center" });
-    
-    currentY += 5;
-    doc.setFont("times", "normal");
-    doc.setFontSize(9.5);
-    doc.text(`Crédito Nro: ${cred.numeroCredito}  |  Socio: ${cred.socio?.nombresCompletos}`, 105, currentY, { align: "center" });
-
-    currentY += 10;
-
-    autoTable(doc, {
-      startY: currentY,
-      margin: { left: 20, right: 20 },
-      head: [
-        ['Cuota', 'Vencimiento', 'Capital', 'Interés', 'Cuota Total', 'Saldo Restante']
-      ],
-      body: cuotas.map(cuo => [
-        cuo.num.toString(),
-        formatFechaStr(cuo.fecha),
-        formatCurrency(cuo.capital),
-        formatCurrency(cuo.interes),
-        formatCurrency(cuo.total),
-        formatCurrency(cuo.saldo)
-      ]),
-      theme: 'grid',
-      styles: {
-        font: 'courier',
-        fontSize: 8.5,
-        cellPadding: 1.5,
-      },
-      headStyles: {
-        fillColor: [245, 247, 250],
-        textColor: [30, 41, 59],
-        font: 'times',
-        fontStyle: 'bold',
-        lineWidth: 0.1,
-        lineColor: [180, 180, 180]
-      },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 15 },
-        1: { halign: 'center', cellWidth: 30 },
-        2: { halign: 'right', cellWidth: 30 },
-        3: { halign: 'right', cellWidth: 30 },
-        4: { halign: 'right', cellWidth: 30 },
-        5: { halign: 'right', cellWidth: 35 }
-      }
-    });
-
-    doc.save(`TablaAmortizacion_${cred.numeroCredito}.pdf`);
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
@@ -1673,19 +1611,13 @@ export const AprobacionCreditos: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in select-none no-print">
           
           {/* Contenedor del Modal Redondeado con altura estática para evitar saltos */}
-          <div className="w-full max-w-4xl bg-white shadow-2xl border border-slate-100 rounded-[2rem] p-5 md:p-6 md:pt-10 pb-6 flex flex-col h-[92vh] max-h-[850px] relative animate-scale-up overflow-hidden">
+          <div className="w-[95vw] max-w-6xl bg-white shadow-2xl border border-slate-100 rounded-[2rem] p-5 md:p-6 md:pt-10 pb-6 flex flex-col h-[92vh] max-h-[850px] relative animate-scale-up overflow-hidden">
             
-            {/* Estado centrado en el filo superior del modal */}
+            {/* Estado centrado en el filo superior del modal (Estilo Limpio sin Fondo) */}
             <div className="absolute top-0 left-0 right-0 flex justify-center no-print">
-              {creditoSeleccionado.estado === 'DESEMBOLSADO' ? (
-                <div className="mt-4 text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.2em] bg-white/80 px-4 py-1 rounded-full backdrop-blur-sm border border-slate-100 shadow-sm">
-                  {getEstadoLabel(creditoSeleccionado.estado)}
-                </div>
-              ) : (
-                <div className={`px-4 py-1.5 rounded-b-xl border-x border-b text-[9px] font-black uppercase tracking-[0.2em] shadow-sm ${getEstadoStyles(creditoSeleccionado.estado)}`}>
-                  {getEstadoLabel(creditoSeleccionado.estado)}
-                </div>
-              )}
+              <div className="mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">
+                {getEstadoLabel(creditoSeleccionado.estado)}
+              </div>
             </div>
 
             {/* Header del Modal */}
@@ -1753,7 +1685,7 @@ export const AprobacionCreditos: React.FC = () => {
               {/* Contenedor Derecho: Action Buttons y Cerrar */}
               <div className="flex items-center gap-3 md:self-end self-start w-full md:w-auto pb-3">
                 <button
-                  onClick={() => descargarTablaAmortizacionPdf(creditoSeleccionado, tablaAmortizacion)}
+                  onClick={() => generarPdfTablaAmortizacionUniversal(creditoSeleccionado, creditoSeleccionado.socio, tablaAmortizacion, activeTenant, user?.nombresCompletos || "Aprobador")}
                   disabled={cargandoAmortizacion}
                   className="px-5 py-2.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-[#0054A6] transition-all duration-300 font-semibold text-[13px] flex items-center gap-2.5 disabled:opacity-50 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer flex-1 md:flex-none justify-center"
                 >
@@ -2088,126 +2020,11 @@ export const AprobacionCreditos: React.FC = () => {
             {/* TAB: TABLA DE AMORTIZACIÓN */}
             {activeModalTab === 'amortizacion' && (
               <div className="animate-fade-in flex-1 overflow-hidden flex flex-col h-full">
-                <div className="bg-white border border-slate-100/80 rounded-2xl p-6 shadow-sm flex-1 flex flex-col min-h-[400px]">
-                  {/* Encabezado Premium Resumen (Como en Foto) */}
-                  <div className="mb-4 bg-slate-50/50 border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="bg-white border-b border-slate-100">
-                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">N° CRÉDITO</th>
-                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">FECHA SOLICITUD</th>
-                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">MONTO</th>
-                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">SALDO DEUDOR</th>
-                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">PRÓXIMO VENCIMIENTO</th>
-                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">ESTADO</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-slate-50/20">
-                        {(() => {
-                          const nextCuota = tablaAmortizacion?.find((c: any) => c.estado !== 'PAGADA');
-                          const saldoDeudor = nextCuota ? (Number(nextCuota.saldo) + Number(nextCuota.capital)) : 0;
-                          
-                          const isMora = tablaAmortizacion?.some((c: any) => c.estado === 'MORA');
-                          const isCancelado = creditoSeleccionado.estado === 'CANCELADO' || (tablaAmortizacion?.length > 0 && !nextCuota);
-                          
-                          let estadoLabel = 'AL DÍA';
-                          let estadoStyles = 'bg-emerald-50 text-emerald-600 border border-emerald-100';
-                          if (isCancelado) {
-                            estadoLabel = 'LIQUIDADO';
-                            estadoStyles = 'bg-slate-100 text-slate-600 border border-slate-200';
-                          } else if (isMora) {
-                            estadoLabel = 'EN MORA';
-                            estadoStyles = 'bg-rose-50 text-rose-600 border border-rose-100';
-                          }
-
-                          return (
-                            <tr>
-                              <td className="px-4 py-4 text-[11px] font-extrabold text-[#0054A6] font-mono text-center">{creditoSeleccionado.numeroCredito}</td>
-                              <td className="px-4 py-4 text-[11px] font-semibold text-slate-600 font-mono text-center">{formatFechaStr(creditoSeleccionado.fechaSolicitud)}</td>
-                              <td className="px-4 py-4 text-[11px] font-bold text-slate-800 font-mono text-center">{formatCurrency(creditoSeleccionado.montoSolicitado)}</td>
-                              <td className="px-4 py-4 text-[11px] font-bold text-slate-800 font-mono text-center">{formatCurrency(saldoDeudor)}</td>
-                              <td className="px-4 py-3 text-center">
-                                {nextCuota ? (
-                                  <>
-                                    <span className="text-[11px] font-bold text-slate-800 font-mono block">{formatCurrency(nextCuota.total)}</span>
-                                    <span className="text-[9px] text-slate-400 font-medium block">Vence: {['SOLICITADO', 'EN_ANALISIS', 'APROBADO'].includes(creditoSeleccionado.estado) ? 'Al desembolsar' : formatFechaStr(nextCuota.fecha)}</span>
-                                  </>
-                                ) : (
-                                  <span className="text-[11px] font-bold text-slate-400">N/A</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-4 text-center">
-                                <span className={`px-2.5 py-1.5 text-[8px] font-black rounded-md uppercase tracking-wider ${estadoStyles}`}>
-                                  {estadoLabel}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {!tablaAmortizacion || tablaAmortizacion.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center py-10">
-                      {cargandoAmortizacion ? (
-                        <Loader2 className="h-6 w-6 animate-spin text-[#0054A6]" />
-                      ) : (
-                        <span className="text-xs text-slate-400 font-medium">No se registra cronograma de pagos para este crédito.</span>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="overflow-y-auto flex-1 border border-slate-100 rounded-xl max-h-[500px]">
-                      <table className="w-full text-left border-collapse">
-                        <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-sm z-10">
-                          <tr className="border-b border-slate-100">
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Cuota</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Vencimiento</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Capital</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Interés</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Total</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Saldo Restante</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Estado</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                          {tablaAmortizacion.map((cuo: any, index: number) => {
-                            const isPagada = cuo.estado === 'PAGADA';
-                            return (
-                              <tr key={index} className="hover:bg-slate-50/50 transition-colors">
-                                <td className="px-4 py-3 text-[10px] font-extrabold text-slate-600 font-mono text-center">
-                                  #{cuo.num}
-                                </td>
-                                <td className="px-4 py-3 text-[10px] font-semibold text-slate-500 font-mono text-center whitespace-nowrap">
-                                  {['SOLICITADO', 'EN_ANALISIS', 'APROBADO'].includes(creditoSeleccionado.estado) ? <span className="text-[9px] italic text-slate-400">Al desembolsar</span> : formatFechaStr(cuo.fecha)}
-                                </td>
-                                <td className="px-4 py-3 text-[10px] font-bold text-slate-500 font-mono text-center">
-                                  {formatCurrency(cuo.capital)}
-                                </td>
-                                <td className="px-4 py-3 text-[10px] font-bold text-slate-500 font-mono text-center">
-                                  {formatCurrency(cuo.interes)}
-                                </td>
-                                <td className="px-4 py-3 text-[10px] font-black text-slate-700 font-mono text-center">
-                                  {formatCurrency(cuo.total)}
-                                </td>
-                                <td className="px-4 py-3 text-[10px] font-bold text-slate-500 font-mono text-center">
-                                  {formatCurrency(cuo.saldo)}
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <span className={`px-2 py-0.5 text-[8px] font-black rounded-md ${
-                                    isPagada ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-500'
-                                  }`}>
-                                    {isPagada ? '✓ PAGADA' : 'PENDIENTE'}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
+                <TablaAmortizacion
+                  credito={creditoSeleccionado}
+                  cuotas={tablaAmortizacion}
+                  isLoading={cargandoAmortizacion}
+                />
               </div>
             )}
 
@@ -2408,7 +2225,7 @@ export const AprobacionCreditos: React.FC = () => {
                       </p>
                       <Button
                         onClick={() => {
-                          descargarTablaAmortizacionPdf(pagareCredito, pagareCuotas);
+                          generarPdfTablaAmortizacionUniversal(pagareCredito, pagareCredito.socio, pagareCuotas, activeTenant, user?.nombresCompletos || "Aprobador");
                         }}
                         disabled={cargandoPagareCuotas}
                         className="w-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-[#0054A6] font-semibold rounded-2xl h-12 text-[13px] flex items-center justify-center gap-2 cursor-pointer shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]"

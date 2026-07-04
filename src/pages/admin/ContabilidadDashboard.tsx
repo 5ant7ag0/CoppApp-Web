@@ -442,7 +442,6 @@ export const ContabilidadDashboard: React.FC = () => {
 
     const primaryColor = [0, 84, 166]; // #0054A6
     const secondaryColor = [71, 85, 105]; // Slate
-    const lightGray = [248, 250, 252]; // Slate-50
 
     // 1. Cabecera Institucional
     doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
