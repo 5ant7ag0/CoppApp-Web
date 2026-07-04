@@ -12,8 +12,8 @@ import {
   UploadCloud, CheckCircle2, AlertTriangle, Trash2, 
   Plus, ArrowRight, ArrowLeft, Check, Loader2, Users,
   Mail, Phone, Calendar, Heart, Search, Printer, X, Pencil, Eye,
-  CreditCard, ArrowRightLeft, Copy, AlertCircle, Download, Lock,
-  FolderOpen, IdCard, Activity
+  CreditCard, ArrowRightLeft, Copy, Download, Lock,
+  FolderOpen, IdCard, Activity, MinusCircle, ShieldCheck
 } from 'lucide-react';
 import { useTenant } from '../../context/TenantContext';
 import { drawExecutiveHeader, generarPdfTablaAmortizacionUniversal } from '../../utils/pdfGenerators';
@@ -103,6 +103,7 @@ export const CreacionSocios: React.FC = () => {
   const [loadingSocios, setLoadingSocios] = useState<boolean>(false);
   const [searchSocioQuery, setSearchSocioQuery] = useState<string>('');
   const [estadoFilter, setEstadoFilter] = useState<string>('TODOS');
+  const [riesgoFilter, setRiesgoFilter] = useState<string>('TODOS');
 
   // Estados para Modal de Detalle, Portafolio y Edición KYC
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
@@ -416,9 +417,14 @@ export const CreacionSocios: React.FC = () => {
     const q = searchSocioQuery.toLowerCase();
     const matchesQuery = s.identificacion.toLowerCase().includes(q) || s.nombresCompletos.toLowerCase().includes(q);
     
-    if (estadoFilter === 'TODOS') return matchesQuery;
-    if (estadoFilter === 'PENDIENTE') return matchesQuery && s.estado === 'PENDIENTE_APROBACION';
-    return matchesQuery && s.estado === estadoFilter;
+    let matchesEstado = true;
+    if (estadoFilter === 'PENDIENTE') matchesEstado = s.estado === 'PENDIENTE_APROBACION';
+    else if (estadoFilter !== 'TODOS') matchesEstado = s.estado === estadoFilter;
+    
+    let matchesRiesgo = true;
+    if (riesgoFilter !== 'TODOS') matchesRiesgo = s.estadoRiesgo === riesgoFilter;
+
+    return matchesQuery && matchesEstado && matchesRiesgo;
   });
 
   // Generador PDF Ficha KYC
@@ -2310,8 +2316,8 @@ export const CreacionSocios: React.FC = () => {
         ) : (
           /* PESTAÑA 2: SOCIOS REGISTRADOS */
           <div className="space-y-4 animate-fade-in">
-            {/* Buscador de socios y filtros de estado */}
-            <div className="flex flex-col md:flex-row items-center gap-3 w-full animate-fade-in">
+            {/* Buscador de socios y filtros de estado e indicadores */}
+            <div className="flex flex-col md:flex-row flex-wrap items-center gap-3 w-full animate-fade-in">
               <div className="flex items-center gap-2 flex-1 w-full">
                 <div className="relative flex-1 w-full">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
@@ -2323,11 +2329,12 @@ export const CreacionSocios: React.FC = () => {
                     className="w-full border border-slate-200 bg-white rounded-2xl h-11 pl-10.5 pr-4 text-xs font-bold transition-all outline-none focus:ring-2 focus:ring-[#0054A6]/20 focus:border-[#0054A6] shadow-sm placeholder:text-slate-400"
                   />
                 </div>
-                {(searchSocioQuery || estadoFilter !== 'TODOS') && (
+                {(searchSocioQuery || estadoFilter !== 'TODOS' || riesgoFilter !== 'TODOS') && (
                   <button
                     onClick={() => {
                       setSearchSocioQuery('');
                       setEstadoFilter('TODOS');
+                      setRiesgoFilter('TODOS');
                     }}
                     className="h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl border border-rose-200 text-rose-600 bg-white hover:bg-rose-50 hover:text-rose-700 transition-all shadow-sm cursor-pointer animate-fade-in"
                     title="Limpiar Filtros"
@@ -2368,6 +2375,20 @@ export const CreacionSocios: React.FC = () => {
                   );
                 })}
               </div>
+
+              {/* Filtro de Riesgo (Select Desplegable) */}
+              <div className="shrink-0 w-full md:w-48 h-11 relative">
+                <select
+                  value={riesgoFilter}
+                  onChange={(e) => setRiesgoFilter(e.target.value)}
+                  className="w-full border border-slate-200 text-slate-600 font-bold rounded-2xl text-[11px] uppercase tracking-wider h-11 pl-4 pr-10 appearance-none bg-white bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%252364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[size:1rem_1rem] bg-[position:right_1rem_center] bg-no-repeat cursor-pointer shadow-sm transition-all hover:bg-slate-50 hover:border-slate-300 focus:outline-none focus:border-[#0054A6] focus:ring-2 focus:ring-[#0054A6]/20"
+                >
+                  <option value="TODOS">Cualquier Riesgo</option>
+                  <option value="AL_DIA">Al Día</option>
+                  <option value="EN_MORA">En Mora</option>
+                  <option value="SIN_CREDITO">Sin Crédito</option>
+                </select>
+              </div>
             </div>
 
             {/* Tabla de Socios */}
@@ -2390,39 +2411,39 @@ export const CreacionSocios: React.FC = () => {
                   <table className="w-full text-left border-collapse table-fixed">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-100">
-                        <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-[15%]">
-                          <div className="flex items-center gap-1.5">
-                            <IdCard className="w-3.5 h-3.5 text-slate-400" />
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-left w-[15%]">
+                          <div className="flex items-center gap-2">
+                            <IdCard className="w-3.5 h-3.5" />
                             Identificación
                           </div>
                         </th>
-                        <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-[35%]">
-                          <div className="flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5 text-slate-400" />
-                            Nombres Completos
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-left w-[25%]">
+                          <div className="flex items-center gap-2">
+                            <User className="w-3.5 h-3.5" />
+                            Socio
                           </div>
                         </th>
-                        <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-[15%]">
-                          <div className="flex items-center gap-1.5">
-                            <Phone className="w-3.5 h-3.5 text-slate-400" />
-                            Celular
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-left w-[12%]">
+                          <div className="flex items-center gap-2">
+                            <Phone className="w-3.5 h-3.5" />
+                            Contacto
                           </div>
                         </th>
-                        <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-[25%]">
-                          <div className="flex items-center gap-1.5">
-                            <Mail className="w-3.5 h-3.5 text-slate-400" />
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-left w-[23%]">
+                          <div className="flex items-center gap-2">
+                            <Mail className="w-3.5 h-3.5" />
                             Correo
                           </div>
                         </th>
-                        <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider text-center w-[10%]">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
-                            Es PEP
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center w-[15%]">
+                          <div className="flex items-center justify-center gap-2">
+                            <Activity className="w-3.5 h-3.5" />
+                            Riesgo
                           </div>
                         </th>
-                        <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-[10%]">
-                          <div className="flex items-center gap-1.5">
-                            <Activity className="w-3.5 h-3.5 text-slate-400" />
+                        <th className="px-5 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center w-[10%]">
+                          <div className="flex items-center justify-center gap-2">
+                            <ShieldCheck className="w-3.5 h-3.5" />
                             Estado
                           </div>
                         </th>
@@ -2435,38 +2456,55 @@ export const CreacionSocios: React.FC = () => {
                           onClick={() => handleVerDetalle(s)}
                           className="hover:bg-slate-50/50 transition-colors cursor-pointer"
                         >
-                          <td className="px-4 py-3 text-xs font-bold text-slate-800 font-mono truncate w-[15%]">
-                            <div className="flex items-center gap-1.5 group">
+                          <td className="px-5 py-4 text-sm font-medium text-slate-700 font-mono truncate w-[15%]">
+                            <div className="flex items-center gap-2 group">
                               {s.identificacion}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   navigator.clipboard.writeText(s.identificacion);
                                 }}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-200 rounded-md text-slate-400 hover:text-[#0054A6]"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-blue-600"
                                 title="Copiar identificación"
                               >
-                                <Copy className="w-3 h-3" />
+                                <Copy className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-xs font-extrabold text-slate-700 uppercase truncate w-[35%]" title={s.nombresCompletos}>{s.nombresCompletos}</td>
-                          <td className="px-4 py-3 text-xs font-semibold text-slate-500 font-mono truncate w-[15%]">{s.telefono}</td>
-                          <td className="px-4 py-3 text-xs font-medium text-slate-500 truncate w-[25%]" title={s.correo}>{s.correo}</td>
-                          <td className="px-4 py-3 text-xs text-center w-[10%]">
-                            {s.esPep ? (
-                              <span className="px-2 py-0.5 text-[9px] font-black text-amber-700 bg-amber-50 border border-amber-100 rounded-md">SÍ</span>
+                          <td className="px-5 py-4 text-sm font-semibold text-slate-800 capitalize truncate w-[25%]">
+                            {s.nombresCompletos.toLowerCase()}
+                          </td>
+                          <td className="px-5 py-4 text-sm font-medium text-slate-500 truncate w-[12%]">
+                            {s.telefono}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-slate-500 truncate w-[23%]">
+                            {s.correo.toLowerCase()}
+                          </td>
+                          <td className="px-5 py-4 text-center w-[15%]">
+                            {s.estadoRiesgo === 'EN_MORA' ? (
+                              <span className="inline-flex items-center justify-center gap-1 px-3 py-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-full whitespace-nowrap">
+                                <AlertTriangle className="w-3 h-3" />
+                                EN MORA
+                              </span>
+                            ) : s.estadoRiesgo === 'AL_DIA' ? (
+                              <span className="inline-flex items-center justify-center gap-1 px-3 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full whitespace-nowrap">
+                                <CheckCircle2 className="w-3 h-3" />
+                                AL DÍA
+                              </span>
                             ) : (
-                              <span className="px-2 py-0.5 text-[9px] font-bold text-slate-400 bg-slate-50 border border-slate-100 rounded-md">NO</span>
+                              <span className="inline-flex items-center justify-center gap-1 px-3 py-1 text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded-full whitespace-nowrap">
+                                <MinusCircle className="w-3 h-3" />
+                                N/A
+                              </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-xs w-[10%]">
-                            <span className={`px-2 py-0.5 text-[9px] font-black rounded-md ${
+                          <td className="px-5 py-4 text-center w-[10%]">
+                            <span className={`inline-flex items-center justify-center px-3 py-1 text-[10px] font-bold rounded-full whitespace-nowrap ${
                               s.estado === 'ACTIVO' 
-                                ? 'text-emerald-700 bg-emerald-50 border border-emerald-100'
+                                ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
                                 : s.estado === 'PENDIENTE_APROBACION'
-                                ? 'text-amber-700 bg-amber-50 border border-amber-100'
-                                : 'text-rose-700 bg-rose-50 border border-rose-100'
+                                ? 'text-amber-700 bg-amber-50 border border-amber-200'
+                                : 'text-rose-700 bg-rose-50 border border-rose-200'
                             }`}>
                               {s.estado === 'PENDIENTE_APROBACION' ? 'PENDIENTE' : s.estado}
                             </span>
@@ -2976,7 +3014,7 @@ export const CreacionSocios: React.FC = () => {
                             }`}
                           />
                         ) : (
-                          <span className="text-xs font-bold text-slate-700 truncate block" title={selectedSocio.correo}>{selectedSocio.correo}</span>
+                          <span className="text-xs font-bold text-slate-700 truncate block">{selectedSocio.correo}</span>
                         )}
                         {editErrors.correo && <span className="text-[9px] text-rose-500 font-bold block">{editErrors.correo}</span>}
                       </div>
@@ -4030,7 +4068,7 @@ export const CreacionSocios: React.FC = () => {
                                     <td className="px-4 py-3 text-xs font-bold text-slate-700 font-mono">
                                       ${parseFloat(tx.saldoResultante).toFixed(2)}
                                     </td>
-                                    <td className="px-4 py-3 text-xs text-slate-500 truncate" title={tx.descripcion}>
+                                    <td className="px-4 py-3 text-xs text-slate-500 truncate">
                                       <span className="block font-semibold text-slate-700 truncate">{tx.descripcion}</span>
                                       <span className="block text-[9px] font-mono text-slate-400 truncate">Ref: {tx.referencia}</span>
                                     </td>
