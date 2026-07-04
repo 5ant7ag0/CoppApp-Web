@@ -43,6 +43,7 @@ interface AmortizationCuota {
   montoMoraAcumulado?: number;
   montoMoraPagado?: number;
   estado: string; // 'PENDIENTE', 'PAGADA', 'EN_MORA'
+  saldoRemanente?: number;
 }
 
 export const Creditos: React.FC = () => {
@@ -144,7 +145,16 @@ export const Creditos: React.FC = () => {
       if (active) {
         setCredit(active);
         const amortRes = await api.get(`/creditos/${active.id}/amortizacion`);
-        setAmortization(amortRes.data as AmortizationCuota[]);
+        const rawAmort = amortRes.data as AmortizationCuota[];
+        let balance = active.montoDesembolsado || active.montoSolicitado;
+        const mappedAmort = rawAmort.map(c => {
+          balance -= (c.capitalProyectado || 0);
+          return {
+            ...c,
+            saldoRemanente: Math.max(0, balance)
+          };
+        });
+        setAmortization(mappedAmort);
         setActiveTab('activo');
       } else {
         setCredit(null);
@@ -181,7 +191,7 @@ export const Creditos: React.FC = () => {
       // Evitar desfase de zona horaria concatenando T00:00:00 si es necesario
       const cleanDateStr = dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`;
       const date = new Date(cleanDateStr);
-      return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+      return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
     } catch {
       return dateStr;
     }
@@ -392,12 +402,13 @@ export const Creditos: React.FC = () => {
                             <table className="w-full text-sm text-left border-collapse">
                               <thead>
                                 <tr className="border-b border-slate-100 text-slate-400 font-semibold text-xs bg-slate-50/10">
-                                  <th className="py-3 px-4 rounded-l-2xl text-center">N° Cuota</th>
-                                  <th className="py-3 px-4">Fecha Vencimiento</th>
-                                  <th className="py-3 px-4 text-right">Capital</th>
-                                  <th className="py-3 px-4 text-right">Interés</th>
-                                  <th className="py-3 px-4 text-right">Cuota Total</th>
-                                  <th className="py-3 px-4 text-center rounded-r-2xl">Estado</th>
+                                  <th className="py-3 px-4 rounded-l-2xl text-center whitespace-nowrap">N° Cuota</th>
+                                  <th className="py-3 px-4 text-center whitespace-nowrap">Fecha Vencimiento</th>
+                                  <th className="py-3 px-4 text-center whitespace-nowrap">Capital</th>
+                                  <th className="py-3 px-4 text-center whitespace-nowrap">Interés</th>
+                                  <th className="py-3 px-4 text-center whitespace-nowrap">Cuota Total</th>
+                                  <th className="py-3 px-4 text-center whitespace-nowrap">Saldo Restante</th>
+                                  <th className="py-3 px-4 text-center rounded-r-2xl whitespace-nowrap">Estado</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -418,22 +429,25 @@ export const Creditos: React.FC = () => {
 
                                   return (
                                     <tr key={cuota.id} className="border-b border-slate-50 hover:bg-slate-50/30 transition-all duration-150">
-                                      <td className="py-3.5 px-4 text-xs font-bold text-slate-500 text-center">
+                                      <td className="py-3.5 px-4 text-xs font-bold text-slate-500 text-center whitespace-nowrap">
                                         {cuota.numeroCuota}
                                       </td>
-                                      <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 whitespace-nowrap">
+                                      <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 text-center whitespace-nowrap">
                                         {formatTxDate(cuota.fechaVencimiento)}
                                       </td>
-                                      <td className="py-3.5 px-4 text-sm text-right font-semibold text-slate-700">
+                                      <td className="py-3.5 px-4 text-sm text-center font-semibold text-slate-700 whitespace-nowrap">
                                         {formatCurrency(cuota.capitalProyectado)}
                                       </td>
-                                      <td className="py-3.5 px-4 text-sm text-right font-semibold text-slate-600">
+                                      <td className="py-3.5 px-4 text-sm text-center font-semibold text-slate-600 whitespace-nowrap">
                                         {formatCurrency(cuota.interesProyectado)}
                                       </td>
-                                      <td className="py-3.5 px-4 text-sm text-right font-extrabold text-[#0054A6]">
+                                      <td className="py-3.5 px-4 text-sm text-center font-extrabold text-[#0054A6] whitespace-nowrap">
                                         {formatCurrency(cuota.cuotaTotalProyectada)}
                                       </td>
-                                      <td className="py-3.5 px-4 text-center">
+                                      <td className="py-3.5 px-4 text-sm text-center font-semibold text-slate-500 whitespace-nowrap">
+                                        {formatCurrency(cuota.saldoRemanente)}
+                                      </td>
+                                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
                                         <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-full border ${badgeClass} uppercase tracking-wider`}>
                                           {estadoStr}
                                         </span>

@@ -20,7 +20,8 @@ import {
   BookOpen,
   TrendingUp,
   Scale,
-  Lock
+  Lock,
+  X
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -447,30 +448,24 @@ export const ContabilidadDashboard: React.FC = () => {
     doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.rect(0, 0, 210, 8, 'F'); // Top colored band
 
+    let textX = 15;
+    if (activeTenant?.logoBase64) {
+      let imgType = 'PNG';
+      if (activeTenant.logoBase64.startsWith('data:image/jpeg')) imgType = 'JPEG';
+      doc.addImage(activeTenant.logoBase64, imgType, 15, 12, 22, 22, undefined, 'FAST');
+      textX = 42;
+    }
+
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(16);
-    doc.text(activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO', 15, 22);
+    doc.text(activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO', textX, 22);
 
     doc.setFontSize(8);
     doc.setFont('Helvetica', 'normal');
     doc.setTextColor(120, 120, 120);
-    doc.text(`R.U.C. ${activeTenant?.ruc || '1790000000001'} | DIRECCIÓN MATRIZ: ${((activeTenant as any)?.address) || 'AV. PRINCIPAL'}`, 15, 27);
-    doc.text('CANAL: SISTEMA CORE BANCARIO | CONTABILIDAD GENERAL', 15, 31);
-
-    // Voucher Title Box
-    doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
-    doc.roundedRect(138, 14, 57, 18, 2, 2, 'FD');
-    doc.setDrawColor(226, 232, 240); // slate-200
-    doc.rect(138, 14, 57, 18);
-
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text('COMPROBANTE DIARIO', 140.5, 20);
-    doc.setTextColor(220, 38, 38); // Red for voucher number
-    doc.setFontSize(10);
-    doc.text(`${asiento.numeroAsiento}`, 140.5, 27);
+    doc.text(`R.U.C. ${activeTenant?.ruc || '1790000000001'} | DIRECCIÓN MATRIZ: ${((activeTenant as any)?.address) || 'AV. PRINCIPAL'}`, textX, 27);
+    doc.text('CANAL: SISTEMA CORE BANCARIO | CONTABILIDAD GENERAL', textX, 31);
 
     // Separator line
     doc.setDrawColor(226, 232, 240);
@@ -479,33 +474,41 @@ export const ContabilidadDashboard: React.FC = () => {
 
     // 2. Metadata Grid
     doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+
+    // Row 0: Comprobante Diario
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('COMPROBANTE DIARIO:', 15, 43);
+    doc.setTextColor(220, 38, 38); // Red for voucher number
+    doc.text(`${asiento.numeroAsiento}`, 60, 43);
+
+    // Row 1: Fecha y Referencia
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(8.5);
-
-    // Row 1
-    doc.text('FECHA/HORA:', 15, 43);
+    doc.text('FECHA/HORA:', 15, 50);
     doc.setFont('Helvetica', 'normal');
     doc.text(new Date(asiento.fechaAsiento).toLocaleString('es-ES', {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit', second: '2-digit'
-    }), 45, 43);
+    }), 55, 50);
 
     doc.setFont('Helvetica', 'bold');
-    doc.text('REFERENCIA:', 115, 43);
+    doc.text('REFERENCIA:', 115, 50);
     doc.setFont('Courier', 'bold'); // monospace for reference
-    doc.text(asiento.referencia || '—', 143, 43);
+    doc.text(asiento.referencia || '—', 143, 50);
     doc.setFont('Helvetica', 'normal');
 
     // Row 2 (Glosa/Concepto)
     doc.setFont('Helvetica', 'bold');
-    doc.text('CONCEPTO / GLOSA:', 15, 50);
+    doc.text('CONCEPTO / GLOSA:', 15, 57);
     doc.setFont('Helvetica', 'normal');
-    const glosaText = doc.splitTextToSize(asiento.glosa, 150);
-    doc.text(glosaText, 45, 50);
+    const glosaText = doc.splitTextToSize(asiento.glosa, 140);
+    doc.text(glosaText, 55, 57);
 
     // Y Position after metadata (Glosa height is dynamic)
     const glosaHeight = glosaText.length * 4;
-    const tableStartY = Math.max(55, 50 + glosaHeight);
+    const tableStartY = Math.max(62, 57 + glosaHeight);
 
     // 3. Table of Accounts (Debe/Haber)
     const tableHeaders = [['Código', 'Cuenta Contable', 'Debe (Débito)', 'Haber (Crédito)']];
@@ -782,19 +785,27 @@ export const ContabilidadDashboard: React.FC = () => {
     doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.rect(0, 0, 210, 8, 'F');
 
+    let textX = 15;
+    if (activeTenant?.logoBase64) {
+      let imgType = 'PNG';
+      if (activeTenant.logoBase64.startsWith('data:image/jpeg')) imgType = 'JPEG';
+      doc.addImage(activeTenant.logoBase64, imgType, 15, 12, 22, 22, undefined, 'FAST');
+      textX = 42;
+    }
+
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(14);
-    doc.text(activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO', 15, 20);
+    doc.text(activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO', textX, 20);
 
     doc.setFontSize(10);
-    doc.text('ESTADO DE RESULTADOS (PÉRDIDAS Y GANANCIAS)', 15, 25);
+    doc.text('ESTADO DE RESULTADOS (PÉRDIDAS Y GANANCIAS)', textX, 25);
 
     doc.setFontSize(8.5);
     doc.setFont('Helvetica', 'normal');
     doc.setTextColor(120, 120, 120);
-    doc.text(`PERIODO: DESDE ${fechaDesdeResultados} HASTA ${fechaHastaResultados}`, 15, 30);
-    doc.text('MONEDA: DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA (USD)', 15, 34);
+    doc.text(`PERIODO: DESDE ${fechaDesdeResultados} HASTA ${fechaHastaResultados}`, textX, 30);
+    doc.text('MONEDA: DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA (USD)', textX, 34);
 
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.5);
@@ -966,19 +977,27 @@ export const ContabilidadDashboard: React.FC = () => {
     doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.rect(0, 0, 210, 8, 'F');
 
+    let textX = 15;
+    if (activeTenant?.logoBase64) {
+      let imgType = 'PNG';
+      if (activeTenant.logoBase64.startsWith('data:image/jpeg')) imgType = 'JPEG';
+      doc.addImage(activeTenant.logoBase64, imgType, 15, 12, 22, 22, undefined, 'FAST');
+      textX = 42;
+    }
+
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(14);
-    doc.text(activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO', 15, 20);
+    doc.text(activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO', textX, 20);
 
     doc.setFontSize(10);
-    doc.text('BALANCE GENERAL (ESTADO DE SITUACIÓN FINANCIERA)', 15, 25);
+    doc.text('BALANCE GENERAL (ESTADO DE SITUACIÓN FINANCIERA)', textX, 25);
 
     doc.setFontSize(8.5);
     doc.setFont('Helvetica', 'normal');
     doc.setTextColor(120, 120, 120);
-    doc.text(`FECHA DE CORTE: ${fechaCorteBalance}`, 15, 30);
-    doc.text('MONEDA: DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA (USD)', 15, 34);
+    doc.text(`FECHA DE CORTE: ${fechaCorteBalance}`, textX, 30);
+    doc.text('MONEDA: DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA (USD)', textX, 34);
 
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.5);
@@ -1562,6 +1581,28 @@ export const ContabilidadDashboard: React.FC = () => {
             </div>
             
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    type="text"
+                    placeholder="Filtrar por código o nombre..."
+                    value={filtroPlan}
+                    onChange={e => setFiltroPlan(e.target.value)}
+                    className="pl-9 pr-4 h-9.5 text-xs rounded-xl"
+                  />
+                </div>
+                {filtroPlan && (
+                  <button
+                    onClick={() => setFiltroPlan('')}
+                    className="h-9.5 w-9.5 shrink-0 flex items-center justify-center rounded-xl border border-rose-200 text-rose-600 bg-white hover:bg-rose-50 hover:text-rose-700 transition-all shadow-sm cursor-pointer animate-fade-in"
+                    title="Limpiar Búsqueda"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
               <Button
                 onClick={exportarCSV}
                 className="bg-white hover:bg-slate-55 text-slate-700 font-bold border border-slate-200 h-9.5 px-4 rounded-xl text-xs shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
@@ -1569,17 +1610,6 @@ export const ContabilidadDashboard: React.FC = () => {
                 <Download className="h-3.5 w-3.5 text-slate-500" />
                 Exportar CSV
               </Button>
-
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                <Input
-                  type="text"
-                  placeholder="Filtrar por código o nombre..."
-                  value={filtroPlan}
-                  onChange={e => setFiltroPlan(e.target.value)}
-                  className="pl-9 pr-4 h-9.5 text-xs rounded-xl"
-                />
-              </div>
             </div>
           </div>
 

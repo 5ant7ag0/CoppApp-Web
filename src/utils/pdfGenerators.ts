@@ -11,18 +11,26 @@ export const drawExecutiveHeader = (
   tenant: Cooperativa | null, 
   startY: number = 20
 ): number => {
-  const tName = tenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO';
+  const anyTenant = tenant as any;
+  const tName = (tenant?.name || anyTenant?.nombre || 'COOPERATIVA DE AHORRO Y CRÉDITO').toUpperCase();
   const tRuc = tenant?.ruc || '1790000000001';
-  const tAddress = (tenant as any)?.address || 'Av. Principal N28-30, Matriz Principal';
-  const tContact = (tenant as any)?.contact || 'Contacto: (02) 200-3000 | info@cooperativa.fin.ec';
+  const tAddress = anyTenant?.address || anyTenant?.direccion || 'Av. Principal N28-30, Matriz Principal';
+  const tel = anyTenant?.telefono || '';
+  const email = anyTenant?.correo || '';
+  const fallbackContact = 'Contacto: (02) 200-3000 | info@cooperativa.fin.ec';
+  const tContact = anyTenant?.contact || (tel || email ? `Contacto: ${tel} ${tel && email ? '|' : ''} ${email}`.trim() : fallbackContact);
 
   // LOGO (Left Side)
   if (tenant && tenant.logoBase64) {
     try {
-      // Intentar extraer el tipo de imagen del base64 (ej. data:image/png;base64,...)
-      let imgType = 'PNG';
-      if (tenant.logoBase64.startsWith('data:image/jpeg')) imgType = 'JPEG';
-      doc.addImage(tenant.logoBase64, imgType, 15, startY - 8, 20, 20, undefined, 'FAST');
+      let imgType: string | undefined = undefined;
+      const base64Upper = tenant.logoBase64.toUpperCase();
+      if (base64Upper.includes('IMAGE/JPEG') || base64Upper.includes('IMAGE/JPG')) imgType = 'JPEG';
+      else if (base64Upper.includes('IMAGE/PNG')) imgType = 'PNG';
+      else if (base64Upper.includes('IMAGE/WEBP')) imgType = 'WEBP';
+      
+      // If we couldn't detect from mime type, we let jsPDF auto-detect from base64 signature by passing undefined
+      doc.addImage(tenant.logoBase64, imgType as any, 15, startY - 8, 20, 20, undefined, 'FAST');
     } catch (e) {
       console.warn("Could not draw logoBase64", e);
       // Fallback

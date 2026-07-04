@@ -99,6 +99,7 @@ const getEstadoLabel = (estado: string) => {
     case 'APROBADO': return 'Aprobado';
     case 'DESEMBOLSADO': return 'Desembolsado';
     case 'RECHAZADO': return 'Rechazado';
+    case 'CANCELADO': return 'Liquidado';
     default: return estado;
   }
 };
@@ -110,6 +111,7 @@ const getEstadoStyles = (estado: string) => {
     case 'APROBADO': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
     case 'DESEMBOLSADO': return 'bg-indigo-50 text-indigo-700 border-indigo-100';
     case 'RECHAZADO': return 'bg-rose-50 text-rose-700 border-rose-100';
+    case 'CANCELADO': return 'bg-slate-50 text-slate-500 border-slate-200';
     default: return 'bg-slate-50 text-slate-700 border-slate-100';
   }
 };
@@ -121,6 +123,7 @@ const getEstadoCardStyles = (estado: string) => {
     case 'APROBADO': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
     case 'DESEMBOLSADO': return 'bg-indigo-50 text-indigo-600 border-indigo-100';
     case 'RECHAZADO': return 'bg-rose-50 text-rose-600 border-rose-100';
+    case 'CANCELADO': return 'bg-slate-50 text-slate-500 border-slate-200';
     default: return 'bg-slate-50 text-slate-650 border-slate-100';
   }
 };
@@ -346,10 +349,10 @@ export const AprobacionCreditos: React.FC = () => {
   }, []);
 
   const fetchAmortizacion = async (credito: Credito) => {
-    setTablaAmortizacion([]);
+    if (!credito) return;
     setCargandoAmortizacion(true);
     try {
-      if (credito.estado === 'DESEMBOLSADO') {
+      if (['DESEMBOLSADO', 'CANCELADO', 'EN_MORA'].includes(credito.estado)) {
         const res = await api.get(`/creditos/${credito.id}/amortizacion`);
         const cuotas = res.data || [];
         
@@ -556,7 +559,7 @@ export const AprobacionCreditos: React.FC = () => {
       ],
       body: cuotas.map(cuo => [
         cuo.num.toString(),
-        cuo.fecha,
+        formatFechaStr(cuo.fecha),
         formatCurrency(cuo.capital),
         formatCurrency(cuo.interes),
         formatCurrency(cuo.total),
@@ -619,7 +622,7 @@ export const AprobacionCreditos: React.FC = () => {
       ],
       body: cuotas.map(cuo => [
         cuo.num.toString(),
-        cuo.fecha,
+        formatFechaStr(cuo.fecha),
         formatCurrency(cuo.capital),
         formatCurrency(cuo.interes),
         formatCurrency(cuo.total),
@@ -1186,12 +1189,22 @@ export const AprobacionCreditos: React.FC = () => {
                 placeholder="Buscar socio, cédula o número de crédito..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 text-xs font-semibold text-slate-700 bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 focus:border-[#0054A6]"
+                className="w-full pl-10 pr-4 py-2 text-xs font-semibold text-slate-700 bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0054A6]/20 focus:border-[#0054A6] h-9.5"
               />
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-450">
                 <Search className="h-4 w-4" />
               </div>
             </div>
+
+            {isFilterActive && (
+              <button
+                onClick={handleClearFilters}
+                className="h-9.5 w-9.5 shrink-0 flex items-center justify-center rounded-2xl border border-rose-200 text-rose-600 bg-white hover:bg-rose-50 hover:text-rose-700 transition-all shadow-sm cursor-pointer animate-fade-in"
+                title="Limpiar Filtros"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
 
             {/* Filtro por Estado */}
             <select
@@ -1209,17 +1222,7 @@ export const AprobacionCreditos: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2.5">
-            {/* Botón X Limpiar */}
-            {isFilterActive && (
-              <Button
-                onClick={handleClearFilters}
-                variant="outline"
-                className="border-rose-200 text-rose-700 hover:bg-rose-50 font-bold rounded-2xl text-xs h-9.5 px-3.5 flex items-center gap-1.5 cursor-pointer shadow-sm animate-fade-in"
-              >
-                <X className="h-3.5 w-3.5" />
-                Limpiar
-              </Button>
-            )}
+
 
             {/* Botón Filtros Avanzados */}
             <Button
@@ -1752,7 +1755,7 @@ export const AprobacionCreditos: React.FC = () => {
                 <button
                   onClick={() => descargarTablaAmortizacionPdf(creditoSeleccionado, tablaAmortizacion)}
                   disabled={cargandoAmortizacion}
-                  className="px-4 py-2 rounded-xl bg-slate-50 text-slate-600 hover:text-[#0054A6] hover:bg-[#0054A6]/10 transition-all font-bold text-xs flex items-center gap-2 disabled:opacity-50 border border-slate-200/60 shadow-sm cursor-pointer flex-1 md:flex-none justify-center"
+                  className="px-5 py-2.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-[#0054A6] transition-all duration-300 font-semibold text-[13px] flex items-center gap-2.5 disabled:opacity-50 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer flex-1 md:flex-none justify-center"
                 >
                   <Printer className="h-4 w-4" />
                   Imprimir
@@ -1761,7 +1764,7 @@ export const AprobacionCreditos: React.FC = () => {
                   <button
                     onClick={() => setVerPagareCredito(creditoSeleccionado)}
                     disabled={cargandoAmortizacion}
-                    className="px-4 py-2 rounded-xl bg-slate-50 text-slate-600 hover:text-[#0054A6] hover:bg-[#0054A6]/10 transition-all font-bold text-xs flex items-center gap-2 disabled:opacity-50 border border-slate-200/60 shadow-sm cursor-pointer flex-1 md:flex-none justify-center"
+                    className="px-5 py-2.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-[#0054A6] transition-all duration-300 font-semibold text-[13px] flex items-center gap-2.5 disabled:opacity-50 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer flex-1 md:flex-none justify-center"
                   >
                     <Eye className="h-4 w-4" />
                     Ver Pagaré
@@ -2085,18 +2088,18 @@ export const AprobacionCreditos: React.FC = () => {
             {/* TAB: TABLA DE AMORTIZACIÓN */}
             {activeModalTab === 'amortizacion' && (
               <div className="animate-fade-in flex-1 overflow-hidden flex flex-col h-full">
-                <div className="bg-white border border-slate-100/80 rounded-2xl p-4 shadow-sm flex-1 flex flex-col min-h-[400px]">
+                <div className="bg-white border border-slate-100/80 rounded-2xl p-6 shadow-sm flex-1 flex flex-col min-h-[400px]">
                   {/* Encabezado Premium Resumen (Como en Foto) */}
                   <div className="mb-4 bg-slate-50/50 border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
                     <table className="w-full text-left">
                       <thead>
                         <tr className="bg-white border-b border-slate-100">
-                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider w-1/6">N° CRÉDITO</th>
-                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider w-1/6">FECHA SOLICITUD</th>
-                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider w-1/6">MONTO</th>
-                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider w-1/6">SALDO DEUDOR</th>
-                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider w-1/6">PRÓXIMO VENCIMIENTO</th>
-                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider w-1/6">ESTADO</th>
+                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">N° CRÉDITO</th>
+                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">FECHA SOLICITUD</th>
+                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">MONTO</th>
+                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">SALDO DEUDOR</th>
+                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">PRÓXIMO VENCIMIENTO</th>
+                          <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">ESTADO</th>
                         </tr>
                       </thead>
                       <tbody className="bg-slate-50/20">
@@ -2110,7 +2113,7 @@ export const AprobacionCreditos: React.FC = () => {
                           let estadoLabel = 'AL DÍA';
                           let estadoStyles = 'bg-emerald-50 text-emerald-600 border border-emerald-100';
                           if (isCancelado) {
-                            estadoLabel = 'CANCELADO';
+                            estadoLabel = 'LIQUIDADO';
                             estadoStyles = 'bg-slate-100 text-slate-600 border border-slate-200';
                           } else if (isMora) {
                             estadoLabel = 'EN MORA';
@@ -2119,21 +2122,21 @@ export const AprobacionCreditos: React.FC = () => {
 
                           return (
                             <tr>
-                              <td className="px-4 py-4 text-[11px] font-extrabold text-[#0054A6] font-mono">{creditoSeleccionado.numeroCredito}</td>
-                              <td className="px-4 py-4 text-[11px] font-semibold text-slate-600 font-mono">{formatFechaStr(creditoSeleccionado.fechaSolicitud)}</td>
-                              <td className="px-4 py-4 text-[11px] font-bold text-slate-800 font-mono">{formatCurrency(creditoSeleccionado.montoSolicitado)}</td>
-                              <td className="px-4 py-4 text-[11px] font-bold text-slate-800 font-mono">{formatCurrency(saldoDeudor)}</td>
-                              <td className="px-4 py-3">
+                              <td className="px-4 py-4 text-[11px] font-extrabold text-[#0054A6] font-mono text-center">{creditoSeleccionado.numeroCredito}</td>
+                              <td className="px-4 py-4 text-[11px] font-semibold text-slate-600 font-mono text-center">{formatFechaStr(creditoSeleccionado.fechaSolicitud)}</td>
+                              <td className="px-4 py-4 text-[11px] font-bold text-slate-800 font-mono text-center">{formatCurrency(creditoSeleccionado.montoSolicitado)}</td>
+                              <td className="px-4 py-4 text-[11px] font-bold text-slate-800 font-mono text-center">{formatCurrency(saldoDeudor)}</td>
+                              <td className="px-4 py-3 text-center">
                                 {nextCuota ? (
                                   <>
                                     <span className="text-[11px] font-bold text-slate-800 font-mono block">{formatCurrency(nextCuota.total)}</span>
-                                    <span className="text-[9px] text-slate-400 font-medium block">Vence: {creditoSeleccionado.estado === 'DESEMBOLSADO' ? nextCuota.fecha : 'Al desembolsar'}</span>
+                                    <span className="text-[9px] text-slate-400 font-medium block">Vence: {['SOLICITADO', 'EN_ANALISIS', 'APROBADO'].includes(creditoSeleccionado.estado) ? 'Al desembolsar' : formatFechaStr(nextCuota.fecha)}</span>
                                   </>
                                 ) : (
                                   <span className="text-[11px] font-bold text-slate-400">N/A</span>
                                 )}
                               </td>
-                              <td className="px-4 py-4">
+                              <td className="px-4 py-4 text-center">
                                 <span className={`px-2.5 py-1.5 text-[8px] font-black rounded-md uppercase tracking-wider ${estadoStyles}`}>
                                   {estadoLabel}
                                 </span>
@@ -2155,16 +2158,16 @@ export const AprobacionCreditos: React.FC = () => {
                     </div>
                   ) : (
                     <div className="overflow-y-auto flex-1 border border-slate-100 rounded-xl max-h-[500px]">
-                      <table className="w-full text-left border-collapse table-fixed">
+                      <table className="w-full text-left border-collapse">
                         <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-sm z-10">
                           <tr className="border-b border-slate-100">
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider w-[12%]">Cuota</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider w-[18%]">Vencimiento</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider w-[14%]">Capital</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider w-[14%]">Interés</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider w-[14%]">Total</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider w-[16%]">Saldo Restante</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider w-[12%] text-right">Estado</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Cuota</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Vencimiento</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Capital</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Interés</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Total</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Saldo Restante</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Estado</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -2172,29 +2175,29 @@ export const AprobacionCreditos: React.FC = () => {
                             const isPagada = cuo.estado === 'PAGADA';
                             return (
                               <tr key={index} className="hover:bg-slate-50/50 transition-colors">
-                                <td className="px-4 py-3 text-[10px] font-extrabold text-slate-600 font-mono">
+                                <td className="px-4 py-3 text-[10px] font-extrabold text-slate-600 font-mono text-center">
                                   #{cuo.num}
                                 </td>
-                                <td className="px-4 py-3 text-[10px] font-semibold text-slate-500 font-mono">
-                                  {creditoSeleccionado.estado === 'DESEMBOLSADO' ? cuo.fecha : <span className="text-[9px] italic text-slate-400">Al desembolsar</span>}
+                                <td className="px-4 py-3 text-[10px] font-semibold text-slate-500 font-mono text-center whitespace-nowrap">
+                                  {['SOLICITADO', 'EN_ANALISIS', 'APROBADO'].includes(creditoSeleccionado.estado) ? <span className="text-[9px] italic text-slate-400">Al desembolsar</span> : formatFechaStr(cuo.fecha)}
                                 </td>
-                                <td className="px-4 py-3 text-[10px] font-bold text-slate-500 font-mono">
+                                <td className="px-4 py-3 text-[10px] font-bold text-slate-500 font-mono text-center">
                                   {formatCurrency(cuo.capital)}
                                 </td>
-                                <td className="px-4 py-3 text-[10px] font-bold text-slate-500 font-mono">
+                                <td className="px-4 py-3 text-[10px] font-bold text-slate-500 font-mono text-center">
                                   {formatCurrency(cuo.interes)}
                                 </td>
-                                <td className="px-4 py-3 text-[10px] font-black text-slate-700 font-mono">
+                                <td className="px-4 py-3 text-[10px] font-black text-slate-700 font-mono text-center">
                                   {formatCurrency(cuo.total)}
                                 </td>
-                                <td className="px-4 py-3 text-[10px] font-bold text-slate-500 font-mono">
+                                <td className="px-4 py-3 text-[10px] font-bold text-slate-500 font-mono text-center">
                                   {formatCurrency(cuo.saldo)}
                                 </td>
-                                <td className="px-4 py-3 text-right">
+                                <td className="px-4 py-3 text-center">
                                   <span className={`px-2 py-0.5 text-[8px] font-black rounded-md ${
                                     isPagada ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-500'
                                   }`}>
-                                    {isPagada ? '✓ PAGADA' : '○ PENDIENTE'}
+                                    {isPagada ? '✓ PAGADA' : 'PENDIENTE'}
                                   </span>
                                 </td>
                               </tr>
@@ -2408,9 +2411,9 @@ export const AprobacionCreditos: React.FC = () => {
                           descargarTablaAmortizacionPdf(pagareCredito, pagareCuotas);
                         }}
                         disabled={cargandoPagareCuotas}
-                        className="w-full bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-xl h-9 text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                        className="w-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-[#0054A6] font-semibold rounded-2xl h-12 text-[13px] flex items-center justify-center gap-2 cursor-pointer shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]"
                       >
-                        <Printer className="h-3.5 w-3.5" />
+                        <Printer className="h-4 w-4" />
                         Imprimir Tabla de Amortización
                       </Button>
                     </div>
@@ -2543,7 +2546,7 @@ export const AprobacionCreditos: React.FC = () => {
                           {pagareCuotas.map(cuo => (
                             <tr key={cuo.num} className="border-b border-slate-200">
                               <td className="border border-slate-250 p-1 text-center font-bold">{cuo.num}</td>
-                              <td className="border border-slate-250 p-1 text-center">{cuo.fecha}</td>
+                              <td className="border border-slate-250 p-1 text-center">{formatFechaStr(cuo.fecha)}</td>
                               <td className="border border-slate-250 p-1">{formatCurrency(cuo.capital)}</td>
                               <td className="border border-slate-250 p-1">{formatCurrency(cuo.interes)}</td>
                               <td className="border border-slate-250 p-1 font-bold">{formatCurrency(cuo.total)}</td>
@@ -2738,7 +2741,7 @@ export const AprobacionCreditos: React.FC = () => {
                       descargarPagarePdf(verPagareCredito, tablaAmortizacion, user?.nombresCompletos || 'Oficial');
                     }
                   }}
-                  className="bg-[#0054A6] hover:bg-[#0054A6]/90 text-white font-bold rounded-xl h-9 px-4 flex items-center gap-2 text-xs cursor-pointer shadow-sm"
+                  className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-[#0054A6] font-semibold rounded-full h-10 px-5 flex items-center gap-2 text-[13px] cursor-pointer shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] active:translate-y-0"
                 >
                   <Printer className="h-4 w-4" />
                   Imprimir Pagaré

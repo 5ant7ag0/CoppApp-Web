@@ -135,6 +135,7 @@ export const CreacionSocios: React.FC = () => {
   const [loadingTransacciones, setLoadingTransacciones] = useState<boolean>(false);
   const [filtroCuentaTx, setFiltroCuentaTx] = useState<string>('TODAS');
   const [isAperturaModalOpen, setIsAperturaModalOpen] = useState<boolean>(false);
+  const [verPagare, setVerPagare] = useState<{cred: any, url: string} | null>(null);
   const [productosAhorro, setProductosAhorro] = useState<any[]>([]);
   const [selectedProductoId, setSelectedProductoId] = useState<number | ''>('');
   const [montoInicialApertura, setMontoInicialApertura] = useState<string>('0');
@@ -146,6 +147,12 @@ export const CreacionSocios: React.FC = () => {
   const [filtroTxBuscar, setFiltroTxBuscar] = useState<string>('');
   const [filtroTxFechaDesde, setFiltroTxFechaDesde] = useState<string>('');
   const [filtroTxFechaHasta, setFiltroTxFechaHasta] = useState<string>('');
+
+  // Filtros de créditos de un socio
+  const [filtroCredBuscar, setFiltroCredBuscar] = useState<string>('');
+  const [filtroCredEstado, setFiltroCredEstado] = useState<string>('TODOS');
+  const [filtroCredFechaDesde, setFiltroCredFechaDesde] = useState<string>('');
+  const [filtroCredFechaHasta, setFiltroCredFechaHasta] = useState<string>('');
 
   // Algoritmo de validación de Cédula Ecuatoriana (Módulo 10)
   const validarCedulaEcuatoriana = (ced: string): boolean => {
@@ -487,7 +494,7 @@ export const CreacionSocios: React.FC = () => {
     currentY += 5;
     drawLabelValue("Correo Electrónico", socio.correo, margin, currentY, 32);
     const pepStatus = socio.esPep ? "SÍ" : "NO";
-    drawLabelValue("Persona Expuesta PEP", pepStatus, 120, currentY, 30);
+    drawLabelValue("Persona Expuesta PEP", pepStatus, 120, currentY, 40);
 
     if (socio.esPep) {
       currentY += 5;
@@ -613,7 +620,8 @@ export const CreacionSocios: React.FC = () => {
     doc.text(splitText, margin, currentY);
 
     // VI. FIRMAS Y HUELLA
-    currentY += 18;
+    const textHeight = splitText.length * 3.5;
+    currentY += textHeight + 25;
     const lineLength = 48;
     const xSocio = margin;
     const xHuella = 85;
@@ -710,7 +718,7 @@ export const CreacionSocios: React.FC = () => {
       : 0;
     drawRow("Saldo Deudor", `$${saldoDeudor.toFixed(2)}`, "Tipo Amortización", cred.tipoAmortizacion || 'FRANCES', currentY);
     currentY += 5;
-    drawRow("Tasa Interés", `${parseFloat(cred.tasaInteresAnual || 0).toFixed(2)}% Anual`, "Estado Crédito", cred.estado, currentY);
+    drawRow("Tasa Interés", `${parseFloat(cred.tasaInteresAnual || 0).toFixed(2)}% Anual`, "Estado Crédito", getEstadoCreditoBadge(cred.estado).label, currentY);
 
     currentY += 8;
 
@@ -774,7 +782,7 @@ export const CreacionSocios: React.FC = () => {
   };
 
   // Descarga el pagaré digital en PDF usando jsPDF
-  const descargarPagarePdf = (cred: any, socio: any) => {
+  const generarPagareDoc = (cred: any, socio: any) => {
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -847,7 +855,18 @@ export const CreacionSocios: React.FC = () => {
     doc.text(`Identificación: ${socio.identificacion}`, margin + 15, currentY);
     doc.text(`Nombre: ${socio.nombresCompletos}`, margin + 15, currentY);
 
+    return doc;
+  };
+
+  const descargarPagarePdf = (cred: any, socio: any) => {
+    const doc = generarPagareDoc(cred, socio);
     doc.save(`pagare_operacion_${cred.numeroCredito}.pdf`);
+  };
+
+  const handleVerPagare = (cred: any, socio: any) => {
+    const doc = generarPagareDoc(cred, socio);
+    const url = doc.output('bloburl');
+    setVerPagare({ cred, url: url.toString() });
   };
 
   // Exporta el historial de transacciones filtradas a un PDF
@@ -2415,15 +2434,29 @@ export const CreacionSocios: React.FC = () => {
           <div className="space-y-4 animate-fade-in">
             {/* Buscador de socios y filtros de estado */}
             <div className="flex flex-col md:flex-row items-center gap-3 w-full animate-fade-in">
-              <div className="relative flex-1 w-full">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar socios por número de identificación o nombres..."
-                  value={searchSocioQuery}
-                  onChange={(e) => setSearchSocioQuery(e.target.value)}
-                  className="w-full border border-slate-200 bg-white rounded-2xl h-11 pl-10.5 pr-4 text-xs font-bold transition-all outline-none focus:ring-2 focus:ring-[#0054A6]/20 focus:border-[#0054A6] shadow-sm placeholder:text-slate-400"
-                />
+              <div className="flex items-center gap-2 flex-1 w-full">
+                <div className="relative flex-1 w-full">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar socios por número de identificación o nombres..."
+                    value={searchSocioQuery}
+                    onChange={(e) => setSearchSocioQuery(e.target.value)}
+                    className="w-full border border-slate-200 bg-white rounded-2xl h-11 pl-10.5 pr-4 text-xs font-bold transition-all outline-none focus:ring-2 focus:ring-[#0054A6]/20 focus:border-[#0054A6] shadow-sm placeholder:text-slate-400"
+                  />
+                </div>
+                {(searchSocioQuery || estadoFilter !== 'TODOS') && (
+                  <button
+                    onClick={() => {
+                      setSearchSocioQuery('');
+                      setEstadoFilter('TODOS');
+                    }}
+                    className="h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl border border-rose-200 text-rose-600 bg-white hover:bg-rose-50 hover:text-rose-700 transition-all shadow-sm cursor-pointer animate-fade-in"
+                    title="Limpiar Filtros"
+                  >
+                    <X className="h-4.5 w-4.5" />
+                  </button>
+                )}
               </div>
 
               {/* Filtros de estado como botones pill */}
@@ -3680,20 +3713,125 @@ export const CreacionSocios: React.FC = () => {
                     <span className="text-[10px] font-bold text-slate-400">El socio no registra solicitudes de crédito.</span>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto border border-slate-100 rounded-2xl">
-                    <table className="w-full text-left border-collapse table-fixed">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-100">
-                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[15%]">Nº Crédito</th>
-                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[13%]">Fecha Solicitud</th>
-                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[15%]">Monto</th>
-                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[15%]">Saldo Deudor</th>
-                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[22%]">Próximo Vencimiento</th>
-                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[20%] text-right">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {creditosSocio.map((cred) => {
+                  <>
+                    {/* Filtros Inteligentes de Créditos */}
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end mb-4 animate-fade-in">
+                      {/* Buscador de Texto y Limpiar */}
+                      <div className="sm:col-span-5 space-y-1.5">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Buscar Nº Crédito o Monto</label>
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              placeholder="Buscar..."
+                              value={filtroCredBuscar}
+                              onChange={(e) => setFiltroCredBuscar(e.target.value)}
+                              className="w-full border border-slate-200 text-slate-600 font-bold rounded-xl text-xs h-9.5 pl-8 pr-3.5 bg-white outline-none transition-all shadow-sm focus:border-[#0054A6] focus:ring-2 focus:ring-[#0054A6]/20"
+                            />
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                          </div>
+                          {(filtroCredBuscar || filtroCredFechaDesde || filtroCredFechaHasta || filtroCredEstado !== 'TODOS') && (
+                            <button
+                              onClick={() => {
+                                setFiltroCredBuscar('');
+                                setFiltroCredFechaDesde('');
+                                setFiltroCredFechaHasta('');
+                                setFiltroCredEstado('TODOS');
+                              }}
+                              className="h-9.5 w-9.5 shrink-0 flex items-center justify-center rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-all shadow-sm cursor-pointer animate-fade-in"
+                              title="Limpiar Filtros"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Filtro por Estado */}
+                      <div className="sm:col-span-3 space-y-1.5">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado</label>
+                        <select
+                          value={filtroCredEstado}
+                          onChange={(e) => setFiltroCredEstado(e.target.value)}
+                          className="w-full border border-slate-200 text-slate-600 font-bold rounded-xl text-xs h-9.5 pl-3.5 pr-8 appearance-none bg-white bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%252364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[size:1rem_1rem] bg-[position:right_0.75rem_center] bg-no-repeat cursor-pointer shadow-sm transition-all hover:bg-slate-50 focus:outline-none focus:border-[#0054A6] focus:ring-2 focus:ring-[#0054A6]/20"
+                        >
+                          <option value="TODOS">Todos los Estados</option>
+                          <option value="DESEMBOLSADO">Desembolsado</option>
+                          <option value="PAGADO">Cancelado / Liquidado</option>
+                          <option value="EN_MORA">En Mora</option>
+                          <option value="SOLICITADO">Solicitado</option>
+                        </select>
+                      </div>
+
+                      {/* Fecha Desde */}
+                      <div className="sm:col-span-2 space-y-1.5">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha Desde</label>
+                        <input
+                          type="date"
+                          value={filtroCredFechaDesde}
+                          onChange={(e) => setFiltroCredFechaDesde(e.target.value)}
+                          className="w-full border border-slate-200 text-slate-600 font-bold rounded-xl text-xs h-9.5 px-2 bg-white outline-none transition-all shadow-sm focus:border-[#0054A6] focus:ring-2 focus:ring-[#0054A6]/20 font-mono"
+                        />
+                      </div>
+
+                      {/* Fecha Hasta */}
+                      <div className="sm:col-span-2 space-y-1.5">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha Hasta</label>
+                        <input
+                          type="date"
+                          value={filtroCredFechaHasta}
+                          onChange={(e) => setFiltroCredFechaHasta(e.target.value)}
+                          className="w-full border border-slate-200 text-slate-600 font-bold rounded-xl text-xs h-9.5 px-2 bg-white outline-none transition-all shadow-sm focus:border-[#0054A6] focus:ring-2 focus:ring-[#0054A6]/20 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {(() => {
+                      const creditosSocioFiltrados = creditosSocio.filter(cred => {
+                        let match = true;
+                        if (filtroCredEstado !== 'TODOS') {
+                          if (cred.estado !== filtroCredEstado) match = false;
+                        }
+                        if (filtroCredFechaDesde) {
+                          if (!cred.fechaSolicitud || new Date(cred.fechaSolicitud) < new Date(filtroCredFechaDesde)) match = false;
+                        }
+                        if (filtroCredFechaHasta) {
+                          if (!cred.fechaSolicitud || new Date(cred.fechaSolicitud) > new Date(filtroCredFechaHasta)) match = false;
+                        }
+                        if (filtroCredBuscar) {
+                          const q = filtroCredBuscar.toLowerCase();
+                          if (!cred.numeroCredito?.toLowerCase().includes(q) &&
+                              !cred.montoSolicitado?.toString().includes(q)) {
+                            match = false;
+                          }
+                        }
+                        return match;
+                      });
+
+                      if (creditosSocioFiltrados.length === 0) {
+                        return (
+                          <div className="text-center py-8 bg-slate-50 border border-slate-100 rounded-2xl">
+                            <span className="text-[10px] font-bold text-slate-400">No hay créditos que coincidan con los filtros aplicados.</span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="overflow-x-auto border border-slate-100 rounded-2xl">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-slate-50 border-b border-slate-100">
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Nº Crédito</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Fecha Solicitud</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Monto</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Saldo Deudor</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Próximo Vencimiento</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Estado</th>
+                                <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center whitespace-nowrap">Acciones</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {creditosSocioFiltrados.map((cred) => {
                           const totalCapitalPagado = cred.cuotas ? cred.cuotas.reduce((sum: number, cuota: any) => sum + parseFloat(cuota.capitalPagado || 0), 0) : 0;
                           const saldoDeudor = cred.estado === 'DESEMBOLSADO' || cred.estado === 'EN_MORA'
                             ? Math.max(0, parseFloat(cred.montoDesembolsado || 0) - totalCapitalPagado)
@@ -3718,21 +3856,21 @@ export const CreacionSocios: React.FC = () => {
                                 onClick={() => setExpandedCreditId(isExpanded ? null : cred.id)}
                                 className={`hover:bg-slate-50/70 active:bg-slate-100/50 transition-all duration-200 cursor-pointer border-b border-slate-100/60 ${isExpanded ? 'bg-[#0054A6]/[0.02]' : ''}`}
                               >
-                                <td className="px-4 py-3.5 text-xs font-bold text-[#0054A6] font-mono truncate">
+                                <td className="px-4 py-3.5 text-xs font-bold text-[#0054A6] font-mono truncate text-center">
                                   {cred.numeroCredito}
                                 </td>
-                                <td className="px-4 py-3.5 text-xs font-semibold text-slate-500 font-mono">
+                                <td className="px-4 py-3.5 text-xs font-semibold text-slate-500 font-mono text-center">
                                   {cred.fechaSolicitud ? new Date(cred.fechaSolicitud).toLocaleDateString('es-EC') : 'N/A'}
                                 </td>
-                                <td className="px-4 py-3.5 text-xs font-bold text-slate-700 font-mono">
+                                <td className="px-4 py-3.5 text-xs font-bold text-slate-700 font-mono text-center">
                                   ${parseFloat(cred.montoSolicitado || 0).toFixed(2)}
                                 </td>
-                                <td className="px-4 py-3.5 text-xs font-bold text-slate-700 font-mono">
+                                <td className="px-4 py-3.5 text-xs font-bold text-slate-700 font-mono text-center">
                                   ${saldoDeudor.toFixed(2)}
                                 </td>
-                                <td className="px-4 py-3.5 text-xs font-semibold text-slate-650 font-mono">
+                                <td className="px-4 py-3.5 text-xs font-semibold text-slate-650 font-mono text-center">
                                   {prox.fecha !== 'N/A' ? (
-                                    <div className="flex flex-col">
+                                    <div className="flex flex-col items-center">
                                       <span className="text-slate-700 font-bold">${prox.monto.toFixed(2)}</span>
                                       <span className="text-[10px] text-slate-400 font-medium">Vence: {prox.fecha}</span>
                                     </div>
@@ -3740,56 +3878,47 @@ export const CreacionSocios: React.FC = () => {
                                     <span className="text-slate-400 font-medium">—</span>
                                   )}
                                 </td>
-                                <td className="px-4 py-3.5 text-xs">
+                                <td className="px-4 py-3.5 text-xs text-center whitespace-nowrap">
                                   <span className={`px-2 py-0.5 text-[9px] font-black rounded-md ${badge.classes}`}>
                                     {badge.label}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3.5 text-xs relative" onClick={(e) => e.stopPropagation()}>
-                                  <div className="flex items-center justify-end gap-2">
-                                    {/* Botón Imprimir Tabla de Amortización */}
-                                    <div className="relative group">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          descargarAmortizacionPdf(cred, selectedSocio);
-                                        }}
-                                        className="p-1.5 rounded-lg text-slate-400 hover:text-[#0054A6] hover:bg-[#0054A6]/5 transition-all focus:outline-none cursor-pointer flex items-center justify-center"
-                                      >
-                                        <Printer className="h-4 w-4" />
-                                      </button>
-                                      <span className="pointer-events-none absolute -top-8 right-0 bg-slate-800 text-white text-[9px] font-bold py-1 px-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-md z-[60]">
-                                        Imprimir Amortización
-                                      </span>
-                                    </div>
-
-                                    {/* Botón Ver Pagaré */}
-                                    <div className="relative group">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          descargarPagarePdf(cred, selectedSocio);
-                                        }}
-                                        className="p-1.5 rounded-lg text-slate-400 hover:text-[#0054A6] hover:bg-[#0054A6]/5 transition-all focus:outline-none cursor-pointer flex items-center justify-center"
-                                      >
-                                        <Eye className="h-4 w-4" />
-                                      </button>
-                                      <span className="pointer-events-none absolute -top-8 right-0 bg-slate-800 text-white text-[9px] font-bold py-1 px-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-md z-[60]">
-                                        Ver Pagaré
-                                      </span>
-                                    </div>
+                                <td className="px-4 py-3.5 text-xs text-center whitespace-nowrap">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        descargarAmortizacionPdf(cred, selectedSocio);
+                                      }}
+                                      className="p-1.5 rounded-full bg-slate-50 text-slate-400 hover:text-[#0054A6] hover:bg-blue-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                                      title="Imprimir tabla"
+                                    >
+                                      <Printer className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleVerPagare(cred, selectedSocio);
+                                      }}
+                                      className="p-1.5 rounded-full bg-slate-50 text-slate-400 hover:text-[#0054A6] hover:bg-blue-50 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                                      title="Ver pagaré"
+                                    >
+                                      <FileText className="h-4 w-4" />
+                                    </button>
                                   </div>
                                 </td>
-                              </tr>
+                                </tr>
 
                               {isExpanded && (
                                 <tr className="bg-slate-50/30">
                                   <td colSpan={7} className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                     <div className="bg-white border border-slate-100/80 rounded-2xl p-4 shadow-sm animate-fade-in">
                                       <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-50">
-                                        <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                          Detalle de Amortización — Sistema: {cred.tipoAmortizacion}
-                                        </h5>
+                                        <div className="flex items-center gap-3">
+                                          <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                            Detalle de Amortización — Sistema: {cred.tipoAmortizacion}
+                                          </h5>
+                                        </div>
                                         <span className="text-[10px] text-slate-400 font-semibold font-mono">
                                           Plazo: {cred.plazoMeses} Meses | Tasa: {parseFloat(cred.tasaInteresAnual || 0).toFixed(2)}%
                                         </span>
@@ -3804,12 +3933,12 @@ export const CreacionSocios: React.FC = () => {
                                           <table className="w-full text-left border-collapse table-fixed">
                                             <thead>
                                               <tr className="bg-slate-50/60 border-b border-slate-100">
-                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[10%]">Cuota</th>
-                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%]">Vencimiento</th>
-                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%]">Capital</th>
-                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%]">Interés</th>
-                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%]">Total</th>
-                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%]">Saldo Restante</th>
+                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[10%] text-center">Cuota</th>
+                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%] text-center">Vencimiento</th>
+                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%] text-center">Capital</th>
+                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%] text-center">Interés</th>
+                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%] text-center">Total</th>
+                                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[18%] text-center">Saldo Restante</th>
                                                 <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider w-[20%] text-center">Estado</th>
                                               </tr>
                                             </thead>
@@ -3819,22 +3948,22 @@ export const CreacionSocios: React.FC = () => {
                                                 
                                                 return (
                                                   <tr key={cuota.id} className="hover:bg-slate-50/30 transition-colors">
-                                                    <td className="px-3 py-2 font-bold text-slate-600 font-mono">
+                                                    <td className="px-3 py-2 font-bold text-slate-600 font-mono text-center">
                                                       #{cuota.numeroCuota}
                                                     </td>
-                                                    <td className="px-3 py-2 text-slate-500 font-mono">
+                                                    <td className="px-3 py-2 text-slate-500 font-mono text-center">
                                                       {cuota.fechaVencimiento ? new Date(cuota.fechaVencimiento).toLocaleDateString('es-EC') : 'N/A'}
                                                     </td>
-                                                    <td className="px-3 py-2 text-slate-600 font-mono">
+                                                    <td className="px-3 py-2 text-slate-600 font-mono text-center">
                                                       ${parseFloat(cuota.capitalProyectado || 0).toFixed(2)}
                                                     </td>
-                                                    <td className="px-3 py-2 text-slate-500 font-mono">
+                                                    <td className="px-3 py-2 text-slate-500 font-mono text-center">
                                                       ${parseFloat(cuota.interesProyectado || 0).toFixed(2)}
                                                     </td>
-                                                    <td className="px-3 py-2 font-bold text-slate-700 font-mono">
+                                                    <td className="px-3 py-2 font-bold text-slate-700 font-mono text-center">
                                                       ${totalCuota.toFixed(2)}
                                                     </td>
-                                                    <td className="px-3 py-2 text-slate-500 font-mono">
+                                                    <td className="px-3 py-2 text-slate-500 font-mono text-center">
                                                       ${cuota.saldoRestante.toFixed(2)}
                                                     </td>
                                                     <td className="px-3 py-2 text-center">
@@ -3845,7 +3974,7 @@ export const CreacionSocios: React.FC = () => {
                                                           </span>
                                                         ) : cuota.estado === 'PENDIENTE' ? (
                                                           <span className="inline-flex items-center gap-1 text-[9px] font-black text-slate-500 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-md">
-                                                            <Circle className="h-2 w-2 text-slate-400 fill-slate-200" /> PENDIENTE
+                                                            PENDIENTE
                                                           </span>
                                                         ) : (
                                                           <span className="inline-flex items-center gap-1 text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded-md">
@@ -3867,10 +3996,13 @@ export const CreacionSocios: React.FC = () => {
                               )}
                             </React.Fragment>
                           );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </>
                 )}
               </div>
             )}
@@ -3934,13 +4066,44 @@ export const CreacionSocios: React.FC = () => {
                         {/* Fila de Filtros Avanzados */}
                         {transaccionesSocio.length > 0 && (
                           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                            {/* Buscador de Texto y Limpiar */}
+                            <div className="sm:col-span-5 space-y-1.5">
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Buscar Concepto / Ref</label>
+                              <div className="flex items-center gap-2">
+                                <div className="relative flex-1">
+                                  <input
+                                    type="text"
+                                    placeholder="Buscar..."
+                                    value={filtroTxBuscar}
+                                    onChange={(e) => setFiltroTxBuscar(e.target.value)}
+                                    className="w-full border border-slate-200 text-slate-600 font-bold rounded-xl text-xs h-9.5 pl-8 pr-3.5 bg-white outline-none transition-all shadow-sm focus:border-[#0054A6] focus:ring-2 focus:ring-[#0054A6]/20"
+                                  />
+                                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                                </div>
+                                {(filtroTxBuscar || filtroTxFechaDesde || filtroTxFechaHasta || filtroCuentaTx !== 'TODAS') && (
+                                  <button
+                                    onClick={() => {
+                                      setFiltroTxBuscar('');
+                                      setFiltroTxFechaDesde('');
+                                      setFiltroTxFechaHasta('');
+                                      setFiltroCuentaTx('TODAS');
+                                    }}
+                                    className="h-9.5 w-9.5 shrink-0 flex items-center justify-center rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-all shadow-sm cursor-pointer animate-fade-in"
+                                    title="Limpiar Filtros"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
                             {/* Filtro por Cuenta */}
-                            <div className="sm:col-span-3 space-y-1">
-                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Cuenta Financiera</label>
+                            <div className="sm:col-span-3 space-y-1.5">
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cuenta Financiera</label>
                               <select
                                 value={filtroCuentaTx}
                                 onChange={(e) => setFiltroCuentaTx(e.target.value)}
-                                className="w-full border border-slate-200 text-xs font-bold rounded-lg px-2.5 h-8.5 bg-white text-slate-700 outline-none focus:border-[#0054A6] cursor-pointer"
+                                className="w-full border border-slate-200 text-slate-600 font-bold rounded-xl text-xs h-9.5 pl-3.5 pr-8 appearance-none bg-white bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%252364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[size:1rem_1rem] bg-[position:right_0.75rem_center] bg-no-repeat cursor-pointer shadow-sm transition-all hover:bg-slate-50 focus:outline-none focus:border-[#0054A6] focus:ring-2 focus:ring-[#0054A6]/20"
                               >
                                 <option value="TODAS">Todas las Cuentas</option>
                                 {cuentasSocio.map((cta) => (
@@ -3951,59 +4114,27 @@ export const CreacionSocios: React.FC = () => {
                               </select>
                             </div>
 
-                            {/* Buscador de Texto */}
-                            <div className="sm:col-span-3 space-y-1">
-                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Buscar Concepto / Ref</label>
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  placeholder="Buscar..."
-                                  value={filtroTxBuscar}
-                                  onChange={(e) => setFiltroTxBuscar(e.target.value)}
-                                  className="w-full border border-slate-200 text-xs font-bold rounded-lg pl-8 pr-2.5 h-8.5 bg-white text-slate-700 outline-none focus:border-[#0054A6]"
-                                />
-                                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                              </div>
-                            </div>
-
                             {/* Fecha Desde */}
-                            <div className="sm:col-span-3 space-y-1">
-                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Fecha Desde</label>
+                            <div className="sm:col-span-2 space-y-1.5">
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha Desde</label>
                               <input
                                 type="date"
                                 value={filtroTxFechaDesde}
                                 onChange={(e) => setFiltroTxFechaDesde(e.target.value)}
-                                className="w-full border border-slate-200 text-xs font-bold rounded-lg px-2.5 h-8.5 bg-white text-slate-700 outline-none focus:border-[#0054A6] font-mono"
+                                className="w-full border border-slate-200 text-slate-600 font-bold rounded-xl text-xs h-9.5 px-2 bg-white outline-none transition-all shadow-sm focus:border-[#0054A6] focus:ring-2 focus:ring-[#0054A6]/20 font-mono"
                               />
                             </div>
 
                             {/* Fecha Hasta */}
-                            <div className="sm:col-span-3 space-y-1">
-                              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide">Fecha Hasta</label>
+                            <div className="sm:col-span-2 space-y-1.5">
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha Hasta</label>
                               <input
                                 type="date"
                                 value={filtroTxFechaHasta}
                                 onChange={(e) => setFiltroTxFechaHasta(e.target.value)}
-                                className="w-full border border-slate-200 text-xs font-bold rounded-lg px-2.5 h-8.5 bg-white text-slate-700 outline-none focus:border-[#0054A6] font-mono"
+                                className="w-full border border-slate-200 text-slate-600 font-bold rounded-xl text-xs h-9.5 px-2 bg-white outline-none transition-all shadow-sm focus:border-[#0054A6] focus:ring-2 focus:ring-[#0054A6]/20 font-mono"
                               />
                             </div>
-                          </div>
-                        )}
-
-                        {/* Botón de limpiar filtros si hay alguno activo */}
-                        {(filtroTxBuscar || filtroTxFechaDesde || filtroTxFechaHasta || filtroCuentaTx !== 'TODAS') && (
-                          <div className="flex justify-end mt-1">
-                            <button
-                              onClick={() => {
-                                setFiltroTxBuscar('');
-                                setFiltroTxFechaDesde('');
-                                setFiltroTxFechaHasta('');
-                                setFiltroCuentaTx('TODAS');
-                              }}
-                              className="text-[9px] font-extrabold text-[#0054A6] hover:underline uppercase tracking-wider cursor-pointer"
-                            >
-                              Limpiar Filtros
-                            </button>
                           </div>
                         )}
                       </div>
@@ -4286,6 +4417,51 @@ export const CreacionSocios: React.FC = () => {
                 src={lightboxImage.url} 
                 alt={lightboxImage.title} 
                 className="max-w-full max-h-[65vh] object-contain rounded-xl shadow-md border border-slate-200/50"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Visor de Pagaré */}
+      {verPagare && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+          <div 
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setVerPagare(null)}
+          />
+          <div className="relative bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden animate-scale-up flex flex-col h-[90vh]">
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">
+                  Pagaré a la Orden
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Operación Nº {verPagare.cred.numeroCredito}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => descargarPagarePdf(verPagare.cred, selectedSocio)}
+                  className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-[#0054A6] rounded-full text-[13px] font-semibold transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-95 flex items-center gap-2 cursor-pointer"
+                >
+                  <Printer className="h-4 w-4" /> Imprimir Pagaré
+                </button>
+                <button
+                  onClick={() => setVerPagare(null)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all focus:outline-none cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Visor PDF */}
+            <div className="flex-1 w-full bg-slate-100/50 p-4">
+              <iframe 
+                src={verPagare.url} 
+                className="w-full h-full rounded-2xl border border-slate-200 bg-white shadow-sm"
+                title="Pagaré Digital"
               />
             </div>
           </div>

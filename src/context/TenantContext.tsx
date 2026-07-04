@@ -55,33 +55,41 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
       try {
         const res = await api.get('/empresas/mi-perfil');
         if (res.data) {
-          baseTenant.name = res.data.nombre || baseTenant.name;
+          baseTenant.name = res.data.nombreComercial || res.data.razonSocial || res.data.nombre || baseTenant.name;
           baseTenant.ruc = res.data.ruc || baseTenant.ruc;
-          baseTenant.address = res.data.direccionMatriz || '';
-          baseTenant.contact = res.data.correoElectronico || '';
+          baseTenant.address = res.data.direccion || res.data.direccionMatriz || '';
+          
+          const tel = res.data.telefono || '';
+          const email = res.data.correoInstitucional || res.data.correoElectronico || '';
+          if (tel || email) {
+            baseTenant.contact = `Contacto: ${tel} ${tel && email ? '|' : ''} ${email}`.trim();
+          } else {
+            baseTenant.contact = '';
+          }
 
           if (res.data.logoUrl) {
             let url = res.data.logoUrl;
             if (!url.startsWith('http')) {
-              // Usar ruta relativa para que el proxy de Vite lo maneje y evite errores CORS en el canvas/fetch
               const path = url.replace(/^\/?(api\/v1\/)?/, '');
               url = `/api/v1/${path}`;
             }
             
             try {
               console.log('Fetching logo from (proxied):', url);
-              // Usamos fetch nativo hacia el mismo dominio (localhost:5173) para que Vite proxycee a 8080
               const imgRes = await fetch(url);
-              const blob = await imgRes.blob();
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                baseTenant.logoBase64 = reader.result as string;
-                console.log('Logo loaded via proxy as Base64.');
-                setActiveTenant({ ...baseTenant });
-              };
-              reader.readAsDataURL(blob);
-              localStorage.setItem('coop_tenant_id', baseTenant.id.toString());
-              return;
+              if (imgRes.ok) {
+                const blob = await imgRes.blob();
+                const base64 = await new Promise<string>((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => resolve(reader.result as string);
+                  reader.onerror = reject;
+                  reader.readAsDataURL(blob);
+                });
+                baseTenant.logoBase64 = base64;
+                console.log('Logo loaded successfully.');
+              } else {
+                console.error('Fetch returned non-OK status:', imgRes.status);
+              }
             } catch (imgErr) {
               console.error('Error fetching logo via proxy', imgErr);
             }
@@ -96,6 +104,13 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
     };
 
     initTenant();
+
+    const handleLogoUpdate = () => {
+      initTenant();
+    };
+    
+    window.addEventListener('logo-updated', handleLogoUpdate);
+    return () => window.removeEventListener('logo-updated', handleLogoUpdate);
   }, []);
 
   const changeTenant = (id: number) => {
