@@ -208,6 +208,18 @@ const numeroALetras = (num: number): string => {
 
 
 
+const getErrorMessage = (err: any): string => {
+  if (err.response?.data) {
+    if (typeof err.response.data === 'object' && err.response.data.message) {
+      return err.response.data.message;
+    }
+    if (typeof err.response.data === 'string') {
+      return err.response.data;
+    }
+  }
+  return err.message || 'Error desconocido';
+};
+
 export const AprobacionCreditos: React.FC = () => {
   const { user } = useAuth();
   const { activeTenant } = useTenant();
@@ -472,7 +484,8 @@ export const AprobacionCreditos: React.FC = () => {
     doc.setFont("times", "normal");
     doc.setFontSize(10);
     
-    const textoLegal = `Debo y pagaré incondicionalmente a la orden de la COOPERATIVA DE AHORRO Y CRÉDITO ITQ, en esta ciudad o en el lugar que se me requiera, la cantidad de ${formatCurrency(cred.montoSolicitado)} (${numeroALetras(cred.montoSolicitado)}) dólares de los Estados Unidos de América, reconociendo una tasa de interés del ${cred.tasaInteresAnual}% anual. En caso de mora, me sujeto a la tasa de interés máxima de mora permitida por la Junta de Política y Regulación Financiera del Ecuador. Renuncio expresamente a fuero y domicilio, y me someto a los jueces competentes de esta jurisdicción y al trámite ejecutivo o coactivo a elección del acreedor.`;
+    const coopName = (activeTenant?.name || "COOPERATIVA DE AHORRO Y CRÉDITO").toUpperCase();
+    const textoLegal = `Debo y pagaré incondicionalmente a la orden de la ${coopName}, en esta ciudad o en el lugar que se me requiera, la cantidad de ${formatCurrency(cred.montoSolicitado)} (${numeroALetras(cred.montoSolicitado)}) dólares de los Estados Unidos de América, reconociendo una tasa de interés del ${cred.tasaInteresAnual}% anual. En caso de mora, me sujeto a la tasa de interés máxima de mora permitida por la Junta de Política y Regulación Financiera del Ecuador. Renuncio expresamente a fuero y domicilio, y me someto a los jueces competentes de esta jurisdicción y al trámite ejecutivo o coactivo a elección del acreedor.`;
 
     const splitText = doc.splitTextToSize(textoLegal, 170);
     doc.text(splitText, marginX, currentY, { align: "justify" });
@@ -505,7 +518,7 @@ export const AprobacionCreditos: React.FC = () => {
     doc.text("OFICIAL DE CRÉDITO", 190 - sigWidth/2, sigY + 4, { align: "center" });
     doc.setFont("times", "normal");
     doc.text(oficialName.toUpperCase(), 190 - sigWidth/2, sigY + 8, { align: "center" });
-    doc.text("COOP. DE AHORRO Y CRÉDITO ITQ", 190 - sigWidth/2, sigY + 12, { align: "center" });
+    doc.text(coopName, 190 - sigWidth/2, sigY + 12, { align: "center" });
 
     // PAGINA 2: Salto de Página Obligatorio para la Tabla de Amortización
     doc.addPage();
@@ -513,7 +526,7 @@ export const AprobacionCreditos: React.FC = () => {
 
     doc.setFont("times", "bold");
     doc.setFontSize(12);
-    doc.text("COOPERATIVA DE AHORRO Y CRÉDITO ITQ", 105, currentY, { align: "center" });
+    doc.text(coopName, 105, currentY, { align: "center" });
     
     currentY += 6;
     doc.setFontSize(10);
@@ -619,7 +632,7 @@ export const AprobacionCreditos: React.FC = () => {
       fetchSolicitudes();
     } catch (err: any) {
       console.error('Error al rechazar crédito:', err);
-      showToast(err.response?.data || 'Error al procesar el rechazo.', 'error');
+      showToast(getErrorMessage(err), 'error');
     }
   };
 
@@ -657,7 +670,7 @@ export const AprobacionCreditos: React.FC = () => {
       handleImprimirPagare(aprobadoCredito);
     } catch (err: any) {
       console.error('Error al aprobar el crédito:', err);
-      showToast(err.response?.data || 'Error al aprobar el crédito.', 'error');
+      showToast(getErrorMessage(err), 'error');
     } finally {
       setIsApproving(false);
     }
@@ -713,9 +726,7 @@ export const AprobacionCreditos: React.FC = () => {
           'El desembolso falló porque el socio no posee una cuenta de ahorros activa para recibir los fondos.'
         );
       } else {
-        setDisburseError(
-          err.response?.data || err.message || 'Error al ejecutar el desembolso.'
-        );
+        setDisburseError(getErrorMessage(err));
       }
       showToast('Error al ejecutar el desembolso.', 'error');
     } finally {
@@ -999,7 +1010,7 @@ export const AprobacionCreditos: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Error buscando socio:', err);
-      setBuscarSocioError(err.response?.data?.message || err.response?.data || 'Error al buscar el socio. Verifique que exista.');
+      setBuscarSocioError(getErrorMessage(err));
     } finally {
       setBuscarSocioLoading(false);
     }
@@ -2092,8 +2103,8 @@ export const AprobacionCreditos: React.FC = () => {
                       <div className="space-y-6 w-full">
                         {/* Membrete */}
                         <div className="text-center space-y-1 w-full">
-                          <h2 className="text-sm font-bold tracking-tight uppercase">COOPERATIVA DE AHORRO Y CRÉDITO ITQ</h2>
-                          <p className="text-[9px] text-slate-500 font-bold">RUC: 1791234567001  |  Dirección Matriz: Av. Antonio de Ulloa N28-30, Quito</p>
+                          <h2 className="text-sm font-bold tracking-tight uppercase">{activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO'}</h2>
+                          <p className="text-[9px] text-slate-500 font-bold">RUC: {activeTenant?.ruc || '1791234567001'}  |  Dirección Matriz: {activeTenant?.address || 'Av. Antonio de Ulloa N28-30, Quito'}</p>
                           <div className="border-b border-double border-slate-350 my-1" />
                           <h3 className="text-xs font-bold uppercase pt-2">PAGARÉ A LA ORDEN</h3>
                           <p className="text-[10px] font-bold">Por USD: {formatCurrency(pagareCredito.montoSolicitado)}</p>
@@ -2101,7 +2112,7 @@ export const AprobacionCreditos: React.FC = () => {
 
                         {/* Texto Legal */}
                         <p className="text-justify text-[10px] leading-relaxed indent-6">
-                          Debo y pagaré incondicionalmente a la orden de la <strong>COOPERATIVA DE AHORRO Y CRÉDITO ITQ</strong>, 
+                          Debo y pagaré incondicionalmente a la orden de la <strong>{activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO'}</strong>, 
                           en esta ciudad o en el lugar que se me requiera, la cantidad de <strong>{formatCurrency(pagareCredito.montoSolicitado)}</strong> 
                           (<strong>{numeroALetras(pagareCredito.montoSolicitado)}</strong>) dólares de los Estados Unidos de América, 
                           reconociendo una tasa de interés del <strong>{pagareCredito.tasaInteresAnual}%</strong> anual. En caso de mora, me 
@@ -2131,7 +2142,7 @@ export const AprobacionCreditos: React.FC = () => {
                               <strong>OFICIAL DE CRÉDITO</strong>
                             </div>
                             <span className="uppercase text-[8px] font-bold">{user?.nombresCompletos || 'Oficial de Crédito'}</span>
-                            <span className="text-[8px] text-slate-400 font-bold">COOP. ITQ</span>
+                            <span className="text-[8px] text-slate-400 font-bold">{(activeTenant?.name || 'COOP').substring(0, 15).toUpperCase()}</span>
                           </div>
                         </div>
 
@@ -2144,8 +2155,8 @@ export const AprobacionCreditos: React.FC = () => {
                       <div className="space-y-6 w-full">
                         {/* Membrete */}
                         <div className="text-center space-y-1 w-full">
-                          <h2 className="text-sm font-bold tracking-tight uppercase">COOPERATIVA DE AHORRO Y CRÉDITO ITQ</h2>
-                          <p className="text-[9px] text-slate-500 font-bold">RUC: 1791234567001  |  Dirección Matriz: Av. Antonio de Ulloa N28-30, Quito</p>
+                          <h2 className="text-sm font-bold tracking-tight uppercase">{activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO'}</h2>
+                          <p className="text-[9px] text-slate-500 font-bold">RUC: {activeTenant?.ruc || '1791234567001'}  |  Dirección Matriz: {activeTenant?.address || 'Av. Antonio de Ulloa N28-30, Quito'}</p>
                           <div className="border-b border-double border-slate-350 my-1" />
                           <h3 className="text-xs font-bold uppercase pt-2">TABLA DE AMORTIZACIÓN</h3>
                           <p className="text-[9px] font-bold text-slate-600 mt-1">

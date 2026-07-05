@@ -639,7 +639,8 @@ export const CreacionSocios: React.FC = () => {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(51, 65, 85);
-    const declaracionText = "Declaro bajo juramento que los fondos y recursos depositados y movilizados en esta institución cooperativa tienen un origen lícito y provienen de las actividades socioeconómicas detalladas en esta ficha. Expresamente manifiesto que no provienen de ninguna actividad relacionada con el lavado de activos, financiamiento del terrorismo u otros delitos tipificados en la Ley de Prevención de Lavado de Activos de la República del Ecuador. Autorizo libre y voluntariamente a la Cooperativa de Ahorro y Crédito ITQ Ltda. a realizar las investigaciones, cruces de bases de datos y reportes de cumplimiento normativo ante la Superintendencia de Economía Popular y Solidaria (SEPS) y la Unidad de Análisis Financiero y Económico (UAFE) que correspondan por ley.";
+    const coopName = activeTenant?.name || "Cooperativa de Ahorro y Crédito";
+    const declaracionText = `Declaro bajo juramento que los fondos y recursos depositados y movilizados en esta institución cooperativa tienen un origen lícito y provienen de las actividades socioeconómicas detalladas en esta ficha. Expresamente manifiesto que no provienen de ninguna actividad relacionada con el lavado de activos, financiamiento del terrorismo u otros delitos tipificados en la Ley de Prevención de Lavado de Activos de la República del Ecuador. Autorizo libre y voluntariamente a la ${coopName} a realizar las investigaciones, cruces de bases de datos y reportes de cumplimiento normativo ante la Superintendencia de Economía Popular y Solidaria (SEPS) y la Unidad de Análisis Financiero y Económico (UAFE) que correspondan por ley.`;
     const splitText = doc.splitTextToSize(declaracionText, pageWidth - 2 * margin);
     doc.text(splitText, margin, currentY);
 
@@ -671,7 +672,7 @@ export const CreacionSocios: React.FC = () => {
     doc.setTextColor(100, 116, 139);
     currentY += 3.5;
     doc.text(`Identificación: ${socio.identificacion}`, xSocio + lineLength/2, currentY, { align: 'center' });
-    doc.text("COOP. AHORRO Y CRÉDITO ITQ", xAsesor + lineLength/2, currentY, { align: 'center' });
+    doc.text(coopName.toUpperCase(), xAsesor + lineLength/2, currentY, { align: 'center' });
 
     currentY += 2.5;
     doc.setFont("helvetica", "bold");
@@ -743,7 +744,8 @@ export const CreacionSocios: React.FC = () => {
     doc.setFontSize(8.5);
     doc.setTextColor(26, 26, 26);
     doc.text("DEUDOR PRINCIPAL", margin + 22, currentY);
-    doc.text("REPRESENTANTE LEGAL COOP ITQ", pageWidth - margin - 58, currentY);
+    const repName = `REPRESENTANTE LEGAL ${(activeTenant?.name || "COOP").toUpperCase()}`;
+    doc.text(repName, pageWidth - margin - 65, currentY);
 
     currentY += 4;
     doc.setFont("helvetica", "normal");
@@ -3647,7 +3649,7 @@ export const CreacionSocios: React.FC = () => {
 
                           {/* 3. Información de Antigüedad (Fecha de Creación) */}
                           <div className="z-10 flex justify-between items-center border-t border-white/10 pt-1.5 mt-1">
-                            <span className="text-[8px] font-medium opacity-50 uppercase">COOP ITQ</span>
+                            <span className="text-[8px] font-medium opacity-50 uppercase">{activeTenant?.name || 'COOP'}</span>
                             <span className="text-[8px] font-medium opacity-50">
                               Apertura: {cta.createdAt ? new Date(cta.createdAt).toLocaleDateString('es-EC') : 'N/A'}
                             </span>

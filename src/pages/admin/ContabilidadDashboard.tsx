@@ -9,7 +9,6 @@ import {
   Calendar, 
   CheckCircle2, 
   AlertCircle, 
-  Filter, 
   Loader2,
   Folder,
   Download,
@@ -28,6 +27,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { drawExecutiveHeader } from '../../utils/pdfGenerators';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -616,7 +616,8 @@ export const ContabilidadDashboard: React.FC = () => {
     doc.setFontSize(7);
     doc.setTextColor(180, 180, 180);
     doc.text('Este documento contable ha sido emitido de manera electrónica y es inmutable por auditoría de la SEPS.', 15, pageHeight - 12);
-    doc.text('Cooperativa de Ahorro y Crédito ITQ | Licencia Corporativa.', 15, pageHeight - 8);
+    const footerLic = `${activeTenant?.name || 'Cooperativa de Ahorro y Crédito'} | Licencia Corporativa.`;
+    doc.text(footerLic, 15, pageHeight - 8);
     doc.text(`Pág. 1 de 1`, 195, pageHeight - 8, { align: 'right' });
 
     // Trigger download
@@ -780,35 +781,19 @@ export const ContabilidadDashboard: React.FC = () => {
     const primaryColor = [0, 84, 166]; // #0054A6
     const secondaryColor = [71, 85, 105]; // Slate
 
-    // 1. Cabecera Institucional
-    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(0, 0, 210, 8, 'F');
+    // 1. Cabecera Ejecutiva Estándar
+    const currentY = drawExecutiveHeader(doc, activeTenant, 15);
 
-    let textX = 15;
-    if (activeTenant?.logoBase64) {
-      let imgType = 'PNG';
-      if (activeTenant.logoBase64.startsWith('data:image/jpeg')) imgType = 'JPEG';
-      doc.addImage(activeTenant.logoBase64, imgType, 15, 12, 22, 22, undefined, 'FAST');
-      textX = 42;
-    }
-
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setTextColor(15, 23, 42); // slate-900
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text(activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO', textX, 20);
-
-    doc.setFontSize(10);
-    doc.text('ESTADO DE RESULTADOS (PÉRDIDAS Y GANANCIAS)', textX, 25);
+    doc.setFontSize(11);
+    doc.text('ESTADO DE RESULTADOS (PÉRDIDAS Y GANANCIAS)', 15, currentY);
 
     doc.setFontSize(8.5);
     doc.setFont('Helvetica', 'normal');
-    doc.setTextColor(120, 120, 120);
-    doc.text(`PERIODO: DESDE ${fechaDesdeResultados} HASTA ${fechaHastaResultados}`, textX, 30);
-    doc.text('MONEDA: DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA (USD)', textX, 34);
-
-    doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.5);
-    doc.line(15, 38, 195, 38);
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text(`PERIODO: DESDE ${fechaDesdeResultados} HASTA ${fechaHastaResultados}`, 15, currentY + 5);
+    doc.text('MONEDA: DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA (USD)', 15, currentY + 9);
 
     // Track group accounts to style them dynamically
     const groupAccounts = new Set<string>();
@@ -867,7 +852,7 @@ export const ContabilidadDashboard: React.FC = () => {
     ]);
 
     autoTable(doc, {
-      startY: 42,
+      startY: currentY + 14,
       head: tableHeaders,
       body: tableRows,
       margin: { left: 15, right: 15 },
@@ -949,7 +934,8 @@ export const ContabilidadDashboard: React.FC = () => {
     doc.setFontSize(7);
     doc.setTextColor(180, 180, 180);
     doc.text('Este documento contable ha sido emitido de manera electrónica y es inmutable por auditoría de la SEPS.', 15, pageHeight - 12);
-    doc.text('Cooperativa de Ahorro y Crédito ITQ | Licencia Corporativa.', 15, pageHeight - 8);
+    const footerLic = `${activeTenant?.name || 'Cooperativa de Ahorro y Crédito'} | Licencia Corporativa.`;
+    doc.text(footerLic, 15, pageHeight - 8);
     doc.text(`Pág. 1 de 1`, 195, pageHeight - 8, { align: 'right' });
 
     doc.save(`estado_resultados_${fechaDesdeResultados}_${fechaHastaResultados}.pdf`);
@@ -972,35 +958,19 @@ export const ContabilidadDashboard: React.FC = () => {
     const primaryColor = [0, 84, 166]; // #0054A6
     const secondaryColor = [71, 85, 105]; // Slate
 
-    // 1. Cabecera
-    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(0, 0, 210, 8, 'F');
+    // 1. Cabecera Ejecutiva Estándar
+    const currentY = drawExecutiveHeader(doc, activeTenant, 15);
 
-    let textX = 15;
-    if (activeTenant?.logoBase64) {
-      let imgType = 'PNG';
-      if (activeTenant.logoBase64.startsWith('data:image/jpeg')) imgType = 'JPEG';
-      doc.addImage(activeTenant.logoBase64, imgType, 15, 12, 22, 22, undefined, 'FAST');
-      textX = 42;
-    }
-
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setTextColor(15, 23, 42); // slate-900
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text(activeTenant?.name?.toUpperCase() || 'COOPERATIVA DE AHORRO Y CRÉDITO', textX, 20);
-
-    doc.setFontSize(10);
-    doc.text('BALANCE GENERAL (ESTADO DE SITUACIÓN FINANCIERA)', textX, 25);
+    doc.setFontSize(11);
+    doc.text('BALANCE GENERAL (ESTADO DE SITUACIÓN FINANCIERA)', 15, currentY);
 
     doc.setFontSize(8.5);
     doc.setFont('Helvetica', 'normal');
-    doc.setTextColor(120, 120, 120);
-    doc.text(`FECHA DE CORTE: ${fechaCorteBalance}`, textX, 30);
-    doc.text('MONEDA: DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA (USD)', textX, 34);
-
-    doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.5);
-    doc.line(15, 38, 195, 38);
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text(`FECHA DE CORTE: ${fechaCorteBalance}`, 15, currentY + 5);
+    doc.text('MONEDA: DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA (USD)', 15, currentY + 9);
 
     // Track group accounts to style them dynamically
     const groupAccounts = new Set<string>();
@@ -1027,7 +997,8 @@ export const ContabilidadDashboard: React.FC = () => {
           `${pct.toFixed(1)}%`
         ]);
       });
-    tableRows.push(['', 'TOTAL ACTIVOS', `$ ${balanceData.totalActivos.toFixed(2)}`, '100.0%']);
+    const totalActivosPct = (balanceData.totalActivos / totalActivos) * 100;
+    tableRows.push(['', 'TOTAL ACTIVOS', `$ ${balanceData.totalActivos.toFixed(2)}`, `${totalActivosPct.toFixed(1)}%`]);
 
     // Pasivos Section
     tableRows.push(['', '', '', '']); // spacing
@@ -1080,7 +1051,7 @@ export const ContabilidadDashboard: React.FC = () => {
     ]);
 
     autoTable(doc, {
-      startY: 42,
+      startY: currentY + 14,
       head: tableHeaders,
       body: tableRows,
       margin: { left: 15, right: 15 },
@@ -1164,7 +1135,8 @@ export const ContabilidadDashboard: React.FC = () => {
     doc.setFontSize(7);
     doc.setTextColor(180, 180, 180);
     doc.text('Este documento contable ha sido emitido de manera electrónica y es inmutable por auditoría de la SEPS.', 15, pageHeight - 12);
-    doc.text('Cooperativa de Ahorro y Crédito ITQ | Licencia Corporativa.', 15, pageHeight - 8);
+    const footerLic = `${activeTenant?.name || 'Cooperativa de Ahorro y Crédito'} | Licencia Corporativa.`;
+    doc.text(footerLic, 15, pageHeight - 8);
     doc.text(`Pág. 1 de 1`, 195, pageHeight - 8, { align: 'right' });
 
     doc.save(`balance_general_${fechaCorteBalance}.pdf`);
@@ -1670,7 +1642,7 @@ export const ContabilidadDashboard: React.FC = () => {
                 disabled={loadingDiario}
                 className="bg-[#0054A6] hover:bg-[#004080] text-white font-bold h-10.5 px-5 rounded-2xl text-xs cursor-pointer shadow-sm flex items-center gap-1.5 shrink-0"
               >
-                {loadingDiario ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Filter className="h-3.5 w-3.5" />}
+                {loadingDiario ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
                 Filtrar Diario
               </Button>
             </div>
@@ -1962,7 +1934,7 @@ export const ContabilidadDashboard: React.FC = () => {
                   disabled={loadingMayor || !cuentaMayorSeleccionada}
                   className="bg-[#0054A6] hover:bg-[#004080] text-white font-bold h-10.5 flex-1 rounded-2xl text-xs cursor-pointer shadow-sm flex items-center justify-center gap-1.5"
                 >
-                  {loadingMayor ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Filter className="h-3.5 w-3.5" />}
+                  {loadingMayor ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
                   Consultar
                 </Button>
                 

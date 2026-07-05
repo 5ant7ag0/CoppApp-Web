@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import { Select } from '../../components/ui/select';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Lock, User, ShieldAlert, ArrowRight, Loader2, UserPlus, Shield } from 'lucide-react';
 
 export const Login: React.FC = () => {
@@ -164,20 +164,51 @@ export const Login: React.FC = () => {
           })()}
 
           {/* Selector de Canal / Rol */}
-          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="bg-slate-100/80 p-1 rounded-xl">
-              <TabsTrigger value="socio" className="text-xs flex items-center justify-center gap-1.5 py-2">
+          {/* Selector de Canal / Rol */}
+          <div className="grid grid-cols-2 p-1 bg-[#F1F3F6] border border-slate-100/50 rounded-2xl gap-1">
+            <button
+              type="button"
+              onClick={() => handleTabChange('socio')}
+              className="relative py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-slate-500 hover:text-slate-800 flex items-center justify-center gap-1.5"
+            >
+              {activeTab === 'socio' && (
+                <motion.div
+                  layoutId="activeTabIndicatorLogin"
+                  className="absolute inset-0 bg-[#0054A6] rounded-xl shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <span className={`relative z-10 flex items-center gap-1.5 transition-colors duration-300 ${
+                activeTab === 'socio' ? 'text-white font-extrabold' : 'text-slate-500'
+              }`}>
                 <User className="h-4 w-4" />
                 <span>Socio</span>
-              </TabsTrigger>
-              <TabsTrigger value="admin" className="text-xs flex items-center justify-center gap-1.5 py-2">
+              </span>
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => handleTabChange('admin')}
+              className="relative py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-slate-500 hover:text-slate-800 flex items-center justify-center gap-1.5"
+            >
+              {activeTab === 'admin' && (
+                <motion.div
+                  layoutId="activeTabIndicatorLogin"
+                  className="absolute inset-0 bg-[#0054A6] rounded-xl shadow-[0_4px_12px_rgba(0,84,166,0.15)]"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <span className={`relative z-10 flex items-center gap-1.5 transition-colors duration-300 ${
+                activeTab === 'admin' ? 'text-white font-extrabold' : 'text-slate-500'
+              }`}>
                 <Shield className="h-4 w-4" />
                 <span>Funcionario</span>
-              </TabsTrigger>
-            </TabsList>
+              </span>
+            </button>
+          </div>
 
-            {/* Inputs de Credenciales */}
-            <div className="mt-6 space-y-5">
+          {/* Inputs de Credenciales */}
+          <div className="mt-6 space-y-5">
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold text-slate-500/70 tracking-wider uppercase pl-0">
                   {activeTab === 'socio' ? 'CÉDULA / IDENTIFICACIÓN' : 'USUARIO'}
@@ -233,7 +264,6 @@ export const Login: React.FC = () => {
                 )}
               </div>
             </div>
-          </Tabs>
 
           {/* Botón de Enviar o Acción de Recuperación (Manejador de Bloqueo) */}
           <div className="pt-2">

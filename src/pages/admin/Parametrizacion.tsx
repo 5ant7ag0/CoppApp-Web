@@ -199,6 +199,18 @@ const estadoKeyMap: Record<string, string> = {
   "Inactivo": "INACTIVO"
 };
 
+const getErrorMessage = (err: any): string => {
+  if (err.response?.data) {
+    if (typeof err.response.data === 'object' && err.response.data.message) {
+      return err.response.data.message;
+    }
+    if (typeof err.response.data === 'string') {
+      return err.response.data;
+    }
+  }
+  return err.message || 'Error desconocido';
+};
+
 export const Parametrizacion: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'institucional' | 'financiero' | 'contabilidad' | 'auditoria' | 'ahorro_productos' | 'credito_productos' | 'cajas_financieras'>('institucional');
   const [settings, setSettings] = useState<CompanySettings | null>(null);
@@ -317,7 +329,7 @@ export const Parametrizacion: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err);
-      setErrorMsg('Error al cargar la parametrización gerencial: ' + (err.response?.data || err.message));
+      setErrorMsg('Error al cargar la parametrización gerencial: ' + getErrorMessage(err));
     }
   };
 
@@ -362,7 +374,7 @@ export const Parametrizacion: React.FC = () => {
       setProductos(res.data || []);
     } catch (err: any) {
       console.error('Error fetching productos:', err);
-      setErrorMsg('Error al cargar catálogo de productos: ' + (err.response?.data || err.message));
+      setErrorMsg('Error al cargar catálogo de productos: ' + getErrorMessage(err));
     } finally {
       setLoadingProductos(false);
     }
@@ -385,7 +397,7 @@ export const Parametrizacion: React.FC = () => {
       setAgencias(agenciasRes.data || []);
     } catch (err: any) {
       console.error('Error fetching cajas/agencias:', err);
-      setErrorMsg('Error al cargar catálogo de cajas y agencias: ' + (err.response?.data || err.message));
+      setErrorMsg('Error al cargar catálogo de cajas y agencias: ' + getErrorMessage(err));
     } finally {
       setLoadingCajas(false);
     }
@@ -575,7 +587,7 @@ export const Parametrizacion: React.FC = () => {
       fetchProductos();
     } catch (err: any) {
       console.error(err);
-      alert('Error al guardar producto: ' + (err.response?.data || err.message));
+      alert('Error al guardar producto: ' + getErrorMessage(err));
     }
   };
 
@@ -589,7 +601,7 @@ export const Parametrizacion: React.FC = () => {
       fetchProductos();
     } catch (err: any) {
       console.error(err);
-      setErrorMsg('Error al inactivar producto: ' + (err.response?.data || err.message));
+      setErrorMsg('Error al inactivar producto: ' + getErrorMessage(err));
     }
   };
   const fetchProductosCredito = async () => {
@@ -599,7 +611,7 @@ export const Parametrizacion: React.FC = () => {
       setProductosCredito(res.data || []);
     } catch (err: any) {
       console.error('Error fetching productos credito:', err);
-      setErrorMsg('Error al cargar catálogo de productos de crédito: ' + (err.response?.data || err.message));
+      setErrorMsg('Error al cargar catálogo de productos de crédito: ' + getErrorMessage(err));
     } finally {
       setLoadingProductosCredito(false);
     }
@@ -705,7 +717,7 @@ export const Parametrizacion: React.FC = () => {
       fetchProductosCredito();
     } catch (err: any) {
       console.error(err);
-      alert('Error al guardar producto de crédito: ' + (err.response?.data || err.message));
+      alert('Error al guardar producto de crédito: ' + getErrorMessage(err));
     }
   };
   // Validaciones en tiempo real
@@ -952,7 +964,7 @@ export const Parametrizacion: React.FC = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       console.error(err);
-      setErrorMsg('Error al guardar cambios: ' + (err.response?.data || err.message));
+      setErrorMsg('Error al guardar cambios: ' + getErrorMessage(err));
     } finally {
       setSaving(false);
     }

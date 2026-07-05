@@ -130,7 +130,7 @@ export const AdminLayout: React.FC = () => {
                     }
                   >
                     <Users className="h-5 w-5 shrink-0" />
-                    <span>{user?.rol === 'CONTADOR' ? 'Socios (Consulta)' : 'Socios'}</span>
+                    <span>Socios</span>
                   </Link>
                 )}
                 {(user?.rol === 'OFICIAL_DE_CREDITO' || user?.rol === 'CONTADOR' || user?.rol === 'GERENTE_GENERAL' || user?.rol === 'SUPER_ADMIN_SAAS' || user?.rol === 'ADMINISTRADOR') && (
@@ -143,7 +143,7 @@ export const AdminLayout: React.FC = () => {
                     }
                   >
                     <CreditCard className="h-5 w-5 shrink-0" />
-                    <span>{user?.rol === 'CONTADOR' ? 'Créditos (Consulta)' : 'Créditos'}</span>
+                    <span>Créditos</span>
                   </Link>
                 )}
                 {user?.rol === 'CAJERO' && (

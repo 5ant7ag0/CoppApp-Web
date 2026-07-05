@@ -54,7 +54,10 @@ export const TenantModal360: React.FC<TenantModal360Props> = ({ tenantId, onClos
       onUpdate();
     } catch (err: any) {
       console.error(err);
-      setStatusMessage({ type: 'error', text: err.response?.data || 'Error al actualizar cuotas' });
+      const errorText = typeof err.response?.data === 'string' 
+        ? err.response.data 
+        : (err.response?.data?.message || err.message || 'Error al actualizar cuotas');
+      setStatusMessage({ type: 'error', text: errorText });
       setTimeout(() => setStatusMessage(null), 5000);
     } finally {
       setSaving(false);
@@ -67,11 +70,15 @@ export const TenantModal360: React.FC<TenantModal360Props> = ({ tenantId, onClos
     try {
       setSaving(true);
       const res = await api.post(`/superadmin/tenants/${tenantId}/reset-manager`);
-      setStatusMessage({ type: 'success', text: res.data });
+      const successText = typeof res.data === 'string' ? res.data : (res.data?.message || 'Enlace de acceso enviado correctamente.');
+      setStatusMessage({ type: 'success', text: successText });
       setTimeout(() => setStatusMessage(null), 6000);
     } catch (err: any) {
       console.error(err);
-      setStatusMessage({ type: 'error', text: err.response?.data || 'Error al resetear contraseña' });
+      const errorText = typeof err.response?.data === 'string' 
+        ? err.response.data 
+        : (err.response?.data?.message || err.message || 'Error al resetear contraseña');
+      setStatusMessage({ type: 'error', text: errorText });
       setTimeout(() => setStatusMessage(null), 5000);
     } finally {
       setSaving(false);
@@ -84,7 +91,8 @@ export const TenantModal360: React.FC<TenantModal360Props> = ({ tenantId, onClos
     try {
       setSaving(true);
       const res = await api.post(`/superadmin/tenants/${tenantId}/suspend`);
-      setStatusMessage({ type: 'success', text: res.data || 'Cooperativa suspendida exitosamente.' });
+      const successText = typeof res.data === 'string' ? res.data : (res.data?.message || 'Cooperativa suspendida exitosamente.');
+      setStatusMessage({ type: 'success', text: successText });
       setIsConfirmingSuspension(false);
       setSuspensionInput('');
       setTimeout(() => setStatusMessage(null), 5000);
@@ -92,7 +100,10 @@ export const TenantModal360: React.FC<TenantModal360Props> = ({ tenantId, onClos
       onUpdate();
     } catch (err: any) {
       console.error(err);
-      setStatusMessage({ type: 'error', text: err.response?.data || 'Error al suspender operaciones.' });
+      const errorText = typeof err.response?.data === 'string' 
+        ? err.response.data 
+        : (err.response?.data?.message || err.message || 'Error al suspender operaciones.');
+      setStatusMessage({ type: 'error', text: errorText });
       setTimeout(() => setStatusMessage(null), 5000);
     } finally {
       setSaving(false);
@@ -105,13 +116,17 @@ export const TenantModal360: React.FC<TenantModal360Props> = ({ tenantId, onClos
     try {
       setSaving(true);
       const res = await api.post(`/superadmin/tenants/${tenantId}/reactivate`);
-      setStatusMessage({ type: 'success', text: res.data || 'Cooperativa reactivada exitosamente.' });
+      const successText = typeof res.data === 'string' ? res.data : (res.data?.message || 'Cooperativa reactivada exitosamente.');
+      setStatusMessage({ type: 'success', text: successText });
       setTimeout(() => setStatusMessage(null), 5000);
       fetchTenantDetails();
       onUpdate();
     } catch (err: any) {
       console.error(err);
-      setStatusMessage({ type: 'error', text: err.response?.data || 'Error al reactivar operaciones.' });
+      const errorText = typeof err.response?.data === 'string' 
+        ? err.response.data 
+        : (err.response?.data?.message || err.message || 'Error al reactivar operaciones.');
+      setStatusMessage({ type: 'error', text: errorText });
       setTimeout(() => setStatusMessage(null), 5000);
     } finally {
       setSaving(false);

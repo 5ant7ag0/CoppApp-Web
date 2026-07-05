@@ -79,6 +79,18 @@ interface LogAuditoria {
   valorNuevo?: any;
 }
 
+const getErrorMessage = (err: any): string => {
+  if (err.response?.data) {
+    if (typeof err.response.data === 'object' && err.response.data.message) {
+      return err.response.data.message;
+    }
+    if (typeof err.response.data === 'string') {
+      return err.response.data;
+    }
+  }
+  return err.message || 'Error desconocido';
+};
+
 export const GestionEquipo: React.FC = () => {
   // Listas y Catálogos
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
@@ -160,7 +172,7 @@ export const GestionEquipo: React.FC = () => {
       setCajas(resCajas.data || []);
     } catch (err: any) {
       console.error(err);
-      setErrorGeneral(err.response?.data || 'Error al conectar con el servidor.');
+      setErrorGeneral(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -328,7 +340,7 @@ export const GestionEquipo: React.FC = () => {
         setEstado(nuevoEstado);
       }
     } catch (err: any) {
-      alert(err.response?.data || 'Error al modificar el estado del usuario.');
+      alert(getErrorMessage(err));
     }
   };
 
@@ -430,7 +442,7 @@ export const GestionEquipo: React.FC = () => {
       }, 1000);
     } catch (err: any) {
       console.error(err);
-      setSubmitError(err.response?.data || 'Error al guardar el registro. Verifique duplicidad de datos.');
+      setSubmitError(getErrorMessage(err));
     }
   };
 

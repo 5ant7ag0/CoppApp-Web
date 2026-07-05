@@ -34,56 +34,45 @@ interface Contact {
   textColor: string;
 }
 
-const FREQUENT_CONTACTS: Contact[] = [
-  {
-    name: 'Carlos Perez',
-    accountNo: '401012000001',
-    email: 'cperez@gmail.com.com',
-    type: 'Transferencia Interna',
-    avatarColor: 'bg-blue-50',
-    textColor: 'text-[#0054A6]',
-  },
-  {
-    name: 'Juan Pueblo Ortega',
-    accountNo: '0201000001',
-    email: 'juan.pueblo@hotmail.com',
-    type: 'Transferencia Interna',
-    avatarColor: 'bg-emerald-50',
-    textColor: 'text-emerald-600',
-  },
-  {
-    name: 'María Belén Espinosa',
-    accountNo: '401010000002',
-    email: 'mbelen@espinosa.com',
-    type: 'Transferencia Interna',
-    avatarColor: 'bg-purple-50',
-    textColor: 'text-purple-600',
-  }
-];
-
 export const Transferencias: React.FC = () => {
   const { user } = useAuth();
   const { activeTenant } = useTenant();
+
+  // Dynamic localStorage key for contacts isolated per user
+  const storageKey = user ? `coop_contacts_${user.username}` : 'coop_contacts';
 
   // Accounts states
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | ''>('');
   const [isSelectOpen, setIsSelectOpen] = useState(false);
   
-  // Contacts list state loaded from localStorage (defaulting to initial list)
+  // Contacts list state loaded from localStorage (defaulting to empty list)
   const [contacts, setContacts] = useState<Contact[]>(() => {
-    const local = localStorage.getItem('coop_contacts');
+    const local = localStorage.getItem(storageKey);
     if (local) {
       try {
         return JSON.parse(local);
       } catch {
-        return FREQUENT_CONTACTS;
+        return [];
       }
     }
-    // Initialize localStorage with defaults
-    localStorage.setItem('coop_contacts', JSON.stringify(FREQUENT_CONTACTS));
-    return FREQUENT_CONTACTS;
+    return [];
   });
+
+  useEffect(() => {
+    if (user) {
+      const local = localStorage.getItem(storageKey);
+      if (local) {
+        try {
+          setContacts(JSON.parse(local));
+        } catch {
+          setContacts([]);
+        }
+      } else {
+        setContacts([]);
+      }
+    }
+  }, [user, storageKey]);
 
   const handleSaveContact = (name: string, accountNo: string) => {
     if (contacts.some(c => c.accountNo === accountNo)) return;
@@ -108,7 +97,7 @@ export const Transferencias: React.FC = () => {
     };
     const updated = [...contacts, newContact];
     setContacts(updated);
-    localStorage.setItem('coop_contacts', JSON.stringify(updated));
+    localStorage.setItem(storageKey, JSON.stringify(updated));
   };
   
   // Tabs state

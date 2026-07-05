@@ -189,6 +189,18 @@ const CedulaPosteriorMockup: React.FC<{ cedula: string }> = ({ cedula }) => {
   );
 };
 
+const getErrorMessage = (err: any): string => {
+  if (err.response?.data) {
+    if (typeof err.response.data === 'object' && err.response.data.message) {
+      return err.response.data.message;
+    }
+    if (typeof err.response.data === 'string') {
+      return err.response.data;
+    }
+  }
+  return err.message || 'Error desconocido';
+};
+
 export const CajaVentanilla: React.FC = () => {
   const { user } = useAuth();
   const { activeTenant } = useTenant();
@@ -458,7 +470,7 @@ export const CajaVentanilla: React.FC = () => {
       window.dispatchEvent(new CustomEvent('caja-updated'));
     } catch (err: any) {
       console.error('Error aperturando caja:', err);
-      setAperturaError(err.response?.data || 'No se pudo aperturar la caja. Inténtalo de nuevo.');
+      setAperturaError(getErrorMessage(err));
     } finally {
       setAperturaLoading(false);
     }
@@ -487,7 +499,7 @@ export const CajaVentanilla: React.FC = () => {
       window.dispatchEvent(new CustomEvent('caja-updated'));
     } catch (err: any) {
       console.error('Error cerrando caja:', err);
-      setCierreError(err.response?.data || 'No se pudo procesar el arqueo de caja.');
+      setCierreError(getErrorMessage(err));
     } finally {
       setCierreLoading(false);
     }
@@ -579,7 +591,7 @@ export const CajaVentanilla: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Error buscando socio para caja:', err);
-      setBusquedaError(err.response?.data || 'No se encontró ninguna cuenta o socio con el valor provisto.');
+      setBusquedaError(getErrorMessage(err));
     } finally {
       setBuscandoSocio(false);
     }
@@ -796,7 +808,7 @@ export const CajaVentanilla: React.FC = () => {
       window.dispatchEvent(new CustomEvent('caja-updated'));
     } catch (err: any) {
       console.error('Error procesando transacción:', err);
-      setTxError(err.response?.data || 'Error interno del servidor al procesar la operación.');
+      setTxError(getErrorMessage(err));
       setConfirmTxData(null);
     } finally {
       setProcesandoTx(false);
@@ -927,7 +939,7 @@ export const CajaVentanilla: React.FC = () => {
       window.dispatchEvent(new CustomEvent('caja-updated'));
     } catch (err: any) {
       console.error('Error anulando transacción:', err);
-      setAnulacionError(err.response?.data || 'No se pudo anular la transacción. Verifique la clave.');
+      setAnulacionError(getErrorMessage(err));
     } finally {
       setAnulandoTx(false);
     }

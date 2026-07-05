@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
-import { KeyRound, ShieldAlert, ArrowRight, Loader2, CheckCircle2, User, Key } from 'lucide-react';
+import { KeyRound, ShieldAlert, ArrowRight, Loader2, CheckCircle2, User } from 'lucide-react';
 
 export const EstablecerPassword: React.FC = () => {
   const navigate = useNavigate();
@@ -97,23 +97,6 @@ export const EstablecerPassword: React.FC = () => {
                     required
                     disabled
                     value={identificacion}
-                    className="h-11 bg-slate-100 border border-slate-200 text-slate-500 rounded-xl pl-9.5 cursor-not-allowed"
-                  />
-                </div>
-              </div>
-
-              {/* Token de Activación (Bloqueado) */}
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-bold text-slate-450 tracking-wider uppercase pl-1">
-                  Token de Activación
-                </label>
-                <div className="relative">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
-                    type="text"
-                    required
-                    disabled
-                    value={token}
                     className="h-11 bg-slate-100 border border-slate-200 text-slate-500 rounded-xl pl-9.5 cursor-not-allowed"
                   />
                 </div>

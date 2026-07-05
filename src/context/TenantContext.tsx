@@ -41,14 +41,27 @@ interface TenantProviderProps {
 
 export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
   const [activeTenant, setActiveTenant] = useState<Cooperativa | null>(null);
+  const [cooperativasList, setCooperativasList] = useState<Cooperativa[]>(COOPERATIVAS);
 
   useEffect(() => {
     const initTenant = async () => {
+      // 1. Fetch dynamic tenants first to have the latest list
+      let latestList = COOPERATIVAS;
+      try {
+        const tenantsRes = await api.get('/auth/tenants');
+        if (tenantsRes.data && Array.isArray(tenantsRes.data) && tenantsRes.data.length > 0) {
+          latestList = tenantsRes.data;
+          setCooperativasList(tenantsRes.data);
+        }
+      } catch (err) {
+        console.warn('Could not load dynamic public tenants, falling back to static list.', err);
+      }
+
       const savedTenantId = localStorage.getItem('coop_tenant_id');
-      let baseTenant = COOPERATIVAS[0];
+      let baseTenant = latestList[0];
       if (savedTenantId) {
         const id = parseInt(savedTenantId, 10);
-        const found = COOPERATIVAS.find(c => c.id === id);
+        const found = latestList.find(c => c.id === id);
         if (found) baseTenant = { ...found };
       }
 
@@ -114,7 +127,7 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
   }, []);
 
   const changeTenant = (id: number) => {
-    const found = COOPERATIVAS.find(c => c.id === id);
+    const found = cooperativasList.find(c => c.id === id);
     if (found) {
       setActiveTenant(found);
       localStorage.setItem('coop_tenant_id', id.toString());
@@ -122,7 +135,7 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
   };
 
   return (
-    <TenantContext.Provider value={{ activeTenant, changeTenant, cooperativas: COOPERATIVAS }}>
+    <TenantContext.Provider value={{ activeTenant, changeTenant, cooperativas: cooperativasList }}>
       {children}
     </TenantContext.Provider>
   );
