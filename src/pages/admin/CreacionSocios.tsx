@@ -13,7 +13,7 @@ import {
   Plus, ArrowRight, ArrowLeft, Check, Loader2, Users,
   Mail, Phone, Calendar, Heart, Search, Printer, X, Pencil, Eye,
   CreditCard, ArrowRightLeft, Copy, Download, Lock,
-  FolderOpen, IdCard, Activity, MinusCircle, ShieldCheck
+  FolderOpen, IdCard, Activity, MinusCircle, ShieldCheck, KeyRound
 } from 'lucide-react';
 import { useTenant } from '../../context/TenantContext';
 import { drawExecutiveHeader, generarPdfTablaAmortizacionUniversal } from '../../utils/pdfGenerators';
@@ -128,6 +128,9 @@ export const CreacionSocios: React.FC = () => {
   const [editEstadoCivil, setEditEstadoCivil] = useState<string>('SOLTERO');
   const [editProfesion, setEditProfesion] = useState<string>('');
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+
+  const [resetLoading, setResetLoading] = useState<boolean>(false);
+  const [resetSuccess, setResetSuccess] = useState<string>('');
 
   // Estados para Navegación 360 y Módulo de Apertura de Cuentas / Créditos
   const [activeDetailTab, setActiveDetailTab] = useState<'perfil' | 'cuentas' | 'creditos' | 'transacciones'>('perfil');
@@ -391,6 +394,20 @@ export const CreacionSocios: React.FC = () => {
       newBens[index] = { ...newBens[index], [key]: value };
     }
     setBeneficiarios(newBens);
+  };
+
+  const handleEnviarRestablecimiento = async (id: number) => {
+    setResetLoading(true);
+    setResetSuccess('');
+    try {
+      const { data } = await api.post(`/socios/${id}/enviar-restablecimiento`);
+      setResetSuccess(data?.message || 'Enlace de restablecimiento enviado correctamente al socio.');
+      setTimeout(() => setResetSuccess(''), 5000);
+    } catch (err: any) {
+      alert(err.response?.data || 'Error al enviar el enlace de restablecimiento.');
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   // Cargar lista de socios (Pestaña 2)
@@ -2880,10 +2897,14 @@ export const CreacionSocios: React.FC = () => {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
                   
-                  {/* Bloque 1: Datos de Identidad */}
-                  <div className="md:col-span-4 space-y-4 bg-slate-50/30 p-4 border border-slate-100 rounded-2xl">
+                  {/* Columna Izquierda: Identidad, Contacto y Botón */}
+                  <div className="md:col-span-8 flex flex-col gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+                      
+                      {/* Bloque 1: Datos de Identidad */}
+                      <div className="h-full flex flex-col space-y-4 bg-slate-50/30 p-4 border border-slate-100 rounded-2xl">
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1 flex items-center gap-1.5">
                       <User className="h-3.5 w-3.5 text-slate-400" />
                       Datos de Identidad
@@ -2975,8 +2996,8 @@ export const CreacionSocios: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Bloque 2: Datos de Contacto */}
-                  <div className="md:col-span-4 space-y-4 bg-slate-50/30 p-4 border border-slate-100 rounded-2xl">
+                      {/* Bloque 2: Datos de Contacto */}
+                      <div className="h-full flex flex-col space-y-4 bg-slate-50/30 p-4 border border-slate-100 rounded-2xl">
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1 flex items-center gap-1.5">
                       <Mail className="h-3.5 w-3.5 text-slate-400" />
                       Datos de Contacto
@@ -3036,6 +3057,33 @@ export const CreacionSocios: React.FC = () => {
                         )}
                         {editErrors.direccion && <span className="text-[9px] text-rose-500 font-bold block">{editErrors.direccion}</span>}
                       </div>
+                    </div>
+                  </div>
+                </div>
+                    
+                    {/* Botón Restablecer Contraseña (Bajo las dos tarjetas, sin bordes) */}
+                    <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
+                      <button
+                        onClick={() => handleEnviarRestablecimiento(selectedSocio.id)}
+                        disabled={resetLoading}
+                        className="shrink-0 w-full sm:w-auto flex justify-center items-center gap-2 bg-[#0054A6] hover:bg-[#004080] text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-[#0054A6]/15 hover:shadow-lg hover:shadow-[#0054A6]/25 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:active:scale-100"
+                      >
+                        {resetLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <KeyRound className="w-4 h-4" />
+                        )}
+                        Restablecer Contraseña
+                      </button>
+                      
+                      {resetSuccess && (
+                        <div className="flex-1 w-full sm:w-auto flex items-center gap-2.5 px-4 py-2 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-700 animate-in fade-in slide-in-from-left-4 duration-500">
+                          <div className="bg-emerald-100/80 rounded-full p-1 shrink-0">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          </div>
+                          <span className="text-xs font-bold">{resetSuccess}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

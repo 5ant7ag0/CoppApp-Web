@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from './ui/card';
 import { Input } from './ui/input';
@@ -6,6 +7,7 @@ import { Button } from './ui/button';
 import { Shield, User, Lock, ArrowRight, Loader2, UserPlus, LockOpen } from 'lucide-react';
 
 export const LoginScreen: React.FC = () => {
+  const navigate = useNavigate();
   const { login, error, clearError } = useAuth();
   
   const [username, setUsername] = useState('');
@@ -197,6 +199,7 @@ export const LoginScreen: React.FC = () => {
                 {/* Desbloquear usuario card-button */}
                 <button
                   type="button"
+                  onClick={() => navigate('/recuperar-clave-socio')}
                   className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-left shadow-sm transition-all hover:border-[#0054A6] hover:shadow-md active:scale-[0.98]"
                 >
                   <LockOpen className="h-6 w-6 flex-shrink-0 text-neutral-500" strokeWidth={1.6} />

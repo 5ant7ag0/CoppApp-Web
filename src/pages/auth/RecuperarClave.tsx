@@ -1,23 +1,28 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
-import { Select } from '../../components/ui/select';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
-import { KeyRound, ShieldAlert, ArrowRight, Loader2, Mail, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { KeyRound, ShieldAlert, ArrowRight, Loader2, Mail, CheckCircle2, ArrowLeft, X } from 'lucide-react';
 
 export const RecuperarClave: React.FC = () => {
   const navigate = useNavigate();
 
   const [step, setStep] = useState<number>(1);
+  const [showOtpModal, setShowOtpModal] = useState<boolean>(false);
   const [identificacion, setIdentificacion] = useState<string>('');
-  const [canal, setCanal] = useState<string>('CORREO');
+  const [canal] = useState<string>('CORREO');
+  const [correoEnmascarado, setCorreoEnmascarado] = useState<string>('');
   
   const [token, setToken] = useState<string>('');
   const [passwordNueva, setPasswordNueva] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isOtpLoading, setIsOtpLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [otpError, setOtpError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const handleRequestToken = async (e: React.FormEvent) => {
@@ -28,8 +33,10 @@ export const RecuperarClave: React.FC = () => {
     setError(null);
 
     try {
-      await api.post('/auth/recuperar/solicitar', { identificacion, canal });
-      setStep(2);
+      const { data } = await api.post('/auth/recuperar/solicitar', { identificacion, canal });
+      setCorreoEnmascarado(data.correoEnmascarado || '');
+      setToken('');
+      setShowOtpModal(true);
     } catch (err: any) {
       let msg = 'Error al solicitar el código de recuperación.';
       if (err.response && err.response.data) {
@@ -41,9 +48,38 @@ export const RecuperarClave: React.FC = () => {
     }
   };
 
+  const handleOtpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (token.length !== 6) {
+      setOtpError('El código OTP debe tener 6 dígitos.');
+      return;
+    }
+    setOtpError(null);
+    setIsOtpLoading(true);
+    try {
+      await api.post('/auth/recuperar/validar-token', {
+        identificacion,
+        token
+      });
+      setShowOtpModal(false);
+      setStep(2);
+    } catch (err: any) {
+      let msg = 'Código OTP incorrecto o expirado.';
+      if (err.response && err.response.data) {
+        msg = typeof err.response.data === 'string' ? err.response.data : (err.response.data.message || msg);
+      }
+      setOtpError(msg);
+    } finally {
+      setIsOtpLoading(false);
+    }
+  };
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token.trim() || !passwordNueva.trim()) return;
+    if (!token.trim() || !passwordNueva.trim() || passwordNueva !== confirmPassword) {
+      setError('Verifique que las contraseñas coincidan.');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
@@ -57,7 +93,7 @@ export const RecuperarClave: React.FC = () => {
       setSuccessMsg('Contraseña restablecida con éxito. Ya puede iniciar sesión.');
       setStep(3);
     } catch (err: any) {
-      let msg = 'Error al validar el código o restablecer la contraseña.';
+      let msg = 'Error al restablecer la contraseña.';
       if (err.response && err.response.data) {
         msg = typeof err.response.data === 'string' ? err.response.data : (err.response.data.message || msg);
       }
@@ -68,9 +104,9 @@ export const RecuperarClave: React.FC = () => {
   };
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full flex justify-center">
       {/* Tarjeta de Recuperación - Blanco Puro, Apple Style */}
-      <div className="bg-white border border-slate-100 rounded-3xl p-8 max-w-md w-full shadow-[0_20px_50px_rgba(0,84,166,0.06)] transition-all duration-500 hover:shadow-[0_25px_60px_rgba(0,84,166,0.09)]">
+      <div className="bg-white border border-slate-100 rounded-3xl p-8 max-w-md w-full shadow-[0_20px_50px_rgba(0,84,166,0.06)] transition-all duration-500 hover:shadow-[0_25px_60px_rgba(0,84,166,0.09)] z-10 relative">
         
         {/* Header */}
         <div className="flex flex-col items-center mb-8">
@@ -100,20 +136,6 @@ export const RecuperarClave: React.FC = () => {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-slate-500/70 tracking-wider uppercase pl-1">
-                Canal de Entrega
-              </label>
-              <Select
-                value={canal}
-                onChange={(e) => setCanal(e.target.value)}
-                className="bg-slate-50/40 text-slate-800 border-slate-200/60 focus:border-[#0054A6] focus:bg-white focus:ring-4 focus:ring-[#0054A6]/10 rounded-xl h-11"
-              >
-                <option value="CORREO" className="bg-white text-slate-800">Correo Electrónico</option>
-                <option value="SMS" className="bg-white text-slate-800">Mensaje de Texto (SMS)</option>
-              </Select>
-            </div>
-
             {error && (
               <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-50/5 border border-red-500/10 text-red-850 text-xs">
                 <ShieldAlert className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
@@ -134,7 +156,7 @@ export const RecuperarClave: React.FC = () => {
 
               <Button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !identificacion}
                 className="bg-[#0054A6] hover:bg-[#004080] text-white h-11 px-6 rounded-xl flex items-center justify-center gap-2 font-medium shadow-md shadow-[#0054A6]/10 hover:shadow-[#0054A6]/20 active:scale-98 transition-all duration-300 focus:scale-[1.01] cursor-pointer"
               >
                 {isLoading ? (
@@ -150,26 +172,12 @@ export const RecuperarClave: React.FC = () => {
           </form>
         )}
 
-        {/* Step 2: Validate OTP & Change Password */}
+        {/* Step 2: Change Password */}
         {step === 2 && (
           <form onSubmit={handleResetPassword} className="space-y-6">
             <div className="p-4 rounded-2xl bg-[#0054A6]/5 border border-[#0054A6]/15 text-[#0054A6] text-xs leading-relaxed flex items-start gap-3">
-              <Mail className="h-4 w-4 shrink-0 text-[#0054A6] mt-0.5" />
-              <p className="text-slate-650">Hemos enviado un código/enlace de validación al canal seleccionado. Por favor, ingréselo a continuación junto con su nueva clave digital.</p>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-slate-500/70 tracking-wider uppercase pl-1">
-                Token / Código OTP
-              </label>
-              <Input
-                type="text"
-                required
-                placeholder={canal === 'SMS' ? 'Código de 6 dígitos' : 'UUID o enlace'}
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                className="h-11 bg-slate-50/40 border border-slate-200/60 text-slate-800 rounded-xl focus:border-[#0054A6] focus:bg-white focus:ring-4 focus:ring-[#0054A6]/10 transition-all placeholder:text-slate-400/80"
-              />
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-[#0054A6] mt-0.5" />
+              <p className="text-slate-650">El código ha sido validado correctamente. Por favor, ingrese su nueva clave digital.</p>
             </div>
 
             <div className="space-y-1.5">
@@ -179,10 +187,24 @@ export const RecuperarClave: React.FC = () => {
               <Input
                 type="password"
                 required
-                placeholder="Mínimo 6 caracteres"
+                placeholder="••••••••"
                 value={passwordNueva}
                 onChange={(e) => setPasswordNueva(e.target.value)}
-                className="h-11 bg-slate-50/40 border border-slate-200/60 text-slate-800 rounded-xl focus:border-[#0054A6] focus:bg-white focus:ring-4 focus:ring-[#0054A6]/10 transition-all placeholder:text-slate-400/80"
+                className="h-11 bg-slate-50/40 border border-slate-200/60 text-slate-800 rounded-xl focus:border-[#0054A6] focus:bg-white focus:ring-4 focus:ring-[#0054A6]/10 transition-all placeholder:text-slate-400/80 font-mono"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-slate-500/70 tracking-wider uppercase pl-1">
+                Confirmar Contraseña
+              </label>
+              <Input
+                type="password"
+                required
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="h-11 bg-slate-50/40 border border-slate-200/60 text-slate-800 rounded-xl focus:border-[#0054A6] focus:bg-white focus:ring-4 focus:ring-[#0054A6]/10 transition-all placeholder:text-slate-400/80 font-mono"
               />
             </div>
 
@@ -193,27 +215,17 @@ export const RecuperarClave: React.FC = () => {
               </div>
             )}
 
-            <div className="pt-2 flex items-center justify-between gap-4">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setStep(1)}
-                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100/50 transition-all cursor-pointer rounded-lg px-3 py-2"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span>Atrás</span>
-              </Button>
-
+            <div className="pt-2 flex flex-col gap-3">
               <Button
                 type="submit"
-                disabled={isLoading}
-                className="bg-[#0054A6] hover:bg-[#004080] text-white h-11 px-6 rounded-xl flex items-center justify-center gap-2 font-medium shadow-md shadow-[#0054A6]/10 hover:shadow-[#0054A6]/20 active:scale-98 transition-all duration-300 focus:scale-[1.01] cursor-pointer"
+                disabled={isLoading || !passwordNueva || passwordNueva !== confirmPassword}
+                className="w-full bg-[#0054A6] hover:bg-[#004080] text-white h-11 rounded-xl flex items-center justify-center gap-2 font-medium shadow-md shadow-[#0054A6]/10 hover:shadow-[#0054A6]/20 active:scale-98 transition-all duration-300 focus:scale-[1.01] cursor-pointer disabled:bg-slate-300"
               >
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
-                    <span>Restablecer y Desbloquear</span>
+                    <span>Restablecer Contraseña</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
@@ -245,8 +257,76 @@ export const RecuperarClave: React.FC = () => {
             </div>
           </div>
         )}
-
       </div>
+
+      {/* Modal Exclusivo de OTP */}
+      <AnimatePresence>
+        {showOtpModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setShowOtpModal(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-white w-full max-w-sm rounded-3xl shadow-xl overflow-hidden relative z-50 p-8"
+            >
+              <button
+                onClick={() => setShowOtpModal(false)}
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              
+              <div className="text-center mb-6 mt-2">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-indigo-50 text-indigo-600 mb-4">
+                  <Mail className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800">Código de Verificación</h3>
+                <p className="text-sm text-slate-500 mt-2">
+                  Ingresa el código de 6 dígitos enviado a:
+                  <br />
+                  <span className="font-bold text-slate-700 mt-1 block">{correoEnmascarado}</span>
+                </p>
+              </div>
+
+              <form onSubmit={handleOtpSubmit} className="space-y-6">
+                {otpError && (
+                  <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm text-center">
+                    {otpError}
+                  </div>
+                )}
+                
+                <div>
+                  <Input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={token}
+                    onChange={(e) => setToken(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="000000"
+                    className="h-14 text-center text-3xl font-black tracking-[0.5em] bg-slate-50 border-slate-200 focus:bg-white rounded-2xl"
+                    autoFocus
+                  />
+                </div>
+                
+                <Button
+                  type="submit"
+                  disabled={isOtpLoading || token.length !== 6}
+                  className="w-full h-12 bg-[#0054A6] hover:bg-[#004385] text-white rounded-xl font-bold cursor-pointer"
+                >
+                  {isOtpLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Validar Código'}
+                </Button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

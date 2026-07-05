@@ -8,6 +8,7 @@ import { AdminLayout } from './layouts/AdminLayout';
 import { Login } from './pages/auth/Login';
 import { RecuperarClave } from './pages/auth/RecuperarClave';
 import { EstablecerPassword } from './pages/auth/EstablecerPassword';
+import { RecuperarClaveSocio } from './pages/auth/RecuperarClaveSocio';
 import { DashboardScreen } from './components/DashboardScreen';
 import { Inicio } from './pages/socio/Inicio';
 import { Transferencias } from './pages/socio/Transferencias';
@@ -66,6 +67,7 @@ const RootRouter: React.FC = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/recuperar-clave" element={<RecuperarClave />} />
           <Route path="/establecer-password" element={<EstablecerPassword />} />
+          <Route path="/recuperar-clave-socio" element={<RecuperarClaveSocio />} />
         </Route>
 
         {/* Ruta de cambio obligatorio de contraseña */}
