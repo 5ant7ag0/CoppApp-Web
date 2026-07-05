@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
 import { Input } from '../../components/ui/input';
@@ -8,6 +8,7 @@ import { KeyRound, ShieldAlert, ArrowRight, Loader2, Mail, CheckCircle2, ArrowLe
 
 export const RecuperarClave: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [step, setStep] = useState<number>(1);
   const [showOtpModal, setShowOtpModal] = useState<boolean>(false);
@@ -24,6 +25,16 @@ export const RecuperarClave: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const tokenFromUrl = searchParams.get('token');
+    const idFromUrl = searchParams.get('identificacion') || searchParams.get('id');
+    if (tokenFromUrl && idFromUrl) {
+      setToken(tokenFromUrl);
+      setIdentificacion(idFromUrl);
+      setStep(2);
+    }
+  }, [searchParams]);
 
   const handleRequestToken = async (e: React.FormEvent) => {
     e.preventDefault();

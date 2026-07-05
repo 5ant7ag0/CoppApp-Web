@@ -47,6 +47,7 @@ interface CompanySettings {
   segmentoSeps: string;
   resolucionSeps: string;
   correoInstitucional: string;
+  correoGerente: string;
   provincia: string;
   canton: string;
   
@@ -766,7 +767,7 @@ export const Parametrizacion: React.FC = () => {
     const keysToCompare: (keyof CompanySettings)[] = [
       'ruc', 'razonSocial', 'nombreComercial', 'siglas', 'codigoSeps', 
       'segmentoSeps', 'resolucionSeps', 'representanteLegal', 'cedulaRepresentante', 
-      'direccion', 'telefono', 'correoInstitucional', 'provincia', 'canton',
+      'direccion', 'telefono', 'correoInstitucional', 'correoGerente', 'provincia', 'canton',
       'saldoMinimoApertura', 'montoMinimoCredito', 'montoMaximoCredito', 
       'tasaInteresAnual', 'tasaInteresMora', 'costoTramite', 
       'porcentajeSeguroDesgravamen', 'cuotaAportacionMensual', 'tasaInteresPasiva', 'diasGraciaMora'
@@ -970,6 +971,7 @@ export const Parametrizacion: React.FC = () => {
       segmentoSeps: 'Segmento SEPS',
       resolucionSeps: 'Resolución SEPS de Constitución',
       correoInstitucional: 'Correo Institucional',
+      correoGerente: 'Correo del Gerente General',
       provincia: 'Provincia',
       canton: 'Cantón',
       saldoMinimoApertura: 'Saldo Mínimo Apertura Cuenta',
@@ -1523,6 +1525,17 @@ export const Parametrizacion: React.FC = () => {
                     value={settings.correoInstitucional || ''}
                     disabled={!isEditing}
                     onChange={(e) => handleInputChange('correoInstitucional', e.target.value)}
+                    className="w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white border border-slate-100 focus:border-blue-500 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 outline-none transition-all"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Correo Electrónico del Gerente General</label>
+                  <input
+                    type="email"
+                    value={settings.correoGerente || ''}
+                    disabled={!isEditing}
+                    onChange={(e) => handleInputChange('correoGerente', e.target.value)}
                     className="w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white border border-slate-100 focus:border-blue-500 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 outline-none transition-all"
                   />
                 </div>

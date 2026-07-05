@@ -5,6 +5,7 @@ import { TenantProvider } from './context/TenantContext';
 import { AuthLayout } from './layouts/AuthLayout';
 import { SocioLayout } from './layouts/SocioLayout';
 import { AdminLayout } from './layouts/AdminLayout';
+import { SaasLayout } from './layouts/SaasLayout';
 import { Login } from './pages/auth/Login';
 import { RecuperarClave } from './pages/auth/RecuperarClave';
 import { EstablecerPassword } from './pages/auth/EstablecerPassword';
@@ -22,6 +23,7 @@ import { ContabilidadDashboard } from './pages/admin/ContabilidadDashboard';
 import { Parametrizacion } from './pages/admin/Parametrizacion';
 import { GestionEquipo } from './pages/admin/GestionEquipo';
 import { ForzarCambioPassword } from './pages/auth/ForzarCambioPassword';
+import { SaasDashboard } from './pages/saas/SaasDashboard';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedAdminRouteProps {
@@ -37,9 +39,20 @@ const ProtectedAdminRoute: React.FC<ProtectedAdminRouteProps> = ({ allowedRoles,
     if (user.rol === 'CAJERO') return <Navigate to="/admin/dashboard" replace />;
     if (user.rol === 'OFICIAL_DE_CREDITO') return <Navigate to="/admin/creditos" replace />;
     if (user.rol === 'CONTADOR') return <Navigate to="/admin/contabilidad" replace />;
-    if (user.rol === 'GERENTE_GENERAL' || user.rol === 'SUPER_ADMIN_SAAS' || user.rol === 'ADMINISTRADOR') {
+    if (user.rol === 'GERENTE_GENERAL' || user.rol === 'ADMINISTRADOR') {
       return <Navigate to="/admin/creditos" replace />;
     }
+    if (user.rol === 'SUPER_ADMIN_SAAS') return <Navigate to="/saas/dashboard" replace />;
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+};
+
+const SuperAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.rol !== 'SUPER_ADMIN_SAAS') {
+    // Si es un empleado normal, redirigirlo a su respectivo inicio o login.
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
@@ -92,6 +105,18 @@ const RootRouter: React.FC = () => {
           <Route path="/socio/perfil" element={<Perfil />} />
         </Route>
 
+        {/* Rutas Privadas del SaaS Manager */}
+        <Route element={<SaasLayout />}>
+          <Route 
+            path="/saas/dashboard" 
+            element={
+              <SuperAdminRoute>
+                <SaasDashboard />
+              </SuperAdminRoute>
+            } 
+          />
+        </Route>
+
         {/* Rutas Protegidas de Administración */}
         <Route element={<AdminLayout />}>
           <Route 
@@ -105,7 +130,7 @@ const RootRouter: React.FC = () => {
           <Route 
             path="/admin/creditos" 
             element={
-              <ProtectedAdminRoute allowedRoles={['OFICIAL_DE_CREDITO', 'CONTADOR', 'GERENTE_GENERAL', 'SUPER_ADMIN_SAAS', 'ADMINISTRADOR']}>
+              <ProtectedAdminRoute allowedRoles={['OFICIAL_DE_CREDITO', 'CONTADOR', 'GERENTE_GENERAL', 'ADMINISTRADOR']}>
                 <AprobacionCreditos />
               </ProtectedAdminRoute>
             } 
@@ -113,7 +138,7 @@ const RootRouter: React.FC = () => {
           <Route 
             path="/admin/socios" 
             element={
-              <ProtectedAdminRoute allowedRoles={['OFICIAL_DE_CREDITO', 'CONTADOR', 'GERENTE_GENERAL', 'SUPER_ADMIN_SAAS', 'ADMINISTRADOR']}>
+              <ProtectedAdminRoute allowedRoles={['OFICIAL_DE_CREDITO', 'CONTADOR', 'GERENTE_GENERAL', 'ADMINISTRADOR']}>
                 <CreacionSocios />
               </ProtectedAdminRoute>
             } 
@@ -121,7 +146,7 @@ const RootRouter: React.FC = () => {
           <Route 
             path="/admin/contabilidad" 
             element={
-              <ProtectedAdminRoute allowedRoles={['CONTADOR', 'GERENTE_GENERAL', 'SUPER_ADMIN_SAAS', 'ADMINISTRADOR']}>
+              <ProtectedAdminRoute allowedRoles={['CONTADOR', 'GERENTE_GENERAL', 'ADMINISTRADOR']}>
                 <ContabilidadDashboard />
               </ProtectedAdminRoute>
             } 
@@ -129,7 +154,7 @@ const RootRouter: React.FC = () => {
           <Route 
             path="/admin/parametrizacion" 
             element={
-              <ProtectedAdminRoute allowedRoles={['GERENTE_GENERAL', 'SUPER_ADMIN_SAAS', 'ADMINISTRADOR']}>
+              <ProtectedAdminRoute allowedRoles={['GERENTE_GENERAL', 'ADMINISTRADOR']}>
                 <Parametrizacion />
               </ProtectedAdminRoute>
             } 
@@ -137,7 +162,7 @@ const RootRouter: React.FC = () => {
           <Route 
             path="/admin/gestion-equipo" 
             element={
-              <ProtectedAdminRoute allowedRoles={['GERENTE_GENERAL', 'SUPER_ADMIN_SAAS', 'ADMINISTRADOR']}>
+              <ProtectedAdminRoute allowedRoles={['GERENTE_GENERAL', 'ADMINISTRADOR']}>
                 <GestionEquipo />
               </ProtectedAdminRoute>
             } 

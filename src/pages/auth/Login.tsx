@@ -183,7 +183,7 @@ export const Login: React.FC = () => {
                   {activeTab === 'socio' ? 'CÉDULA / IDENTIFICACIÓN' : 'USUARIO'}
                 </label>
                 <div className="relative group">
-                  <span className={`absolute left-0 top-1/2 -translate-y-1/2 transition-colors ${usernameError ? 'text-red-500' : 'text-slate-400 group-focus-within:text-[#0054A6]'}`}>
+                  <span className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${usernameError ? 'text-red-500' : 'text-slate-400 group-focus-within:text-[#0054A6]'}`}>
                     <User className="h-5 w-5" />
                   </span>
                   <Input
@@ -194,10 +194,10 @@ export const Login: React.FC = () => {
                     onChange={handleUsernameChange}
                     disabled={isBlocked}
                     maxLength={activeTab === 'socio' ? 10 : undefined}
-                    className={`pl-8 h-11 bg-transparent border-t-0 border-x-0 border-b text-slate-850 focus:ring-0 rounded-none transition-all duration-205 placeholder:text-slate-400/70 ${
+                    className={`pl-10 h-12 bg-slate-50/50 border text-slate-800 focus:ring-1 rounded-xl transition-all duration-200 placeholder:text-slate-400/70 shadow-sm ${
                       usernameError 
-                        ? 'border-red-500 focus:border-b-2 focus:border-red-500' 
-                        : 'border-slate-200 focus:border-b-2 focus:border-[#0054A6]'
+                        ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50/30' 
+                        : 'border-slate-200 focus:border-[#0054A6] focus:ring-[#0054A6] hover:bg-white'
                     }`}
                   />
                 </div>
@@ -211,7 +211,7 @@ export const Login: React.FC = () => {
                   CONTRASEÑA
                 </label>
                 <div className="relative group">
-                  <span className={`absolute left-0 top-1/2 -translate-y-1/2 transition-colors ${passwordError ? 'text-red-500' : 'text-slate-400 group-focus-within:text-[#0054A6]'}`}>
+                  <span className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${passwordError ? 'text-red-500' : 'text-slate-400 group-focus-within:text-[#0054A6]'}`}>
                     <Lock className="h-5 w-5" />
                   </span>
                   <Input
@@ -221,10 +221,10 @@ export const Login: React.FC = () => {
                     value={password}
                     onChange={handlePasswordChange}
                     disabled={isBlocked}
-                    className={`pl-8 h-11 bg-transparent border-t-0 border-x-0 border-b text-slate-850 focus:ring-0 rounded-none transition-all duration-205 placeholder:text-slate-400/70 ${
+                    className={`pl-10 h-12 bg-slate-50/50 border text-slate-800 focus:ring-1 rounded-xl transition-all duration-200 placeholder:text-slate-400/70 shadow-sm ${
                       passwordError 
-                        ? 'border-red-500 focus:border-b-2 focus:border-red-500' 
-                        : 'border-slate-200 focus:border-b-2 focus:border-[#0054A6]'
+                        ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50/30' 
+                        : 'border-slate-200 focus:border-[#0054A6] focus:ring-[#0054A6] hover:bg-white'
                     }`}
                   />
                 </div>
