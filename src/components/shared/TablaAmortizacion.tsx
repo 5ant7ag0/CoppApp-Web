@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
+import { formatCurrency } from '../../utils/formatters';
 
 interface TablaAmortizacionProps {
   credito: {
@@ -23,10 +24,7 @@ interface TablaAmortizacionProps {
   isEmbedded?: boolean;
 }
 
-const formatCurrency = (val: number | string | undefined | null) => {
-  const v = Number(val) || 0;
-  return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+
 
 const formatFechaStr = (dateStr?: any) => {
   if (!dateStr) return 'N/A';

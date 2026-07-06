@@ -18,6 +18,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select } from './ui/select';
 import api from '../services/api';
+import { formatCurrency } from '../utils/formatters';
 import { useEffect } from 'react';
 
 interface CuotaSimulada {
@@ -54,10 +55,7 @@ interface ProductoCredito {
   plazoMaximoMeses: number;
 }
 
-const formatCurrency = (val: number | undefined | null) => {
-  const v = val ?? 0;
-  return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+
 
 const formatTxDate = (dateStr: string) => {
   try {

@@ -68,13 +68,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const logoutLocal = () => {
-    localStorage.removeItem('coop_token');
-    localStorage.removeItem('coop_tenant_id');
+    // Barrido de seguridad de todos los datos de sesión en localStorage que tengan el prefijo 'coop_'
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('coop_')) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+
     setUser(null);
     setToken(null);
     setError(null);
     setIsBlocked(false);
   };
+
+  useEffect(() => {
+    const handleSessionExpired = (e: Event) => {
+      logoutLocal();
+      const customEvent = e as CustomEvent;
+      const status = customEvent.detail;
+      setError(
+        status === 403 
+          ? 'Acceso denegado: No tiene permisos suficientes para realizar esta acción.' 
+          : 'Su sesión ha expirado. Por favor, inicie sesión nuevamente.'
+      );
+    };
+
+    window.addEventListener('coop_session_expired', handleSessionExpired);
+    return () => {
+      window.removeEventListener('coop_session_expired', handleSessionExpired);
+    };
+  }, []);
 
   const login = async (username: string, password: string, isSocio: boolean, tenantId: number) => {
     setIsLoading(true);

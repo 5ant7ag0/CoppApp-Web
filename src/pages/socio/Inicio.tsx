@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../services/api';
+import api, { getAssetUrl } from '../../services/api';
+import { formatCurrency } from '../../utils/formatters';
 import { 
   TrendingUp, 
   AlertCircle,
@@ -83,11 +84,7 @@ export const Inicio: React.FC = () => {
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
   const getFullAvatarUrl = (url: string | null) => {
-    if (!url) return null;
-    if (url.startsWith('http') || url.startsWith('data:')) {
-      return url;
-    }
-    return `http://localhost:8080/api/v1${url}`;
+    return getAssetUrl(url);
   };
 
   useEffect(() => {
@@ -293,9 +290,7 @@ export const Inicio: React.FC = () => {
     };
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  };
+
 
 
 

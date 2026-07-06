@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import api from '../../services/api';
+import api, { getAssetUrl } from '../../services/api';
+import { validarCedulaEcuatoriana } from '../../utils/validators';
 import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
 import { Card } from '../../components/ui/card';
@@ -159,25 +160,7 @@ export const CreacionSocios: React.FC = () => {
   const [filtroCredFechaDesde, setFiltroCredFechaDesde] = useState<string>('');
   const [filtroCredFechaHasta, setFiltroCredFechaHasta] = useState<string>('');
 
-  // Algoritmo de validación de Cédula Ecuatoriana (Módulo 10)
-  const validarCedulaEcuatoriana = (ced: string): boolean => {
-    if (ced.length !== 10) return false;
-    const provincia = parseInt(ced.substring(0, 2), 10);
-    if (provincia < 1 || provincia > 24) return false;
-    const tercerDigito = parseInt(ced.substring(2, 3), 10);
-    if (tercerDigito >= 6) return false; // Solo personas naturales (0-5)
 
-    const coeficientes = [2, 1, 2, 1, 2, 1, 2, 1, 2];
-    let suma = 0;
-    for (let i = 0; i < 9; i++) {
-      let valor = parseInt(ced.charAt(i), 10) * coeficientes[i];
-      if (valor >= 10) valor -= 9;
-      suma += valor;
-    }
-    const verificadorCalculado = (Math.ceil(suma / 10) * 10) - suma;
-    const verificadorReal = parseInt(ced.charAt(9), 10);
-    return verificadorCalculado === verificadorReal;
-  };
 
   // Validación de RUC Ecuatoriano
   const validarRucEcuatoriano = (ruc: string): boolean => {
@@ -2738,7 +2721,7 @@ export const CreacionSocios: React.FC = () => {
                 <div className="h-16 w-16 rounded-full border border-slate-100 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                   {selectedSocio.fotoPerfilUrl ? (
                     <img 
-                      src={`http://localhost:8080/api/v1${selectedSocio.fotoPerfilUrl}`} 
+                      src={getAssetUrl(selectedSocio.fotoPerfilUrl)} 
                       alt="Foto de Perfil" 
                       className="w-full h-full object-cover"
                     />
@@ -3275,7 +3258,7 @@ export const CreacionSocios: React.FC = () => {
                     {/* Cédula Anverso */}
                     {(() => {
                       const path = selectedSocio.fotoCedulaFrontalUrl;
-                      const docUrl = path ? `http://localhost:8080/api/v1${path}` : '';
+                      const docUrl = path ? getAssetUrl(path) : '';
                       const isLoading = cargandoDocType === 'cedula-frontal';
                       return (
                         <div className="bg-white border border-slate-100 rounded-2xl flex flex-col h-56 shadow-sm relative overflow-hidden group hover:border-[#0054A6]/20 transition-all duration-300">
@@ -3352,7 +3335,7 @@ export const CreacionSocios: React.FC = () => {
                     {/* Cédula Reverso */}
                     {(() => {
                       const path = selectedSocio.fotoCedulaPosteriorUrl;
-                      const docUrl = path ? `http://localhost:8080/api/v1${path}` : '';
+                      const docUrl = path ? getAssetUrl(path) : '';
                       const isLoading = cargandoDocType === 'cedula-posterior';
                       return (
                         <div className="bg-white border border-slate-100 rounded-2xl flex flex-col h-56 shadow-sm relative overflow-hidden group hover:border-[#0054A6]/20 transition-all duration-300">
@@ -3429,7 +3412,7 @@ export const CreacionSocios: React.FC = () => {
                     {/* Firma Registrada */}
                     {(() => {
                       const path = selectedSocio.firmaUrl;
-                      const docUrl = path ? `http://localhost:8080/api/v1${path}` : '';
+                      const docUrl = path ? getAssetUrl(path) : '';
                       const isLoading = cargandoDocType === 'firma';
                       return (
                         <div className="bg-white border border-slate-100 rounded-2xl flex flex-col h-56 shadow-sm relative overflow-hidden group hover:border-[#0054A6]/20 transition-all duration-300">

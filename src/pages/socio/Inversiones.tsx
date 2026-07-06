@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api from '../../services/api';
+import { formatCurrency } from '../../utils/formatters';
 import { motion } from 'framer-motion';
 import { 
   TrendingUp, 
@@ -67,9 +68,7 @@ export const Inversiones: React.FC = () => {
 
   const simulatorRef = useRef<HTMLDivElement>(null);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  };
+
 
   const fetchData = async () => {
     setLoading(true);

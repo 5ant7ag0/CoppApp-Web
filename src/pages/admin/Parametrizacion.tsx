@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../../services/api';
+import api, { getAssetUrl } from '../../services/api';
 import { motion } from 'framer-motion';
 import { ECUADOR_GEODATA } from '../../utils/ecuadorGeodata';
 import { SearchableCombobox } from '../../components/SearchableCombobox';
@@ -322,9 +322,7 @@ export const Parametrizacion: React.FC = () => {
       setOriginalSettings(res.data);
       if (res.data?.logoUrl) {
         // Resolver URL estática
-        const url = res.data.logoUrl.startsWith('http') 
-          ? res.data.logoUrl 
-          : `http://localhost:8080/api/v1${res.data.logoUrl}`;
+        const url = getAssetUrl(res.data.logoUrl);
         setLogoPreview(url);
       }
     } catch (err: any) {
@@ -810,9 +808,7 @@ export const Parametrizacion: React.FC = () => {
     if (originalSettings) {
       setSettings(originalSettings);
       if (originalSettings.logoUrl) {
-        const url = originalSettings.logoUrl.startsWith('http') 
-          ? originalSettings.logoUrl 
-          : `http://localhost:8080/api/v1${originalSettings.logoUrl}`;
+        const url = getAssetUrl(originalSettings.logoUrl);
         setLogoPreview(url);
       } else {
         setLogoPreview(null);
@@ -955,7 +951,7 @@ export const Parametrizacion: React.FC = () => {
       setSettings(res.data);
       setOriginalSettings(res.data);
       if (res.data?.logoUrl) {
-        setLogoPreview(`http://localhost:8080/api/v1${res.data.logoUrl}`);
+        setLogoPreview(getAssetUrl(res.data.logoUrl));
       }
       setLogoFile(null);
       setIsEditing(false);
@@ -1618,7 +1614,7 @@ export const Parametrizacion: React.FC = () => {
                                 e.stopPropagation();
                                 setLogoFile(null);
                                 if (settings.logoUrl) {
-                                  setLogoPreview(`http://localhost:8080/api/v1${settings.logoUrl}`);
+                                  setLogoPreview(getAssetUrl(settings.logoUrl));
                                 } else {
                                   setLogoPreview(null);
                                 }
@@ -1669,7 +1665,7 @@ export const Parametrizacion: React.FC = () => {
                                   if (logoFile) {
                                     setLogoFile(null);
                                     if (settings.logoUrl) {
-                                      setLogoPreview(`http://localhost:8080/api/v1${settings.logoUrl}`);
+                                      setLogoPreview(getAssetUrl(settings.logoUrl));
                                     } else {
                                       setLogoPreview(null);
                                     }

@@ -17,7 +17,7 @@ import {
   DollarSign,
   LogOut
 } from 'lucide-react';
-import api from '../../services/api';
+import api, { getAssetUrl } from '../../services/api';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
@@ -107,7 +107,7 @@ const CedulaFrontalMockup: React.FC<{ nombres: string, cedula: string, avatarUrl
       <div className="flex gap-3 pt-2 z-10 flex-1">
         <div className="w-16 h-20 bg-slate-200/50 border border-slate-300/60 rounded-lg overflow-hidden flex items-center justify-center shrink-0 shadow-inner bg-white relative">
           {avatarUrl ? (
-            <img src={`http://localhost:8080/api/v1${avatarUrl}`} alt="Foto Cedula" className="h-full w-full object-cover" />
+            <img src={getAssetUrl(avatarUrl)} alt="Foto Cedula" className="h-full w-full object-cover" />
           ) : (
             <User className="h-8 w-8 text-slate-400" />
           )}
@@ -1251,7 +1251,7 @@ export const CajaVentanilla: React.FC = () => {
                   <div className="h-12 w-12 rounded-full overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0 relative shadow-sm">
                     {socioInfo.socio.fotoPerfilUrl ? (
                       <img 
-                        src={`http://localhost:8080/api/v1${socioInfo.socio.fotoPerfilUrl}`} 
+                        src={getAssetUrl(socioInfo.socio.fotoPerfilUrl)} 
                         alt="Foto Perfil Socio" 
                         className="h-full w-full object-cover" 
                       />
@@ -1383,7 +1383,7 @@ export const CajaVentanilla: React.FC = () => {
                         onClick={() => setCedulaModalView('FRONTAL')}
                       >
                         <img 
-                          src={`http://localhost:8080/api/v1${socioInfo.socio.fotoCedulaFrontalUrl}`} 
+                          src={getAssetUrl(socioInfo.socio.fotoCedulaFrontalUrl)} 
                           alt="Cédula Frontal" 
                           className="h-full w-full object-cover" 
                           onError={() => setUseMockups(true)}
@@ -1397,7 +1397,7 @@ export const CajaVentanilla: React.FC = () => {
                         onClick={() => setCedulaModalView('POSTERIOR')}
                       >
                         <img 
-                          src={`http://localhost:8080/api/v1${socioInfo.socio.fotoCedulaPosteriorUrl}`} 
+                          src={getAssetUrl(socioInfo.socio.fotoCedulaPosteriorUrl)} 
                           alt="Cédula Posterior" 
                           className="h-full w-full object-cover" 
                           onError={() => setUseMockups(true)}
@@ -2572,7 +2572,7 @@ export const CajaVentanilla: React.FC = () => {
               {cedulaModalView === 'FRONTAL' ? (
                 (!useMockups && socioInfo.socio.fotoCedulaFrontalUrl) ? (
                   <img 
-                    src={`http://localhost:8080/api/v1${socioInfo.socio.fotoCedulaFrontalUrl}`} 
+                    src={getAssetUrl(socioInfo.socio.fotoCedulaFrontalUrl)} 
                     alt="Cédula Frontal Ampliada" 
                     className="w-full max-w-sm rounded-2xl shadow-xl object-contain"
                   />
@@ -2586,7 +2586,7 @@ export const CajaVentanilla: React.FC = () => {
               ) : (
                 (!useMockups && socioInfo.socio.fotoCedulaPosteriorUrl) ? (
                   <img 
-                    src={`http://localhost:8080/api/v1${socioInfo.socio.fotoCedulaPosteriorUrl}`} 
+                    src={getAssetUrl(socioInfo.socio.fotoCedulaPosteriorUrl)} 
                     alt="Cédula Posterior Ampliada" 
                     className="w-full max-w-sm rounded-2xl shadow-xl object-contain"
                   />

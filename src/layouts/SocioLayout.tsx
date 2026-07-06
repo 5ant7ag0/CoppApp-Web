@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Navigate, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Loader2, LogOut, Home, Send, CreditCard, User, Menu, History, TrendingUp } from 'lucide-react';
-import api from '../services/api';
+import api, { getAssetUrl } from '../services/api';
 import { useTenant } from '../context/TenantContext';
 
 export const SocioLayout: React.FC = () => {
@@ -15,9 +15,7 @@ export const SocioLayout: React.FC = () => {
     try {
       const res = await api.get('/empresas/mi-perfil');
       if (res.data?.logoUrl) {
-        const url = res.data.logoUrl.startsWith('http') 
-          ? res.data.logoUrl 
-          : `http://localhost:8080/api/v1${res.data.logoUrl}`;
+        const url = getAssetUrl(res.data.logoUrl);
         setLogoUrl(url);
       } else {
         setLogoUrl(null);
@@ -34,9 +32,7 @@ export const SocioLayout: React.FC = () => {
       const handleLogoUpdated = (e: Event) => {
         const customEvent = e as CustomEvent;
         if (customEvent.detail) {
-          const url = customEvent.detail.startsWith('http')
-            ? customEvent.detail
-            : `http://localhost:8080/api/v1${customEvent.detail}`;
+          const url = getAssetUrl(customEvent.detail);
           setLogoUrl(url);
         } else {
           fetchLogo();
@@ -76,8 +72,8 @@ export const SocioLayout: React.FC = () => {
 
   const getLinkClass = ({ isActive }: { isActive: boolean }) => {
     return isActive
-      ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)]"
-      : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300";
+      ? "flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 text-[#0054A6] font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(0,84,166,0.06)] md:justify-center xl:justify-start md:group-hover:justify-start"
+      : "flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300 md:justify-center xl:justify-start md:group-hover:justify-start";
   };
 
   return (
@@ -110,69 +106,123 @@ export const SocioLayout: React.FC = () => {
         </button>
       </header>
 
-      {/* Floating Sidebar (Desktop) */}
-      <aside className={`
-        fixed inset-y-4 left-4 z-50 w-64 bg-white/95 backdrop-blur-xl border border-slate-100 rounded-[2rem] p-6 flex flex-col justify-between shadow-[0_20px_50px_rgba(0,84,166,0.04)]
-        md:sticky md:top-6 md:h-[calc(100vh-3rem)] md:translate-x-0 transition-transform duration-300
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-[110%] md:translate-x-0'}
-      `}>
-        <div className="space-y-8">
-          {/* Brand Logo & Institution */}
-          <div className="flex flex-col items-center justify-center text-center gap-3 px-2">
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt="Logo Institucional"
-                className="w-full max-h-24 object-contain select-none"
-                onError={() => setLogoUrl(null)}
-              />
-            ) : (
-              <div className="h-16 w-16 rounded-2xl bg-[#0054A6] flex items-center justify-center font-black text-white text-2xl shadow-lg shadow-blue-600/30 select-none">
-                {activeTenant?.name ? activeTenant.name.charAt(0).toUpperCase() : 'C'}
+      {/* Mobile Sidebar Drawer */}
+      {mobileOpen && (
+        <aside className="fixed inset-y-4 left-4 z-50 w-64 bg-white/95 backdrop-blur-xl border border-slate-100 rounded-[2rem] p-6 flex flex-col justify-between shadow-2xl md:hidden transition-transform duration-300">
+          <div className="space-y-8">
+            <div className="flex flex-col items-center justify-center text-center gap-3 px-2">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt="Logo Institucional"
+                  className="w-full max-h-24 object-contain select-none"
+                  onError={() => setLogoUrl(null)}
+                />
+              ) : (
+                <div className="h-16 w-16 rounded-2xl bg-[#0054A6] flex items-center justify-center font-black text-white text-2xl shadow-lg shadow-blue-600/30 select-none">
+                  {activeTenant?.name ? activeTenant.name.charAt(0).toUpperCase() : 'C'}
+                </div>
+              )}
+              <div className="flex flex-col items-center">
+                <span className="font-bold tracking-tight text-slate-800 text-xs leading-snug text-center max-w-full">
+                  {activeTenant?.name || 'CoopApp'}
+                </span>
+                <span className="text-[9px] text-slate-400 font-extrabold tracking-wider uppercase mt-1">
+                  Portal Socios
+                </span>
               </div>
-            )}
-            <div className="flex flex-col items-center">
-              <span className="font-bold tracking-tight text-slate-800 text-xs leading-snug text-center max-w-full">
-                {activeTenant?.name || 'CoopApp'}
-              </span>
-              <span className="text-[9px] text-slate-400 font-extrabold tracking-wider uppercase mt-1">
-                Portal Socios
-              </span>
             </div>
+
+            <nav className="flex flex-col gap-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink 
+                    key={item.to} 
+                    to={item.to} 
+                    className="flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium transition-all duration-300"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span>{item.label}</span>
+                  </NavLink>
+                );
+              })}
+            </nav>
           </div>
 
-          {/* Nav Links */}
-          <nav className="flex flex-col gap-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink 
-                  key={item.to} 
-                  to={item.to} 
-                  className={getLinkClass}
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <Icon className="h-5 w-5 shrink-0" />
-                  <span>{item.label}</span>
-                </NavLink>
-              );
-            })}
-          </nav>
-        </div>
+          <div className="border-t border-slate-100 pt-6">
+            <button
+              onClick={() => {
+                setMobileOpen(false);
+                logout();
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold transition-all duration-300 cursor-pointer"
+            >
+              <LogOut className="h-4 w-5 shrink-0" />
+              <span className="text-xs">Cerrar Sesión</span>
+            </button>
+          </div>
+        </aside>
+      )}
 
-        {/* Footer Sidebar */}
-        <div className="border-t border-slate-100 pt-6">
-          <button
-            onClick={() => {
-              setMobileOpen(false);
-              logout();
-            }}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold transition-all duration-300 cursor-pointer shadow-[0_4px_12px_rgba(225,29,72,0.02)]"
-            title="Cerrar Sesión"
-          >
-            <LogOut className="h-4 w-5 shrink-0" />
-            <span className="text-xs">Cerrar Sesión</span>
-          </button>
+      {/* Premium Desktop Collapsible Floating Sidebar (No Layout Shift) */}
+      <aside className="hidden md:block md:w-20 xl:w-64 h-[calc(100vh-3rem)] sticky top-6 shrink-0 group z-50">
+        <div className="absolute left-0 top-0 bottom-0 md:w-20 xl:w-64 md:group-hover:w-64 bg-white/95 backdrop-blur-xl border border-slate-100 rounded-[2rem] p-6 flex flex-col justify-between shadow-[0_20px_50px_rgba(0,84,166,0.04)] group-hover:shadow-[0_20px_60px_rgba(0,84,166,0.12)] transition-all duration-300 ease-in-out">
+          <div className="space-y-8">
+            {/* Brand Logo & Institution */}
+            <div className="flex flex-col items-center justify-center text-center gap-3 px-2">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt="Logo Institucional"
+                  className="w-10 h-10 md:w-11 md:h-11 xl:w-full xl:max-h-24 md:group-hover:w-full md:group-hover:max-h-24 object-contain select-none transition-all duration-300"
+                  onError={() => setLogoUrl(null)}
+                />
+              ) : (
+                <div className="h-10 w-10 md:h-11 md:w-11 xl:h-16 xl:w-16 rounded-2xl bg-[#0054A6] flex items-center justify-center font-black text-white text-lg xl:text-2xl shadow-lg shadow-blue-600/30 select-none transition-all duration-300">
+                  {activeTenant?.name ? activeTenant.name.charAt(0).toUpperCase() : 'C'}
+                </div>
+              )}
+              <div className="flex flex-col items-center xl:block md:hidden md:group-hover:block transition-all duration-300">
+                <span className="font-bold tracking-tight text-slate-800 text-xs leading-snug text-center max-w-full block truncate">
+                  {activeTenant?.name || 'CoopApp'}
+                </span>
+                <span className="text-[9px] text-slate-400 font-extrabold tracking-wider uppercase mt-1 block">
+                  Portal Socios
+                </span>
+              </div>
+            </div>
+
+            {/* Nav Links */}
+            <nav className="flex flex-col gap-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink 
+                    key={item.to} 
+                    to={item.to} 
+                    className={getLinkClass}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span className="xl:inline md:hidden md:group-hover:inline transition-opacity duration-300 whitespace-nowrap truncate">{item.label}</span>
+                  </NavLink>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Footer Sidebar */}
+          <div className="border-t border-slate-100 pt-6">
+            <button
+              onClick={() => logout()}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold transition-all duration-300 cursor-pointer shadow-[0_4px_12px_rgba(225,29,72,0.02)] md:justify-center xl:justify-start md:group-hover:justify-start"
+              title="Cerrar Sesión"
+            >
+              <LogOut className="h-4 w-5 shrink-0" />
+              <span className="text-xs xl:inline md:hidden md:group-hover:inline whitespace-nowrap">Cerrar Sesión</span>
+            </button>
+          </div>
         </div>
       </aside>
 

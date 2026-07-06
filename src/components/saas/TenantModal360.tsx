@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Building2, ShieldAlert, KeyRound, Mail, AlertCircle, Loader2, Edit3, User, CreditCard, Check, Sliders } from 'lucide-react';
-import api from '../../services/api';
+import api, { getAssetUrl } from '../../services/api';
 
 export interface TenantModal360Props {
   tenantId: number;
@@ -140,10 +140,7 @@ export const TenantModal360: React.FC<TenantModal360Props> = ({ tenantId, onClos
   };
 
   const getFullLogoUrl = (logoPath: string | null) => {
-    if (!logoPath) return null;
-    if (logoPath.startsWith('http') || logoPath.startsWith('data:')) return logoPath;
-    const path = logoPath.replace(/^\/?(api\/v1\/)?/, '');
-    return `http://localhost:8080/api/v1/${path}`;
+    return getAssetUrl(logoPath);
   };
 
   const switchTab = (tab: 'GENERAL' | 'QUOTAS' | 'SECURITY') => {

@@ -1,4 +1,6 @@
 import React from 'react';
+import { getAssetUrl } from '../../services/api';
+import { formatCurrency } from '../../utils/formatters';
 import { Card } from '../ui/card';
 import { 
   TrendingUp, 
@@ -26,10 +28,7 @@ interface PerfilCrediticioSocioProps {
   layout?: 'stack' | 'grid';
 }
 
-const formatCurrency = (val: number | undefined | null) => {
-  const v = val ?? 0;
-  return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+
 
 const getCreditScore = (socio: Socio, cuota: number) => {
   const ing = socio.ingresosMensuales ?? 0;
@@ -90,7 +89,7 @@ export const PerfilCrediticioSocio: React.FC<PerfilCrediticioSocioProps> = ({
             <div className="h-16 w-16 md:h-20 md:w-20 rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0 flex items-center justify-center">
               {socio?.fotoPerfilUrl ? (
                 <img 
-                  src={socio.fotoPerfilUrl.startsWith('http') || socio.fotoPerfilUrl.startsWith('data:') ? socio.fotoPerfilUrl : `http://localhost:8080/api/v1${socio.fotoPerfilUrl}`} 
+                  src={getAssetUrl(socio.fotoPerfilUrl)} 
                   alt="Perfil" 
                   className="h-full w-full object-cover" 
                 />

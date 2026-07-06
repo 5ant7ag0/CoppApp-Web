@@ -238,10 +238,14 @@ export const AprobacionCreditos: React.FC = () => {
   const [tablaAmortizacion, setTablaAmortizacion] = useState<CuotaProyectada[]>([]);
   const [cargandoAmortizacion, setCargandoAmortizacion] = useState<boolean>(false);
   const [verPagareCredito, setVerPagareCredito] = useState<Credito | null>(null);
+  // Dynamic localStorage keys isolated per user and tenant
+  const notesKey = user ? `coop_tenant_${user.empresaId}_user_${user.username}_credito_notas` : 'coop_credito_notas';
+  const pagaresKey = user ? `coop_tenant_${user.empresaId}_user_${user.username}_pagares_firmados` : 'coop_pagares_firmados';
+
   const [activeModalTab, setActiveModalTab] = useState<'detalles' | 'amortizacion' | 'pagare'>('detalles');
   const [documentosFirmados, setDocumentosFirmados] = useState<Record<number, { name: string; dataUrl?: string }>>(() => {
     try {
-      const saved = localStorage.getItem('coop_pagares_firmados');
+      const saved = localStorage.getItem(pagaresKey);
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -297,7 +301,7 @@ export const AprobacionCreditos: React.FC = () => {
   // Notas de Crédito / Bitácora
   const [notasCredito, setNotasCredito] = useState<Record<number, string>>(() => {
     try {
-      const saved = localStorage.getItem('coop_credito_notas');
+      const saved = localStorage.getItem(notesKey);
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -310,7 +314,7 @@ export const AprobacionCreditos: React.FC = () => {
       [creditoId]: nota
     };
     setNotasCredito(updated);
-    localStorage.setItem('coop_credito_notas', JSON.stringify(updated));
+    localStorage.setItem(notesKey, JSON.stringify(updated));
   };
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -711,7 +715,7 @@ export const AprobacionCreditos: React.FC = () => {
         }
       };
       setDocumentosFirmados(updatedDocs);
-      localStorage.setItem('coop_pagares_firmados', JSON.stringify(updatedDocs));
+      localStorage.setItem(pagaresKey, JSON.stringify(updatedDocs));
 
       setPagareCredito(null); // Cerrar pagare modal
       setCreditoSeleccionado(null); // Cerrar detail modal

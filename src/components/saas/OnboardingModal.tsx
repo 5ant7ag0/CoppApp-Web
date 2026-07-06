@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Building2, UserCircle, Settings2, Loader2, CheckCircle2, AlertCircle, ChevronDown, Lock, Sliders } from 'lucide-react';
 import api from '../../services/api';
+import { validarCedulaEcuatoriana } from '../../utils/validators';
 
 interface OnboardingModalProps {
   onClose: () => void;
@@ -65,25 +66,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onClose }) => 
   const handleNext = () => setStep(prev => prev + 1);
   const handlePrev = () => setStep(prev => prev - 1);
 
-  // Algoritmo de validación de Cédula Ecuatoriana (Módulo 10)
-  const validarCedulaEcuatoriana = (ced: string): boolean => {
-    if (ced.length !== 10) return false;
-    const provincia = parseInt(ced.substring(0, 2), 10);
-    if (provincia < 1 || provincia > 24) return false;
-    const tercerDigito = parseInt(ced.substring(2, 3), 10);
-    if (tercerDigito >= 6) return false;
 
-    const coeficientes = [2, 1, 2, 1, 2, 1, 2, 1, 2];
-    let suma = 0;
-    for (let i = 0; i < 9; i++) {
-      let valor = parseInt(ced.charAt(i), 10) * coeficientes[i];
-      if (valor >= 10) valor -= 9;
-      suma += valor;
-    }
-    const verificadorCalculado = (Math.ceil(suma / 10) * 10) - suma;
-    const verificadorReal = parseInt(ced.charAt(9), 10);
-    return verificadorCalculado === verificadorReal;
-  };
 
   // Real-time RUC Checking
   useEffect(() => {

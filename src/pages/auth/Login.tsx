@@ -20,10 +20,12 @@ export const Login: React.FC = () => {
   // Estados para errores de validación local
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const handleTenantChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     changeTenant(parseInt(e.target.value, 10));
     clearError();
+    setLocalError(null);
     setUsernameError(null);
     setPasswordError(null);
   };
@@ -33,6 +35,7 @@ export const Login: React.FC = () => {
     setUsername('');
     setPassword('');
     clearError();
+    setLocalError(null);
     setUsernameError(null);
     setPasswordError(null);
   };
@@ -85,6 +88,7 @@ export const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
+    setLocalError(null);
     setUsernameError(null);
     setPasswordError(null);
 
@@ -149,9 +153,8 @@ export const Login: React.FC = () => {
             </Select>
           </div>
 
-          {/* Alertas de error del Backend (Renderizado de forma elegante entre selector de Tenant e Inputs) */}
-          {error && (() => {
-            const disp = getDisplayError(error);
+          {(error || localError) && (() => {
+            const disp = getDisplayError((error || localError) as string);
             return (
               <div className="flex items-start gap-3 bg-red-50 text-red-600 border border-red-200 rounded-xl p-3 text-sm leading-relaxed animate-shake">
                 <ShieldAlert className="h-5 w-5 shrink-0 text-red-500 mt-0.5" />
@@ -307,7 +310,7 @@ export const Login: React.FC = () => {
           <button
             type="button"
             className="flex items-center gap-3 border border-slate-100 rounded-2xl p-4 bg-white shadow-[0_4px_12px_rgba(0,0,0,0.01)] hover:bg-slate-50/80 transition-all duration-250 cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-[#0054A6]/30"
-            onClick={() => navigate('/registro')}
+            onClick={() => setLocalError("Para solicitar la creación de su cuenta de Socio, por favor acérquese a la agencia de la cooperativa más cercana con su documento de identidad original.")}
           >
             <UserPlus className="h-6 w-6 text-slate-400 shrink-0" />
             <div className="flex flex-col">

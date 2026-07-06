@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { formatCurrency } from '../../utils/formatters';
 import { 
   Loader2, 
   Download, 
@@ -308,9 +309,7 @@ export const Movimientos: React.FC = () => {
     };
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  };
+
 
   const formatTxDate = (dateStr: string) => {
     try {

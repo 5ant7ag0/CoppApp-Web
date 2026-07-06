@@ -20,7 +20,7 @@ import {
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import api from '../../services/api';
+import api, { getAssetUrl } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 interface ToastState {
@@ -102,11 +102,7 @@ export const Perfil: React.FC = () => {
   }, [user]);
 
   const getFullAvatarUrl = (url: string | null) => {
-    if (!url) return null;
-    if (url.startsWith('http') || url.startsWith('data:')) {
-      return url;
-    }
-    return `http://localhost:8080/api/v1${url}`;
+    return getAssetUrl(url);
   };
 
   // Manejar el cambio de foto de perfil (guarda en estado temporal)
