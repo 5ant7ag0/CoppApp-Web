@@ -63,12 +63,14 @@ export const Perfil: React.FC = () => {
     setContactoError(null);
   };
 
-  // Campos del Formulario de Cambio de Clave
+  // Campos del Formulario de Cambio de Clave con OTP
   const [isPasswordFormOpen, setIsPasswordFormOpen] = useState<boolean>(false);
-  const [passwordActual, setPasswordActual] = useState<string>('');
+  const [otp, setOtp] = useState<string>('');
+  const [correoEnmascarado, setCorreoEnmascarado] = useState<string>('');
   const [passwordNueva, setPasswordNueva] = useState<string>('');
   const [passwordConfirmar, setPasswordConfirmar] = useState<string>('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
+
 
   // Estado del Toast Global
   const [toast, setToast] = useState<ToastState>({
@@ -259,13 +261,49 @@ export const Perfil: React.FC = () => {
     }
   };
 
-  // Enviar Cambio de Clave al Servidor
+  // Solicitar OTP para Cambio de Clave
+  const handleSolicitarOtp = async () => {
+    if (!user?.detalles?.identificacion) return;
+    setPasswordLoading(true);
+    setPasswordError(null);
+    try {
+      const { data } = await api.post('/auth/recuperar/solicitar', {
+        identificacion: user.detalles.identificacion,
+        canal: 'CORREO'
+      });
+      setCorreoEnmascarado(data.correoEnmascarado || '');
+      setOtp('');
+      setPasswordNueva('');
+      setPasswordConfirmar('');
+      setIsPasswordFormOpen(true);
+      showToast('Se ha enviado un código de seguridad a tu correo electrónico.', 'success');
+    } catch (err: any) {
+      console.error('Error al solicitar OTP:', err);
+      const errMsg = err.response?.data || 'No se pudo enviar el código de seguridad. Inténtalo más tarde.';
+      setPasswordError(typeof errMsg === 'string' ? errMsg : (errMsg.message || 'Error al enviar código.'));
+      showToast('Error al enviar el código al correo.', 'error');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  // Enviar Cambio de Clave al Servidor con OTP
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError(null);
 
-    if (!passwordActual || !passwordNueva || !passwordConfirmar) {
-      setPasswordError('Todos los campos de clave son obligatorios.');
+    if (!user?.detalles?.identificacion) {
+      setPasswordError('Error de sesión: No se pudo identificar al socio.');
+      return;
+    }
+
+    if (!otp.trim() || !passwordNueva.trim() || !passwordConfirmar.trim()) {
+      setPasswordError('Todos los campos son obligatorios.');
+      return;
+    }
+
+    if (otp.trim().length !== 6) {
+      setPasswordError('El código OTP debe tener exactamente 6 dígitos.');
       return;
     }
 
@@ -282,20 +320,22 @@ export const Perfil: React.FC = () => {
     setPasswordLoading(true);
 
     try {
-      await api.post('/auth/socio/cambiar-clave', {
-        passwordActual,
-        passwordNueva
+      await api.post('/auth/recuperar/validar-cambiar', {
+        identificacion: user.detalles.identificacion,
+        token: otp.trim(),
+        passwordNueva: passwordNueva.trim()
       });
 
       // Limpiar campos
-      setPasswordActual('');
+      setOtp('');
       setPasswordNueva('');
       setPasswordConfirmar('');
       setIsPasswordFormOpen(false);
       showToast('Contraseña digital actualizada correctamente.', 'success');
     } catch (err: any) {
-      console.error('Error cambiando clave:', err);
-      setPasswordError(err.response?.data || 'No se pudo cambiar la clave. Verifica tu contraseña actual.');
+      console.error('Error al cambiar clave con OTP:', err);
+      const errMsg = err.response?.data || 'Código OTP incorrecto o expirado.';
+      setPasswordError(typeof errMsg === 'string' ? errMsg : (errMsg.message || 'Error al cambiar contraseña.'));
       showToast('Error al actualizar contraseña.', 'error');
     } finally {
       setPasswordLoading(false);
@@ -589,14 +629,26 @@ export const Perfil: React.FC = () => {
 
               <Button
                 onClick={() => {
-                  setIsPasswordFormOpen(!isPasswordFormOpen);
-                  setPasswordError(null);
+                  if (isPasswordFormOpen) {
+                    setIsPasswordFormOpen(false);
+                    setPasswordError(null);
+                  } else {
+                    handleSolicitarOtp();
+                  }
                 }}
+                disabled={passwordLoading}
                 variant="outline"
                 className="border border-slate-200 text-[#0054A6] hover:bg-slate-50 font-bold rounded-2xl h-10 px-4 transition-all cursor-pointer text-xs"
               >
-                {isPasswordFormOpen ? 'Cancelar' : 'Cambiar contraseña'}
+                {passwordLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-[#0054A6]" />
+                ) : isPasswordFormOpen ? (
+                  'Cancelar'
+                ) : (
+                  'Cambiar contraseña'
+                )}
               </Button>
+
             </div>
 
             {isPasswordFormOpen && (
@@ -609,17 +661,24 @@ export const Perfil: React.FC = () => {
                 )}
 
                 <form onSubmit={handlePasswordSubmit} className="space-y-5">
+                  {correoEnmascarado && (
+                    <p className="text-[11px] font-semibold text-slate-500 bg-slate-50/50 border border-slate-100 p-3 rounded-xl">
+                      Código de seguridad enviado al correo: <span className="text-[#0054A6] font-bold">{correoEnmascarado}</span>. Por favor ingrésalo a continuación.
+                    </p>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Clave Actual */}
+                    {/* Código OTP */}
                     <div className="space-y-1.5">
-                      <label className="block text-xs font-semibold text-slate-500">Contraseña Actual</label>
+                      <label className="block text-xs font-semibold text-slate-500">Código de Seguridad (OTP)</label>
                       <div className="relative">
                         <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <Input 
-                          type="password"
-                          value={passwordActual}
-                          onChange={(e) => setPasswordActual(e.target.value)}
-                          placeholder="••••••••"
+                          type="text"
+                          value={otp}
+                          maxLength={6}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                          placeholder="123456"
                           disabled={passwordLoading}
                           className="pl-10 font-mono text-base"
                         />
@@ -659,7 +718,7 @@ export const Perfil: React.FC = () => {
                     </div>
                   </div>
 
-                  {passwordActual.trim() && passwordNueva.trim() && passwordConfirmar.trim() && (
+                  {otp.trim() && passwordNueva.trim() && passwordConfirmar.trim() && (
                     <div className="pt-2 flex justify-end animate-fade-in">
                       <Button
                         type="submit"
