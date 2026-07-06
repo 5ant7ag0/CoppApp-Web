@@ -41,7 +41,7 @@ api.interceptors.response.use(
       
       const hasToken = !!localStorage.getItem('coop_token');
 
-      if ((status === 401 || status === 403) && !isAuthUrl && hasToken) {
+      if (status === 401 && !isAuthUrl && hasToken) {
         // Disparar evento personalizado para cerrar sesión en el AuthContext
         window.dispatchEvent(new CustomEvent('coop_session_expired', { detail: status }));
       }
