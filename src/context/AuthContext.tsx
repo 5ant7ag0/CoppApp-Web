@@ -72,8 +72,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith('coop_') && key !== 'coop_tenant_id') {
-        keysToRemove.push(key);
+      if (key && key.startsWith('coop_')) {
+        const isPersistent = key === 'coop_tenant_id' || 
+                             key.startsWith('coop_contacts_') || 
+                             key.includes('_credito_notas') || 
+                             key.includes('_pagares_firmados');
+        if (!isPersistent) {
+          keysToRemove.push(key);
+        }
       }
     }
     keysToRemove.forEach(key => localStorage.removeItem(key));
