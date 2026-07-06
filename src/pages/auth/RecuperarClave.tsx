@@ -29,6 +29,10 @@ export const RecuperarClave: React.FC = () => {
   useEffect(() => {
     const tokenFromUrl = searchParams.get('token');
     const idFromUrl = searchParams.get('identificacion') || searchParams.get('id');
+    const tenantIdFromUrl = searchParams.get('tenantId') || searchParams.get('empresaId');
+    if (tenantIdFromUrl) {
+      localStorage.setItem('coop_tenant_id', tenantIdFromUrl);
+    }
     if (tokenFromUrl && idFromUrl) {
       setToken(tokenFromUrl);
       setIdentificacion(idFromUrl);

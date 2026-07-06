@@ -27,6 +27,10 @@ export const RecuperarClaveSocio = () => {
   useEffect(() => {
     const tokenFromUrl = searchParams.get('token');
     const idFromUrl = searchParams.get('id') || searchParams.get('identificacion');
+    const tenantIdFromUrl = searchParams.get('tenantId') || searchParams.get('empresaId');
+    if (tenantIdFromUrl) {
+      localStorage.setItem('coop_tenant_id', tenantIdFromUrl);
+    }
     if (tokenFromUrl && idFromUrl) {
       setOtp(tokenFromUrl);
       setIdentificacion(idFromUrl);
