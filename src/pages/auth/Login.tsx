@@ -6,7 +6,8 @@ import { useTenant } from '../../context/TenantContext';
 import { Select } from '../../components/ui/select';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
-import { Lock, User, ShieldAlert, ArrowRight, Loader2, UserPlus, Shield } from 'lucide-react';
+import { Lock, User, ShieldAlert, ArrowRight, Loader2, UserPlus, Shield, Eye, EyeOff } from 'lucide-react';
+
 
 export const Login: React.FC = () => {
   const { login, error, isLoading, isBlocked, clearError } = useAuth();
@@ -16,6 +17,8 @@ export const Login: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('socio');
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+
   
   // Estados para errores de validación local
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -249,18 +252,31 @@ export const Login: React.FC = () => {
                     <Lock className="h-5 w-5" />
                   </span>
                   <Input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     required
                     placeholder="••••••••"
                     value={password}
                     onChange={handlePasswordChange}
                     disabled={isBlocked}
-                    className={`pl-10 h-12 bg-slate-50/50 border text-slate-800 focus:ring-1 rounded-xl transition-all duration-200 placeholder:text-slate-400/70 shadow-sm ${
+                    className={`pl-10 pr-10 h-12 bg-slate-50/50 border text-slate-800 focus:ring-1 rounded-xl transition-all duration-200 placeholder:text-slate-400/70 shadow-sm ${
                       passwordError 
                         ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50/30' 
                         : 'border-slate-200 focus:border-[#0054A6] focus:ring-[#0054A6] hover:bg-white'
                     }`}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer transition-colors p-1"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4.5 w-4.5" />
+                    ) : (
+                      <Eye className="h-4.5 w-4.5" />
+                    )}
+                  </button>
+
                 </div>
                 {passwordError && (
                   <p className="text-xs text-red-500 font-medium mt-1 pl-0 leading-none">{passwordError}</p>
