@@ -57,6 +57,7 @@ interface Credito {
   fechaDesembolso?: string;
   usuarioOficialId?: number;
   motivoRechazo?: string;
+  pagareUrl?: string;
 }
 
 export interface CuotaProyectada {
@@ -696,12 +697,25 @@ export const AprobacionCreditos: React.FC = () => {
       if (!cuentaAhorro) {
         throw new Error('EL_SOCIO_NO_POSEE_CUENTA_AHORRO_ACTIVA');
       }
+
+      // Subir el pagaré firmado a R2
+      let uploadedPagareUrl = '';
+      if (pagareFirmadoFile) {
+        const formData = new FormData();
+        formData.append('file', pagareFirmadoFile);
+        const uploadRes = await api.post(`/creditos/${targetCredito.id}/pagare`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        uploadedPagareUrl = uploadRes.data.pagareUrl;
+      }
       
       // Paso 2: Ejecutar el desembolso transaccional
       await api.post('/creditos/desembolsar', {
         creditoId: targetCredito.id,
         cuentaAhorrosId: cuentaAhorro.id,
-        referenciaDocumental: pagareFirmadoName || 'pagare_firmado.pdf'
+        referenciaDocumental: uploadedPagareUrl || pagareFirmadoName || 'pagare_firmado.pdf'
       });
       
       showToast('Crédito desembolsado con éxito.', 'success');
@@ -711,7 +725,7 @@ export const AprobacionCreditos: React.FC = () => {
         ...documentosFirmados,
         [targetCredito.id]: {
           name: pagareFirmadoName || `pagare_firmado_${targetCredito.numeroCredito}.pdf`,
-          dataUrl: pagareFirmadoDataUrl || ''
+          dataUrl: uploadedPagareUrl || pagareFirmadoDataUrl || ''
         }
       };
       setDocumentosFirmados(updatedDocs);
@@ -722,6 +736,7 @@ export const AprobacionCreditos: React.FC = () => {
       setPagareFirmadoFile(null);
       setPagareFirmadoName('');
       fetchSolicitudes();
+
       
     } catch (err: any) {
       console.error('Error crítico en desembolso:', err);
@@ -2372,10 +2387,13 @@ export const AprobacionCreditos: React.FC = () => {
                 <Button
                   onClick={() => {
                     const doc = documentosFirmados[verPagareCredito.id];
-                    if (doc && doc.dataUrl) {
+                    let docUrl = doc?.dataUrl || verPagareCredito.pagareUrl;
+                    let docName = doc?.name || `pagare_firmado_${verPagareCredito.numeroCredito}.pdf`;
+                    if (docUrl) {
                       const link = document.createElement('a');
-                      link.href = doc.dataUrl;
-                      link.download = doc.name || `pagare_firmado_${verPagareCredito.numeroCredito}.pdf`;
+                      link.href = docUrl;
+                      link.target = '_blank';
+                      link.download = docName;
                       document.body.appendChild(link);
                       link.click();
                       document.body.removeChild(link);
@@ -2399,8 +2417,14 @@ export const AprobacionCreditos: React.FC = () => {
 
             <div className="flex-1 w-full bg-slate-100/50 rounded-2xl overflow-hidden relative border border-slate-200/60">
               {(() => {
-                const doc = documentosFirmados[verPagareCredito.id];
-                if (!doc || !doc.dataUrl) {
+                let docUrl = documentosFirmados[verPagareCredito.id]?.dataUrl;
+                let docName = documentosFirmados[verPagareCredito.id]?.name || `pagare_firmado_${verPagareCredito.numeroCredito}.pdf`;
+                
+                if (!docUrl && verPagareCredito.pagareUrl) {
+                  docUrl = verPagareCredito.pagareUrl;
+                }
+
+                if (!docUrl) {
                   return (
                     <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3">
                       <AlertTriangle className="h-12 w-12 text-amber-400" />
@@ -2409,13 +2433,13 @@ export const AprobacionCreditos: React.FC = () => {
                   );
                 }
 
-                const isImage = doc.dataUrl.startsWith('data:image/');
-                const isPdf = doc.dataUrl.startsWith('data:application/pdf');
+                const isImage = docUrl.startsWith('data:image/') || docUrl.toLowerCase().match(/\.(jpg|jpeg|png|webp)/);
+                const isPdf = docUrl.startsWith('data:application/pdf') || docUrl.toLowerCase().endsWith('.pdf') || docUrl.toLowerCase().includes('.pdf');
 
                 if (isImage) {
                   return (
                     <div className="absolute inset-0 overflow-y-auto flex justify-center p-4 bg-slate-100/50">
-                      <img src={doc.dataUrl} alt={doc.name} className="max-w-full h-auto object-contain rounded-lg shadow-sm" />
+                      <img src={docUrl} alt={docName} className="max-w-full h-auto object-contain rounded-lg shadow-sm" />
                     </div>
                   );
                 }
@@ -2423,8 +2447,8 @@ export const AprobacionCreditos: React.FC = () => {
                 if (isPdf) {
                   return (
                     <iframe 
-                      src={doc.dataUrl} 
-                      title={doc.name}
+                      src={docUrl} 
+                      title={docName}
                       className="w-full h-full border-0"
                     />
                   );
@@ -2433,7 +2457,7 @@ export const AprobacionCreditos: React.FC = () => {
                 return (
                   <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3">
                     <FileText className="h-12 w-12 text-slate-400" />
-                    <p className="text-sm text-slate-500 font-bold">{doc.name}</p>
+                    <p className="text-sm text-slate-500 font-bold">{docName}</p>
                   </div>
                 );
               })()}
