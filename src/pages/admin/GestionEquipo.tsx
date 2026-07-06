@@ -127,7 +127,9 @@ export const GestionEquipo: React.FC = () => {
   const [telefono, setTelefono] = useState('');
   const [direccion, setDireccion] = useState('');
   const [fotoPerfilUrl, setFotoPerfilUrl] = useState('');
+  const [tempFile, setTempFile] = useState<File | null>(null);
   const [username, setUsername] = useState('');
+
   const [correo, setCorreo] = useState('');
   const [rol, setRol] = useState('CAJERO');
   const [estado, setEstado] = useState('ACTIVO');
@@ -299,7 +301,9 @@ export const GestionEquipo: React.FC = () => {
     setTelefono('');
     setDireccion('');
     setFotoPerfilUrl('');
+    setTempFile(null);
     setUsername('');
+
     setCorreo('');
     setRol('CAJERO');
     setEstado('ACTIVO');
@@ -392,28 +396,56 @@ export const GestionEquipo: React.FC = () => {
 
     if (!validateForm()) return;
 
-    const payload: Empleado = {
-      username: username.trim(),
-      nombresCompletos: nombresCompletos.trim(),
-      correo: correo.trim().toLowerCase(),
-      rol,
-      estado,
-      identificacion: identificacion.trim(),
-      fotoPerfilUrl,
-      telefono: telefono.trim() || undefined,
-      direccion: direccion.trim() || undefined,
-      cambiarPasswordProximoInicio,
-      cajaId: rol === 'CAJERO' && cajaId !== '' ? Number(cajaId) : undefined,
-      limiteTransaccionMax: rol === 'CAJERO' ? Number(limiteTransaccionMax) : 0,
-      passwordHash: tempPassword.trim() || undefined
-    };
+    let uploadedAvatarUrl = fotoPerfilUrl;
 
     try {
+      if (tempFile && isEditing && selectedEmpleado?.id) {
+        const formData = new FormData();
+        formData.append('file', tempFile);
+        const uploadRes = await api.post(`/usuarios/${selectedEmpleado.id}/avatar`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        uploadedAvatarUrl = uploadRes.data.avatarUrl;
+      }
+
+      const payload: Empleado = {
+        username: username.trim(),
+        nombresCompletos: nombresCompletos.trim(),
+        correo: correo.trim().toLowerCase(),
+        rol,
+        estado,
+        identificacion: identificacion.trim(),
+        fotoPerfilUrl: uploadedAvatarUrl,
+        telefono: telefono.trim() || undefined,
+        direccion: direccion.trim() || undefined,
+        cambiarPasswordProximoInicio,
+        cajaId: rol === 'CAJERO' && cajaId !== '' ? Number(cajaId) : undefined,
+        limiteTransaccionMax: rol === 'CAJERO' ? Number(limiteTransaccionMax) : 0,
+        passwordHash: tempPassword.trim() || undefined
+      };
+
       if (isEditing && selectedEmpleado?.id) {
         await api.put(`/usuarios/${selectedEmpleado.id}`, payload);
         setSubmitSuccess('¡Empleado actualizado con éxito!');
       } else {
-        await api.post('/usuarios', payload);
+        const createRes = await api.post('/usuarios', payload);
+        const newUser = createRes.data as Empleado;
+        if (tempFile && newUser && newUser.id) {
+          const formData = new FormData();
+          formData.append('file', tempFile);
+          const uploadRes = await api.post(`/usuarios/${newUser.id}/avatar`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+          const newAvatarUrl = uploadRes.data.avatarUrl;
+          await api.put(`/usuarios/${newUser.id}`, {
+            ...payload,
+            fotoPerfilUrl: newAvatarUrl
+          });
+        }
         setSubmitSuccess('¡Empleado creado con éxito!');
       }
       fetchInitialData();
@@ -422,6 +454,7 @@ export const GestionEquipo: React.FC = () => {
         setIsCreating(false);
         setSelectedEmpleado(null);
         setSubmitSuccess(null);
+        setTempFile(null);
       }, 1000);
     } catch (err: any) {
       console.error(err);
@@ -834,6 +867,11 @@ export const GestionEquipo: React.FC = () => {
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
+                                  if (file.size > 1024 * 1024) {
+                                    alert('La imagen es demasiado grande. Elige una de menos de 1 MB.');
+                                    return;
+                                  }
+                                  setTempFile(file);
                                   const reader = new FileReader();
                                   reader.onloadend = () => {
                                     setFotoPerfilUrl(reader.result as string);
