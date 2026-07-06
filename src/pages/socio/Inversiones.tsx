@@ -223,9 +223,6 @@ export const Inversiones: React.FC = () => {
 
         <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
           <div className="lg:col-span-8 space-y-4">
-            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-black uppercase tracking-wider rounded-full inline-block">
-              Finanzas Inteligentes
-            </span>
             <h2 className="text-xl md:text-3xl font-extrabold tracking-tight leading-tight text-slate-800">
               Haz que tu dinero trabaje para ti
             </h2>
