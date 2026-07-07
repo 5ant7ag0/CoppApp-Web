@@ -1373,7 +1373,7 @@ export const Parametrizacion: React.FC = () => {
               <div className="border-b border-slate-100 pb-3 flex items-center justify-between gap-4">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-[#0054A6]" />
-                  Datos Legales y de Identificación (SRI / SEPS)
+                  Datos Legales y de Identificación
                 </h2>
                 {renderActionButtons()}
               </div>
