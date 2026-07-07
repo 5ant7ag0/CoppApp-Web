@@ -552,9 +552,6 @@ export const GestionEquipo: React.FC = () => {
             <Users className="h-6 w-6 text-[#0054A6]" />
             <span>Gestión de Equipo</span>
           </h1>
-          <p className="text-slate-400 text-xs mt-1">
-            Administración del personal, asignación de roles (RBAC), control de ventanillas y límites operativos.
-          </p>
         </div>
 
         {!isEditing && !isCreating && (

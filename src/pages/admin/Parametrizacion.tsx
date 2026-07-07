@@ -2067,16 +2067,12 @@ export const Parametrizacion: React.FC = () => {
               <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-3 gap-4">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-amber-500" />
-                  Historial de Cambios en Configuración (Audit Trail SEPS)
+                  Historial de Cambios en Configuración
                 </h2>
                 <div className="px-3 py-1 bg-amber-50 rounded-full border border-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-wider shadow-sm select-none">
                   Registro Inmutable
                 </div>
               </div>
-
-              <p className="text-xs text-slate-400 font-semibold leading-relaxed">
-                Esta bitácora almacena en formato inmutable cada mutación de parámetros realizada por la gerencia. Exigido de acuerdo a las circulares de control interno de la SEPS.
-              </p>
 
               <div className="overflow-x-auto border border-slate-100 rounded-3xl shadow-sm">
                 <table className="w-full text-left border-collapse">
@@ -2476,9 +2472,6 @@ export const Parametrizacion: React.FC = () => {
                   <span className="h-2 w-2 rounded-full bg-[#0054A6]" />
                   Catálogo de Productos de Crédito
                 </h2>
-                <p className="text-xs text-slate-500">
-                  Defina los tipos de crédito, tasas, plazos y su parametrización contable.
-                </p>
               </div>
               <button
                 onClick={handleOpenNewProductCredito}
@@ -2828,11 +2821,8 @@ export const Parametrizacion: React.FC = () => {
               <div className="space-y-1">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-[#0054A6]" />
-                  Gestión de Cajas Financieras
+                  Gestión de Cajas/Ventanillas Financieras
                 </h2>
-                <p className="text-xs text-slate-400 font-semibold leading-relaxed max-w-3xl">
-                  Configure las ventanillas físicas (cajas) de la cooperativa. Esto habilita el origen de la infraestructura para operaciones en efectivo, estableciendo límites operativos y saldos de bóveda de manera contable estricta.
-                </p>
               </div>
               <div className="flex items-center gap-3">
                 <button

@@ -1043,11 +1043,8 @@ export const AprobacionCreditos: React.FC = () => {
         <div>
           <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
             <Layers className="h-5.5 w-5.5 text-[#0054A6]" />
-            Mesa de Aprobación de Créditos
+            Aprobación de Créditos
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Evalúa el flujo neto del socio, simula la tabla de amortización y desembolsa de forma segura.
-          </p>
         </div>
         <Button
           onClick={() => {
