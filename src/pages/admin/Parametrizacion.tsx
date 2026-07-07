@@ -1301,7 +1301,7 @@ export const Parametrizacion: React.FC = () => {
             activeTab === 'auditoria' ? 'text-white' : 'text-slate-500'
           }`}>
             <History className="h-4 w-4" />
-            <span>Pista de Auditoría (SEPS)</span>
+            <span>Auditoría</span>
           </span>
         </button>
 
@@ -1358,7 +1358,7 @@ export const Parametrizacion: React.FC = () => {
             activeTab === 'cajas_financieras' ? 'text-white' : 'text-slate-500'
           }`}>
             <Coins className="h-4 w-4" />
-            <span>Cajas Financieras</span>
+            <span>Cajas</span>
           </span>
         </button>
       </div>
