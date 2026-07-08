@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
-import { KeyRound, ShieldAlert, ArrowRight, Loader2, CheckCircle2, User } from 'lucide-react';
+import { KeyRound, ShieldAlert, ArrowRight, Loader2, CheckCircle2, User, Eye, EyeOff } from 'lucide-react';
 
 export const EstablecerPassword: React.FC = () => {
   const navigate = useNavigate();
@@ -16,6 +16,8 @@ export const EstablecerPassword: React.FC = () => {
   const [token, setToken] = useState<string>(tokenParam);
   const [passwordNueva, setPasswordNueva] = useState<string>('');
   const [confirmarPassword, setConfirmarPassword] = useState<string>('');
+  const [showNewPassword, setShowNewPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,14 +109,28 @@ export const EstablecerPassword: React.FC = () => {
                 <label className="block text-[11px] font-bold text-slate-500/70 tracking-wider uppercase pl-1">
                   Nueva Contraseña Digital
                 </label>
-                <Input
-                  type="password"
-                  required
-                  placeholder="Mínimo 6 caracteres"
-                  value={passwordNueva}
-                  onChange={(e) => setPasswordNueva(e.target.value)}
-                  className="h-11 bg-slate-50/40 border border-slate-200/60 text-slate-800 rounded-xl focus:border-[#0054A6] focus:bg-white focus:ring-4 focus:ring-[#0054A6]/10 transition-all placeholder:text-slate-400/80"
-                />
+                <div className="relative">
+                  <Input
+                    type={showNewPassword ? "text" : "password"}
+                    required
+                    placeholder="Mínimo 6 caracteres"
+                    value={passwordNueva}
+                    onChange={(e) => setPasswordNueva(e.target.value)}
+                    className="h-11 pr-10 bg-slate-50/40 border border-slate-200/60 text-slate-800 rounded-xl focus:border-[#0054A6] focus:bg-white focus:ring-4 focus:ring-[#0054A6]/10 transition-all placeholder:text-slate-400/80"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer transition-colors p-1"
+                  >
+                    {showNewPassword ? (
+                      <EyeOff className="h-4.5 w-4.5" />
+                    ) : (
+                      <Eye className="h-4.5 w-4.5" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Confirmar Contraseña */}
@@ -122,14 +138,28 @@ export const EstablecerPassword: React.FC = () => {
                 <label className="block text-[11px] font-bold text-slate-500/70 tracking-wider uppercase pl-1">
                   Confirmar Contraseña
                 </label>
-                <Input
-                  type="password"
-                  required
-                  placeholder="Repita la nueva contraseña"
-                  value={confirmarPassword}
-                  onChange={(e) => setConfirmarPassword(e.target.value)}
-                  className="h-11 bg-slate-50/40 border border-slate-200/60 text-slate-800 rounded-xl focus:border-[#0054A6] focus:bg-white focus:ring-4 focus:ring-[#0054A6]/10 transition-all placeholder:text-slate-400/80"
-                />
+                <div className="relative">
+                  <Input
+                    type={showConfirmPassword ? "text" : "password"}
+                    required
+                    placeholder="Repita la nueva contraseña"
+                    value={confirmarPassword}
+                    onChange={(e) => setConfirmarPassword(e.target.value)}
+                    className="h-11 pr-10 bg-slate-50/40 border border-slate-200/60 text-slate-800 rounded-xl focus:border-[#0054A6] focus:bg-white focus:ring-4 focus:ring-[#0054A6]/10 transition-all placeholder:text-slate-400/80"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer transition-colors p-1"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4.5 w-4.5" />
+                    ) : (
+                      <Eye className="h-4.5 w-4.5" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               {error && (

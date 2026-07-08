@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
-import { KeyRound, ShieldAlert, ArrowRight, Loader2, Mail, CheckCircle2, ArrowLeft, X } from 'lucide-react';
+import { KeyRound, ShieldAlert, ArrowRight, Loader2, Mail, CheckCircle2, ArrowLeft, X, Eye, EyeOff } from 'lucide-react';
 
 export const RecuperarClave: React.FC = () => {
   const navigate = useNavigate();
@@ -19,6 +19,8 @@ export const RecuperarClave: React.FC = () => {
   const [token, setToken] = useState<string>('');
   const [passwordNueva, setPasswordNueva] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [showNewPassword, setShowNewPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isOtpLoading, setIsOtpLoading] = useState<boolean>(false);
@@ -199,28 +201,56 @@ export const RecuperarClave: React.FC = () => {
               <label className="block text-[11px] font-bold text-slate-500/70 tracking-wider uppercase pl-1">
                 Nueva Contraseña Digital
               </label>
-              <Input
-                type="password"
-                required
-                placeholder="••••••••"
-                value={passwordNueva}
-                onChange={(e) => setPasswordNueva(e.target.value)}
-                className="h-11 bg-slate-50/40 border border-slate-200/60 text-slate-800 rounded-xl focus:border-[#0054A6] focus:bg-white focus:ring-4 focus:ring-[#0054A6]/10 transition-all placeholder:text-slate-400/80 font-mono"
-              />
+              <div className="relative">
+                <Input
+                  type={showNewPassword ? "text" : "password"}
+                  required
+                  placeholder="••••••••"
+                  value={passwordNueva}
+                  onChange={(e) => setPasswordNueva(e.target.value)}
+                  className="h-11 pr-10 bg-slate-50/40 border border-slate-200/60 text-slate-800 rounded-xl focus:border-[#0054A6] focus:bg-white focus:ring-4 focus:ring-[#0054A6]/10 transition-all placeholder:text-slate-400/80 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  tabIndex={-1}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer transition-colors p-1"
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="h-4.5 w-4.5" />
+                  ) : (
+                    <Eye className="h-4.5 w-4.5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1.5">
               <label className="block text-[11px] font-bold text-slate-500/70 tracking-wider uppercase pl-1">
                 Confirmar Contraseña
               </label>
-              <Input
-                type="password"
-                required
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="h-11 bg-slate-50/40 border border-slate-200/60 text-slate-800 rounded-xl focus:border-[#0054A6] focus:bg-white focus:ring-4 focus:ring-[#0054A6]/10 transition-all placeholder:text-slate-400/80 font-mono"
-              />
+              <div className="relative">
+                <Input
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="h-11 pr-10 bg-slate-50/40 border border-slate-200/60 text-slate-800 rounded-xl focus:border-[#0054A6] focus:bg-white focus:ring-4 focus:ring-[#0054A6]/10 transition-all placeholder:text-slate-400/80 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  tabIndex={-1}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer transition-colors p-1"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4.5 w-4.5" />
+                  ) : (
+                    <Eye className="h-4.5 w-4.5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             {error && (

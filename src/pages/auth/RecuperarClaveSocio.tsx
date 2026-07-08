@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, Mail, Lock, KeyRound, ArrowRight, Loader2, CheckCircle2, X } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, KeyRound, ArrowRight, Loader2, CheckCircle2, X, Eye, EyeOff } from 'lucide-react';
 import api from '../../services/api';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
@@ -23,6 +23,8 @@ export const RecuperarClaveSocio = () => {
   const [otp, setOtp] = useState('');
   const [passwordNueva, setPasswordNueva] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     const tokenFromUrl = searchParams.get('token');
@@ -188,28 +190,56 @@ export const RecuperarClaveSocio = () => {
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                   Nueva Contraseña
                 </label>
-                <Input
-                  type="password"
-                  required
-                  value={passwordNueva}
-                  onChange={(e) => setPasswordNueva(e.target.value)}
-                  placeholder="••••••••"
-                  className="h-12 bg-slate-50 border-slate-200 focus:bg-white rounded-xl font-mono text-lg"
-                />
+                <div className="relative">
+                  <Input
+                    type={showNewPassword ? "text" : "password"}
+                    required
+                    value={passwordNueva}
+                    onChange={(e) => setPasswordNueva(e.target.value)}
+                    placeholder="••••••••"
+                    className="h-12 pr-10 bg-slate-50 border-slate-200 focus:bg-white rounded-xl font-mono text-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer transition-colors p-1"
+                  >
+                    {showNewPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                   Confirmar Contraseña
                 </label>
-                <Input
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="h-12 bg-slate-50 border-slate-200 focus:bg-white rounded-xl font-mono text-lg"
-                />
+                <div className="relative">
+                  <Input
+                    type={showConfirmPassword ? "text" : "password"}
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="h-12 pr-10 bg-slate-50 border-slate-200 focus:bg-white rounded-xl font-mono text-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer transition-colors p-1"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <Button

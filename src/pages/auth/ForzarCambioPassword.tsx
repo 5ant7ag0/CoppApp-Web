@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
-import { Lock, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, ShieldCheck, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 import api from '../../services/api';
 
 export const ForzarCambioPassword: React.FC = () => {
@@ -16,6 +16,8 @@ export const ForzarCambioPassword: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,14 +103,26 @@ export const ForzarCambioPassword: React.FC = () => {
                   <Lock className="h-4 w-4" />
                 </span>
                 <Input
-                  type="password"
+                  type={showNewPassword ? "text" : "password"}
                   required
                   disabled={loading || success}
                   placeholder="Mínimo 6 caracteres"
                   value={passwordNueva}
                   onChange={(e) => setPasswordNueva(e.target.value)}
-                  className="pl-7 h-10 bg-transparent border-t-0 border-x-0 border-b border-slate-200 focus:border-b-2 focus:border-[#0054A6] text-slate-800 focus:ring-0 rounded-none text-xs placeholder:text-slate-400/70"
+                  className="pl-7 pr-7 h-10 bg-transparent border-t-0 border-x-0 border-b border-slate-200 focus:border-b-2 focus:border-[#0054A6] text-slate-800 focus:ring-0 rounded-none text-xs placeholder:text-slate-400/70"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  tabIndex={-1}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer transition-colors p-1"
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -121,14 +135,26 @@ export const ForzarCambioPassword: React.FC = () => {
                   <Lock className="h-4 w-4" />
                 </span>
                 <Input
-                  type="password"
+                  type={showConfirmPassword ? "text" : "password"}
                   required
                   disabled={loading || success}
                   placeholder="Repite tu contraseña"
                   value={confirmarPassword}
                   onChange={(e) => setConfirmarPassword(e.target.value)}
-                  className="pl-7 h-10 bg-transparent border-t-0 border-x-0 border-b border-slate-200 focus:border-b-2 focus:border-[#0054A6] text-slate-800 focus:ring-0 rounded-none text-xs placeholder:text-slate-400/70"
+                  className="pl-7 pr-7 h-10 bg-transparent border-t-0 border-x-0 border-b border-slate-200 focus:border-b-2 focus:border-[#0054A6] text-slate-800 focus:ring-0 rounded-none text-xs placeholder:text-slate-400/70"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  tabIndex={-1}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer transition-colors p-1"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
             </div>
 
