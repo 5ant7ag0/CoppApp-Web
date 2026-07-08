@@ -1243,6 +1243,7 @@ export const CreacionSocios: React.FC = () => {
         deudasActuales: deudasVal,
         fotoCedulaFrontalUrl: docCedulaFrontal ? `/uploads/kyc/${identificacion}_frontal_${docCedulaFrontal.name}` : null,
         fotoCedulaPosteriorUrl: docCedulaPosterior ? `/uploads/kyc/${identificacion}_posterior_${docCedulaPosterior.name}` : null,
+        firmaUrl: docFirmaDigital ? `/uploads/kyc/${identificacion}_firma_${docFirmaDigital.name}` : null,
         esPep,
         estado: 'PENDIENTE_APROBACION'
       };
@@ -1264,6 +1265,15 @@ export const CreacionSocios: React.FC = () => {
         const formDataBack = new FormData();
         formDataBack.append('file', docCedulaPosterior);
         await api.post(`/socios/${socioCreado.id}/cedula-posterior`, formDataBack, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      }
+
+      // 1.3 Subir Firma Manuscrita si existe
+      if (docFirmaDigital) {
+        const formDataFirma = new FormData();
+        formDataFirma.append('file', docFirmaDigital);
+        await api.post(`/socios/${socioCreado.id}/firma`, formDataFirma, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
       }
