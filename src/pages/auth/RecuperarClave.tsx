@@ -21,6 +21,8 @@ export const RecuperarClave: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [showNewPassword, setShowNewPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
+  const [isActivar, setIsActivar] = useState<boolean>(false);
+  const [coopName, setCoopName] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isOtpLoading, setIsOtpLoading] = useState<boolean>(false);
@@ -32,9 +34,29 @@ export const RecuperarClave: React.FC = () => {
     const tokenFromUrl = searchParams.get('token');
     const idFromUrl = searchParams.get('identificacion') || searchParams.get('id');
     const tenantIdFromUrl = searchParams.get('tenantId') || searchParams.get('empresaId');
+    const activarFromUrl = searchParams.get('activar') === 'true';
+
     if (tenantIdFromUrl) {
       localStorage.setItem('coop_tenant_id', tenantIdFromUrl);
+      api.get('/auth/tenants')
+        .then(res => {
+          const list = res.data;
+          if (Array.isArray(list)) {
+            const matched = list.find((item: any) => String(item.id) === String(tenantIdFromUrl));
+            if (matched && matched.name) {
+              setCoopName(matched.name);
+            }
+          }
+        })
+        .catch(err => {
+          console.error("Error al cargar cooperativas públicas:", err);
+        });
     }
+
+    if (activarFromUrl) {
+      setIsActivar(true);
+    }
+
     if (tokenFromUrl && idFromUrl) {
       setToken(tokenFromUrl);
       setIdentificacion(idFromUrl);
@@ -107,7 +129,9 @@ export const RecuperarClave: React.FC = () => {
         token,
         passwordNueva
       });
-      setSuccessMsg('Contraseña restablecida con éxito. Ya puede iniciar sesión.');
+      setSuccessMsg(isActivar 
+        ? 'Cuenta activada con éxito. Su usuario administrativo ya está listo para operar.' 
+        : 'Contraseña restablecida con éxito. Ya puede iniciar sesión.');
       setStep(3);
     } catch (err: any) {
       let msg = 'Error al restablecer la contraseña.';
@@ -130,10 +154,16 @@ export const RecuperarClave: React.FC = () => {
           <div className="h-12 w-12 rounded-2xl bg-[#0054A6] flex items-center justify-center font-bold text-white shadow-md shadow-[#0054A6]/25 mb-3 transition-transform duration-300 hover:scale-105">
             <KeyRound className="h-6 w-6" />
           </div>
-          <h1 className="text-xl font-bold text-slate-800 tracking-tight">
-            Recuperar Contraseña
+          <h1 className="text-xl font-bold text-slate-800 tracking-tight text-center px-4">
+            {isActivar 
+              ? `Activar ${coopName || 'Banca Digital'}` 
+              : 'Recuperar Contraseña'}
           </h1>
-          <p className="text-xs text-slate-500 mt-1">Desbloqueo autónomo de cuenta digital</p>
+          <p className="text-xs text-slate-500 mt-1 text-center">
+            {isActivar 
+              ? 'Establezca su contraseña para enrolarse digitalmente' 
+              : 'Desbloqueo autónomo de cuenta digital'}
+          </p>
         </div>
 
         {/* Step 1: Request Recovery */}
@@ -270,7 +300,7 @@ export const RecuperarClave: React.FC = () => {
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
-                    <span>Restablecer Contraseña</span>
+                    <span>{isActivar ? 'Activar Cuenta' : 'Restablecer Contraseña'}</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
@@ -287,7 +317,9 @@ export const RecuperarClave: React.FC = () => {
             </div>
             
             <div className="space-y-2">
-              <h3 className="text-lg font-bold text-slate-800">¡Operación Completada!</h3>
+              <h3 className="text-lg font-bold text-slate-800">
+                {isActivar ? '¡Cuenta Activada!' : '¡Operación Completada!'}
+              </h3>
               <p className="text-sm text-slate-500 leading-relaxed">{successMsg}</p>
             </div>
 
