@@ -48,8 +48,8 @@ export const Login: React.FC = () => {
     clearError();
     let val = e.target.value;
     if (activeTab === 'socio') {
-      // Filtrar en tiempo real: sólo números y máximo 10 caracteres
-      val = val.replace(/\D/g, '').slice(0, 10);
+      // Filtrar en tiempo real: alfanumérico (letras y números) y máximo 15 caracteres
+      val = val.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 15);
     }
     setUsername(val);
   };
@@ -102,10 +102,18 @@ export const Login: React.FC = () => {
       setUsernameError(activeTab === 'socio' ? 'La identificación es requerida' : 'El usuario es requerido');
       hasValidationError = true;
     } else if (activeTab === 'socio') {
-      const cleanCedula = username.replace(/\D/g, '');
-      if (cleanCedula.length !== 10) {
-        setUsernameError('La cédula debe tener 10 dígitos numéricos');
-        hasValidationError = true;
+      const cleanVal = username.trim();
+      const isAllDigits = /^\d+$/.test(cleanVal);
+      if (isAllDigits) {
+        if (cleanVal.length !== 10 && cleanVal.length !== 13) {
+          setUsernameError('La identificación (Cédula o RUC) debe tener 10 o 13 dígitos');
+          hasValidationError = true;
+        }
+      } else {
+        if (cleanVal.length < 5 || cleanVal.length > 15) {
+          setUsernameError('El pasaporte debe tener entre 5 y 15 caracteres');
+          hasValidationError = true;
+        }
       }
     }
 
@@ -226,11 +234,11 @@ export const Login: React.FC = () => {
                   <Input
                     type="text"
                     required
-                    placeholder={activeTab === 'socio' ? 'Ej: 1712345678' : 'Ej: cajero_test'}
+                    placeholder={activeTab === 'socio' ? 'Cédula, RUC o Pasaporte' : 'Ej: cajero_test'}
                     value={username}
                     onChange={handleUsernameChange}
                     disabled={isBlocked}
-                    maxLength={activeTab === 'socio' ? 10 : undefined}
+                    maxLength={activeTab === 'socio' ? 15 : undefined}
                     className={`pl-10 h-12 bg-slate-50/50 border text-slate-800 focus:ring-1 rounded-xl transition-all duration-200 placeholder:text-slate-400/70 shadow-sm ${
                       usernameError 
                         ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50/30' 
