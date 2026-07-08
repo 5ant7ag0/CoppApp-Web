@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Building2, UserCircle, Settings2, Loader2, CheckCircle2, AlertCircle, ChevronDown, Lock, Sliders } from 'lucide-react';
+import { X, Building2, UserCircle, Settings2, Loader2, CheckCircle2, AlertCircle, ChevronDown, Lock, Sliders, Phone, Smartphone } from 'lucide-react';
 import api from '../../services/api';
 import { validarCedulaEcuatoriana } from '../../utils/validators';
 
@@ -31,6 +31,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onClose }) => 
     limiteUsuariosAdmin: '5',
     limiteSocios: '500'
   });
+
+  const [phoneType, setPhoneType] = useState<'movil' | 'fijo'>('movil');
 
   // Real-time Validation States - Step 1
   const [isRucChecking, setIsRucChecking] = useState(false);
@@ -147,7 +149,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onClose }) => 
 
   const isInstitucionalEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.correoInstitucional);
   const isGerenteEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.correoGerente);
-  const isPhoneValid = /^(09[0-9]{8}|0[2-7][0-9]{7})$/.test(formData.telefono);
+  const isPhoneValid = phoneType === 'movil' 
+    ? /^09[0-9]{8}$/.test(formData.telefono)
+    : /^0[2-7][0-9]{7}$/.test(formData.telefono);
   const isCedulaValid = validarCedulaEcuatoriana(formData.cedulaRepresentante);
 
   const isStep2Valid = () => {
@@ -398,21 +402,54 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onClose }) => 
                         <input type="text" name="direccion" value={formData.direccion} onChange={handleChange} className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-bold focus:border-[#0054A6] outline-none" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Teléfono Institucional</label>
-                        <input 
-                          type="text" 
-                          name="telefono" 
-                          value={formData.telefono} 
-                          onChange={(e) => {
-                            const val = e.target.value.replace(/[^0-9]/g, '');
-                            setFormData(prev => ({ ...prev, telefono: val }));
-                          }} 
-                          className={`w-full border rounded-xl px-3.5 py-2 text-sm font-bold outline-none transition-all duration-200 ${
-                            formData.telefono.length === 0 ? 'border-slate-200 focus:border-[#0054A6]' :
-                            isPhoneValid ? 'border-emerald-400 text-emerald-700 bg-emerald-50/5' :
-                            'border-rose-300 text-rose-700 bg-rose-50/5'
-                          }`}
-                        />
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                          Teléfono Institucional
+                        </label>
+                        <div className="flex gap-2 items-center">
+                          {/* Selector Tipo Botón Premium */}
+                          <div className="relative shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPhoneType(prev => prev === 'movil' ? 'fijo' : 'movil');
+                                setFormData(prev => ({ ...prev, telefono: '' }));
+                              }}
+                              className="h-11 px-3 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-1.5 hover:bg-slate-100/70 hover:border-slate-350 transition-all active:scale-95 cursor-pointer shadow-sm min-w-[85px] justify-center"
+                            >
+                              {phoneType === 'movil' ? (
+                                <>
+                                  <Smartphone className="w-3.5 h-3.5 text-[#0054A6]" />
+                                  <span>Móvil</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Phone className="w-3.5 h-3.5 text-[#0054A6]" />
+                                  <span>Fijo</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          {/* Campo para ingresar los dígitos */}
+                          <div className="relative flex-1">
+                            <input 
+                              type="text" 
+                              name="telefono" 
+                              placeholder={phoneType === 'movil' ? "Ej: 0998887777" : "Ej: 022345678"}
+                              maxLength={phoneType === 'movil' ? 10 : 9}
+                              value={formData.telefono} 
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9]/g, '');
+                                setFormData(prev => ({ ...prev, telefono: val }));
+                              }} 
+                              className={`w-full border rounded-xl px-3.5 py-2 h-11 text-sm font-bold outline-none transition-all duration-200 ${
+                                formData.telefono.length === 0 ? 'border-slate-200 focus:border-[#0054A6]' :
+                                isPhoneValid ? 'border-emerald-400 text-emerald-700 bg-emerald-50/5' :
+                                'border-rose-300 text-rose-700 bg-rose-50/5'
+                              }`}
+                            />
+                          </div>
+                        </div>
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Correo Electrónico Institucional</label>
