@@ -1950,7 +1950,7 @@ export const CajaVentanilla: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-50 font-medium text-slate-700">
               {movimientosFiltrados.length > 0 ? (
-                [...movimientosFiltrados].reverse().map((mov) => {
+                [...movimientosFiltrados].sort((a, b) => b.id - a.id).map((mov) => {
                   const esIngreso = esIngresoEfectivo(mov);
                   const esAnulada = mov.descripcion.startsWith('[ANULADA]');
                   return (
