@@ -3953,6 +3953,9 @@ export const CreacionSocios: React.FC = () => {
                       return false;
                     }
                     return true;
+                  }).sort((a, b) => {
+                    if (a.id && b.id) return b.id - a.id;
+                    return new Date(b.fechaContable || 0).getTime() - new Date(a.fechaContable || 0).getTime();
                   });
 
                   return (

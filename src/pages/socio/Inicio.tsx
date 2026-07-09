@@ -139,7 +139,11 @@ export const Inicio: React.FC = () => {
       if (mainAccount) {
         const txsRes = await api.get(`/cuentas/${mainAccount.id}/transacciones`);
         const txsList = txsRes.data as Transaction[];
-        setTransactions(txsList.slice(0, 5));
+        const sortedList = [...txsList].sort((a, b) => {
+          if (a.id && b.id) return b.id - a.id;
+          return new Date(b.fechaContable).getTime() - new Date(a.fechaContable).getTime();
+        });
+        setTransactions(sortedList.slice(0, 5));
       }
 
       // 4. Si hay un crédito desembolsado, cargar su tabla de amortización para buscar la siguiente cuota pendiente

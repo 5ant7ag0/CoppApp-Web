@@ -452,6 +452,9 @@ export const Movimientos: React.FC = () => {
     }
 
     return true;
+  }).sort((a, b) => {
+    if (a.id && b.id) return b.id - a.id;
+    return new Date(b.fechaContable).getTime() - new Date(a.fechaContable).getTime();
   });
 
   // Cálculos estadísticos sobre movimientos filtrados
