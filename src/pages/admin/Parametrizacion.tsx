@@ -286,6 +286,43 @@ export const Parametrizacion: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  
+  // Estados para Modal de Confirmación y Errores de Producto
+  const [productoModalError, setProductoModalError] = useState<string | null>(null);
+  const [productoCreditoModalError, setProductoCreditoModalError] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    cancelText?: string;
+    isDestructive?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+  });
+
+  const showConfirm = (
+    title: string,
+    description: string,
+    onConfirm: () => void,
+    isDestructive = false,
+    confirmText = 'Confirmar',
+    cancelText = 'Cancelar'
+  ) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      description,
+      onConfirm,
+      confirmText,
+      cancelText,
+      isDestructive
+    });
+  };
 
   // Estados de Carga de Logo
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -517,6 +554,7 @@ export const Parametrizacion: React.FC = () => {
       cuentaContableGastoId: '',
       estado: 'ACTIVO'
     });
+    setProductoModalError(null);
     setIsProductModalOpen(true);
   };
 
@@ -534,6 +572,7 @@ export const Parametrizacion: React.FC = () => {
       cuentaContableGastoId: prod.cuentaContableGasto ? `${prod.cuentaContableGasto.codigoContable} - ${prod.cuentaContableGasto.nombreCuenta}` : '',
       estado: prod.estado
     });
+    setProductoModalError(null);
     setIsProductModalOpen(true);
   };
 
@@ -541,22 +580,23 @@ export const Parametrizacion: React.FC = () => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
+    setProductoModalError(null);
 
     if (!productForm.nombre.trim()) {
-      alert('El nombre del producto es requerido.');
+      setProductoModalError('El nombre del producto es requerido.');
       return;
     }
     const pasivoCode = productForm.cuentaContablePasivoId.split(' - ')[0];
     const pasivoAcc = accounts.find(a => a.codigoContable === pasivoCode);
     if (!pasivoAcc) {
-      alert('Debe seleccionar una cuenta contable de pasivo válida.');
+      setProductoModalError('Debe seleccionar una cuenta contable de pasivo válida.');
       return;
     }
 
     const gastoCode = productForm.cuentaContableGastoId.split(' - ')[0];
     const gastoAcc = accounts.find(a => a.codigoContable === gastoCode);
     if (!gastoAcc) {
-      alert('Debe seleccionar una cuenta contable de gasto válida.');
+      setProductoModalError('Debe seleccionar una cuenta contable de gasto válida.');
       return;
     }
 
@@ -585,22 +625,28 @@ export const Parametrizacion: React.FC = () => {
       fetchProductos();
     } catch (err: any) {
       console.error(err);
-      alert('Error al guardar producto: ' + getErrorMessage(err));
+      setProductoModalError('Error al guardar producto: ' + getErrorMessage(err));
     }
   };
 
-  const handleDeleteProduct = async (id: number) => {
-    if (!window.confirm('¿Está seguro de que desea inactivar este producto de ahorro?')) {
-      return;
-    }
-    try {
-      await api.delete(`/productos-ahorro/${id}`);
-      setSuccessMsg('¡Producto de ahorro inactivado con éxito!');
-      fetchProductos();
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg('Error al inactivar producto: ' + getErrorMessage(err));
-    }
+  const handleDeleteProduct = (prod: ProductoAhorro) => {
+    showConfirm(
+      '¿Inactivar Producto de Ahorro?',
+      `¿Está seguro de que desea inactivar el producto "${prod.nombre}"? No se podrán abrir nuevas cuentas utilizando este producto.`,
+      async () => {
+        try {
+          await api.delete(`/productos-ahorro/${prod.id}`);
+          setSuccessMsg('¡Producto de ahorro inactivado con éxito!');
+          fetchProductos();
+        } catch (err: any) {
+          console.error(err);
+          setErrorMsg('Error al inactivar producto: ' + getErrorMessage(err));
+        }
+      },
+      true,
+      'Inactivar',
+      'Cancelar'
+    );
   };
   const fetchProductosCredito = async () => {
     setLoadingProductosCredito(true);
@@ -638,6 +684,7 @@ export const Parametrizacion: React.FC = () => {
       cuentaContableSeguroId: '',
       estado: 'ACTIVO'
     });
+    setProductoCreditoModalError(null);
     setIsProductCreditoModalOpen(true);
   };
 
@@ -658,6 +705,7 @@ export const Parametrizacion: React.FC = () => {
       cuentaContableSeguroId: prod.cuentaContableSeguro ? `${prod.cuentaContableSeguro.codigoContable} - ${prod.cuentaContableSeguro.nombreCuenta}` : '',
       estado: prod.estado
     });
+    setProductoCreditoModalError(null);
     setIsProductCreditoModalOpen(true);
   };
 
@@ -665,9 +713,10 @@ export const Parametrizacion: React.FC = () => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
+    setProductoCreditoModalError(null);
 
     if (!productCreditoForm.nombre.trim()) {
-      alert('El nombre del producto es requerido.');
+      setProductoCreditoModalError('El nombre del producto es requerido.');
       return;
     }
     
@@ -683,7 +732,7 @@ export const Parametrizacion: React.FC = () => {
     const seguroId = extractId(productCreditoForm.cuentaContableSeguroId);
 
     if (!carteraId || !ingresosId || !moraId) {
-      alert('Debe seleccionar cuentas contables válidas para Cartera, Ingresos por Intereses y Mora.');
+      setProductoCreditoModalError('Debe seleccionar cuentas contables válidas para Cartera, Ingresos por Intereses y Mora.');
       return;
     }
 
@@ -715,9 +764,45 @@ export const Parametrizacion: React.FC = () => {
       fetchProductosCredito();
     } catch (err: any) {
       console.error(err);
-      alert('Error al guardar producto de crédito: ' + getErrorMessage(err));
+      setProductoCreditoModalError('Error al guardar producto de crédito: ' + getErrorMessage(err));
     }
   };
+
+  const handleInactivateProductoCredito = (prod: ProductoCredito) => {
+    showConfirm(
+      '¿Inactivar Producto de Crédito?',
+      `¿Está seguro de que desea inactivar el producto "${prod.nombre}"? No se podrán registrar nuevas solicitudes de crédito bajo este producto.`,
+      async () => {
+        try {
+          const payload = {
+            nombre: prod.nombre,
+            montoMinimo: prod.montoMinimo,
+            montoMaximo: prod.montoMaximo,
+            plazoMinimoMeses: prod.plazoMinimoMeses,
+            plazoMaximoMeses: prod.plazoMaximoMeses,
+            tasaInteresAnual: prod.tasaInteresAnual,
+            tasaMoraAnual: prod.tasaMoraAnual,
+            porcentajeSeguroDesgravamen: prod.porcentajeSeguroDesgravamen,
+            cuentaContableCarteraId: prod.cuentaContableCartera?.id,
+            cuentaContableIngresosInteresesId: prod.cuentaContableIngresosIntereses?.id,
+            cuentaContableMoraId: prod.cuentaContableMora?.id,
+            cuentaContableSeguroId: prod.cuentaContableSeguro?.id || null,
+            estado: 'INACTIVO'
+          };
+          await api.put(`/productos-credito/${prod.id}`, payload);
+          setSuccessMsg(`¡Producto de crédito "${prod.nombre}" inactivado con éxito!`);
+          fetchProductosCredito();
+        } catch (err: any) {
+          console.error(err);
+          setErrorMsg('Error al inactivar el producto de crédito: ' + getErrorMessage(err));
+        }
+      },
+      true,
+      'Inactivar',
+      'Cancelar'
+    );
+  };
+
   // Validaciones en tiempo real
   const validateField = (field: string, value: string, currentSettings?: CompanySettings) => {
     const errors = { ...validationErrors };
@@ -2262,7 +2347,7 @@ export const Parametrizacion: React.FC = () => {
                         {prod.estado === 'ACTIVO' && (
                           <button
                             type="button"
-                            onClick={() => handleDeleteProduct(prod.id!)}
+                            onClick={() => handleDeleteProduct(prod)}
                             className="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-xs font-bold text-rose-600 transition-all cursor-pointer"
                           >
                             Inactivar
@@ -2294,6 +2379,12 @@ export const Parametrizacion: React.FC = () => {
                   </div>
 
                   <div className="mt-6">
+                    {productoModalError && (
+                      <div className="mb-4 bg-rose-50 border border-rose-100 rounded-2xl p-4 text-rose-700 flex items-center gap-3 animate-fade-in shadow-sm">
+                        <AlertCircle className="h-5 w-5 shrink-0" />
+                        <span className="text-xs font-semibold">{productoModalError}</span>
+                      </div>
+                    )}
                     <form id="product-form" onSubmit={handleSaveProduct} className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       
@@ -2565,7 +2656,7 @@ export const Parametrizacion: React.FC = () => {
                         Editar
                       </button>
                       <button
-                        onClick={() => alert('Para inactivar, edite el producto.')}
+                        onClick={() => handleInactivateProductoCredito(prod)}
                         className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-bold transition-colors cursor-pointer"
                       >
                         Desactivar
@@ -2608,6 +2699,12 @@ export const Parametrizacion: React.FC = () => {
                 </div>
 
                 <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
+                  {productoCreditoModalError && (
+                    <div className="mb-6 bg-rose-50 border border-rose-100 rounded-2xl p-4 text-rose-700 flex items-center gap-3 animate-fade-in shadow-sm">
+                      <AlertCircle className="h-5 w-5 shrink-0" />
+                      <span className="text-xs font-semibold">{productoCreditoModalError}</span>
+                    </div>
+                  )}
                   <form id="product-credito-form" onSubmit={handleSaveProductCredito} className="space-y-8">
                     
                     {/* Sección 1: Datos Generales */}
@@ -3154,6 +3251,47 @@ export const Parametrizacion: React.FC = () => {
           </div>
         </div>
       )}
+
+     {confirmModal.isOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md">
+                <div className="bg-white rounded-[2rem] border border-slate-100 p-8 shadow-2xl max-w-sm w-full relative animate-scale-in text-center">
+                  <div className={`mx-auto w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${
+                    confirmModal.isDestructive ? 'bg-rose-50 text-rose-500' : 'bg-blue-50 text-[#0054A6]'
+                  }`}>
+                    <AlertCircle className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-800 mb-2">
+                    {confirmModal.title}
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+                    {confirmModal.description}
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+                      className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                    >
+                      {confirmModal.cancelText || 'Cancelar'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmModal({ ...confirmModal, isOpen: false });
+                        confirmModal.onConfirm();
+                      }}
+                      className={`flex-1 py-2.5 text-white rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        confirmModal.isDestructive 
+                          ? 'bg-rose-600 hover:bg-rose-700 shadow-md shadow-rose-200' 
+                          : 'bg-[#0054A6] hover:bg-blue-700 shadow-md shadow-blue-200'
+                      }`}
+                    >
+                      {confirmModal.confirmText || 'Confirmar'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
     </div>
   );
