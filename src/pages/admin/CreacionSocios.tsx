@@ -4086,8 +4086,14 @@ export const CreacionSocios: React.FC = () => {
                             <tbody className="divide-y divide-slate-100">
                               {filtradas.map((tx) => {
                                 const esCredito = tx.tipoTransaccion === 'CREDITO';
+                                const esAnulada = tx.descripcion && tx.descripcion.startsWith('[ANULADA]');
                                 return (
-                                  <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors">
+                                  <tr 
+                                    key={tx.id} 
+                                    className={`hover:bg-slate-50/50 transition-colors ${
+                                      esAnulada ? 'opacity-60 bg-slate-50/30' : ''
+                                    }`}
+                                  >
                                     <td className="px-4 py-3 text-xs font-semibold text-slate-500 font-mono">
                                       {tx.fechaContable ? new Date(tx.fechaContable).toLocaleString('es-EC') : 'N/A'}
                                     </td>
@@ -4099,15 +4105,19 @@ export const CreacionSocios: React.FC = () => {
                                     </td>
                                     <td className="px-4 py-3 text-xs">
                                       <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-black rounded ${
-                                        esCredito 
-                                          ? 'text-emerald-700 bg-emerald-50 border border-emerald-100'
-                                          : 'text-rose-700 bg-rose-50 border border-rose-100'
+                                        esAnulada
+                                          ? 'text-slate-500 bg-slate-100 border border-slate-200'
+                                          : esCredito 
+                                            ? 'text-emerald-700 bg-emerald-50 border border-emerald-100'
+                                            : 'text-rose-700 bg-rose-50 border border-rose-100'
                                       }`}>
-                                        {esCredito ? 'DEPÓSITO' : 'RETIRO'}
+                                        {esAnulada ? 'ANULADO' : esCredito ? 'DEPÓSITO' : 'RETIRO'}
                                       </span>
                                     </td>
                                     <td className={`px-4 py-3 text-xs font-black font-mono ${
-                                      esCredito ? 'text-emerald-600' : 'text-rose-600'
+                                      esAnulada 
+                                        ? 'text-slate-400 line-through' 
+                                        : esCredito ? 'text-emerald-600' : 'text-rose-600'
                                     }`}>
                                       {esCredito ? '+' : '-'}${parseFloat(tx.monto).toFixed(2)}
                                     </td>

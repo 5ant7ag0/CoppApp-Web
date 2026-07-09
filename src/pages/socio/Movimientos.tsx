@@ -673,26 +673,29 @@ export const Movimientos: React.FC = () => {
                 <tbody>
                   {filteredTransactions.map((tx) => {
                     const isIngreso = tx.tipoTransaccion === 'CREDITO';
+                    const esAnulada = tx.descripcion && tx.descripcion.startsWith('[ANULADA]');
                     const parsed = parseDescription(tx.descripcion);
                     return (
                       <tr 
                         key={tx.id}
                         onClick={() => {
-                          if (parsed.isTransfer) {
+                          if (parsed.isTransfer && !esAnulada) {
                             setSelectedTxForReceipt(tx);
                           }
                         }}
                         className={`border-b border-slate-50 transition-all duration-150 ${
-                          parsed.isTransfer 
-                            ? 'cursor-pointer hover:bg-slate-50 active:bg-slate-100' 
-                            : 'hover:bg-slate-50/30'
+                          esAnulada 
+                            ? 'opacity-60 bg-slate-50/30'
+                            : parsed.isTransfer 
+                              ? 'cursor-pointer hover:bg-slate-50 active:bg-slate-100' 
+                              : 'hover:bg-slate-50/30'
                         }`}
                       >
                         <td className="py-3.5 px-4 text-xs font-semibold text-slate-400 whitespace-nowrap">
                           {formatTxDate(tx.fechaContable)}
                         </td>
                         <td className="py-3.5 px-4 text-xs font-semibold text-slate-500">
-                          {isIngreso ? 'Ingreso' : 'Egreso'}
+                          {esAnulada ? 'Anulado' : isIngreso ? 'Ingreso' : 'Egreso'}
                         </td>
                         <td className="py-3.5 px-4 text-xs font-bold text-slate-700">
                           {parsed.descripcionDisplay}
@@ -701,7 +704,9 @@ export const Movimientos: React.FC = () => {
                           {parsed.nombres}
                         </td>
                         <td className={`py-3.5 px-4 text-sm text-right font-extrabold ${
-                          isIngreso ? 'text-emerald-600' : 'text-slate-800'
+                          esAnulada 
+                            ? 'text-slate-400 line-through'
+                            : isIngreso ? 'text-emerald-600' : 'text-slate-800'
                         }`}>
                           {isIngreso ? '+' : '-'}{formatCurrency(tx.monto)}
                         </td>
